@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+:root {
+  /* Novax Surgical Tokens */
+  --bg-void: rgb(8, 8, 15);
+  --bg-glass-core: rgb(21, 21, 30);
+  --accent-blue: rgb(0, 118, 255);
+  --accent-yellow: #f5f02c;
+  --text-primary: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --spotlight-glow: rgba(0, 118, 255, 0.4);
+}
+
+@theme inline {
+  --color-background: var(--bg-void);
+  --color-foreground: var(--text-primary);
+  --color-glass-surface: var(--bg-glass-core);
+  --color-accent-blue: var(--accent-blue);
+  
+  --font-display: "Poppins", sans-serif;
+  --font-sans: "DM Sans", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  --animate-float: float 6s ease-in-out infinite;
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+}
+
+body {
+  background-color: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Surgical Glass Portal System */
+.surgical-glass {
+  background: var(--bg-glass-core);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  overflow: hidden;
+  position: relative;
+  transition: border-color 0.3s ease;
+}
+
+/* Spotlight Engine: Mouse-Responsive Glow */
+.spotlight {
+  position: relative;
+}
+
+.spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    600px circle at var(--mouse-x) var(--mouse-y),
+    rgba(255, 255, 255, 0.06),
+    transparent 40%
+  );
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.spotlight:hover::before {
+  opacity: 1;
+}
+
+/* High-End Headline */
+.surgical-headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+  color: #FFFFFF;
+}
+
+/* Novax Shimmer Button */
+.btn-novax {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  padding: 12px 28px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.btn-novax:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.btn-novax::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.btn-novax:hover::after {
+  transform: translateX(100%);
+}
