@@ -1,0 +1,29 @@
+{
+	"invite": "Invite",
+	"support": "Support Server",
+	"previous": "Previous",
+	"resume": "Resume",
+	"pause": "Pause",
+	"stop": "Stop",
+	"skip": "Skip",
+	"loop": "Loop",
+	"next": "Next",
+	"rewind": "Rewind",
+	"forward": "Forward",
+	"shuffle": "Shuffle",
+	"volume_up": "Volume Up",
+	"volume_down": "Volume Down",
+	"errors": {
+		"not_author": "You can't use this button."
+	},
+    "rewind_by": "Rewound by {user}",
+    "shuffled_by": "Shuffled by {user}",
+    "volume_up_by": "Volume increased by {user}",
+    "volume_down_by": "Volume decreased by {user}",
+    "forward_by": "Forwarded by {user}",
+    "looped_by": "Looping mode changed by {user}",
+    "skipped_by": "Skipped by {user}",
+    "resumed_by": "Resumed by {user}",
+    "paused_by": "Paused by {user}",
+    "stopped_by": "Stopped by {user}"
+}

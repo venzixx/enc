@@ -1,0 +1,329 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Guild {
+  id                    String   @id
+  confessionChannel     String?
+  countingChannel       String?
+  countingCurrent       Int      @default(0)
+  countingLastUser      String?
+  countingHighScore     Int      @default(0)
+  
+  // Phase 2 New Fields
+  logChannelId          String?
+  autoroleId            String?
+  welcomeChannelId      String?
+  joinDmMessage         String?
+  verificationChannelId String?
+  verificationRoleId    String?
+  verificationType      String   @default("BUTTON") // BUTTON or CAPTCHA
+  vanityString          String?
+  vanityRoleId          String?
+  birthdayChannelId     String?
+  birthdayPingRoleId    String?
+  levelChannelId        String?
+  prefix                String   @default("e!")
+  suggestionChannelId   String?  // NEW: Suggestion Channel
+
+  // Anti-Nuke Settings
+  antiNukeEnabled       Boolean  @default(false)
+  antiNukeBan           Boolean  @default(false)
+  antiNukeKick          Boolean  @default(false)
+  antiNukeChannel       Boolean  @default(false)
+  antiNukeRole          Boolean  @default(false)
+  antiNukeBot           Boolean  @default(false)
+  antiNukeWebhook       Boolean  @default(false)
+
+  // Music Settings
+  music_language        String?  @default("en-US")
+  defaultVolume         Int?     @default(100)
+  djMode                Boolean? @default(false)
+  setupChannel          String?
+  setupMessage          String?
+  stay247               Boolean? @default(false)
+  stay247TextChannel    String?
+  stay247VoiceChannel   String?
+
+  djRoles               DjRole[]
+  playlists             Playlist[]
+  stickyMessages        StickyMessage[]
+  ignoredChannels       IgnoredChannel[]
+  autoResponses         AutoResponse[]
+  reactionRoles         ReactionRole[]
+  giveaways             Giveaway[]
+  suggestions           Suggestion[]
+  
+  // Anti-Nuke Hierarchy
+  extraOwners           ExtraOwner[]
+  whitelistedUsers      WhitelistedUser[]
+  whitelistedRoles      WhitelistedRole[]
+
+  // AI Settings
+  aiPersonality         String?  @default("CASUAL")
+  aiCustomPrompt        String?
+  aiSearchEnabled       Boolean  @default(true)
+}
+
+model ExtraOwner {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  userId  String
+  guild   Guild  @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, userId])
+}
+
+model WhitelistedUser {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  userId  String
+  guild   Guild  @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, userId])
+}
+
+model WhitelistedRole {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  roleId  String
+  guild   Guild  @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, roleId])
+}
+
+model StickyMessage {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  channelId String
+  content   String
+  lastMsgId String?
+  guild     Guild    @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, channelId])
+}
+
+model Story {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  channelId String
+  content   String   @default("")
+  isActive  Boolean  @default(true)
+  lastUser  String?
+
+  @@unique([guildId, channelId])
+}
+
+model Member {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  userId    String
+  xp        Int      @default(0)
+  level     Int      @default(0)
+  messages  Int      @default(0) // Message Tracker
+  invites   Int      @default(0) // Invite Tracker
+
+  @@unique([guildId, userId])
+}
+
+model IgnoredChannel {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  channelId String
+  guild     Guild    @relation(fields: [guildId], references: [id])
+}
+
+model AutoResponse {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  trigger   String
+  response  String
+  guild     Guild    @relation(fields: [guildId], references: [id])
+}
+
+model ReactionRole {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  messageId String
+  emoji     String
+  roleId    String
+  guild     Guild    @relation(fields: [guildId], references: [id])
+}
+
+model Giveaway {
+  id              Int      @id @default(autoincrement())
+  guildId         String
+  channelId       String
+  messageId       String   @unique
+  prize           String
+  winnersCount    Int
+  endTime         DateTime
+  reqMessageCount Int      @default(0)
+  reqLevel        Int      @default(0)
+  isActive        Boolean  @default(true)
+  hostId          String
+  guild           Guild    @relation(fields: [guildId], references: [id])
+  entries         GiveawayEntry[]
+}
+
+model GiveawayEntry {
+  id              Int      @id @default(autoincrement())
+  giveawayId      Int
+  userId          String
+  giveaway        Giveaway @relation(fields: [giveawayId], references: [id])
+
+  @@unique([giveawayId, userId])
+}
+
+model Birthday {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  userId    String
+  day       Int
+  month     Int
+  year      Int?      // Optional if they don't want to show age
+
+  @@unique([guildId, userId])
+}
+
+model CustomRole {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  userId    String
+  roleId    String
+
+  @@unique([guildId, userId])
+}
+
+model DjRole {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  roleId  String
+  guild   Guild  @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, roleId])
+}
+
+model Playlist {
+  id      Int     @id @default(autoincrement())
+  userId  String
+  name    String
+  guildId String?
+  guild   Guild?  @relation(fields: [guildId], references: [id])
+  tracks  Track[]
+
+  @@unique([userId, name])
+}
+
+model Track {
+  id         Int      @id @default(autoincrement())
+  playlistId Int
+  encoded    String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+}
+
+model Confession {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  number    Int      // Per-guild confession number (#1, #2, etc.)
+  userId    String   // Author (hidden, only revealed via /whoconfessed)
+  userTag   String   // Author tag for display
+  content   String
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, number])
+}
+
+model Afk {
+  id        Int          @id @default(autoincrement())
+  userId    String       @unique // Global — works across all guilds
+  reason    String       @default("AFK")
+  timestamp DateTime     @default(now())
+  mentions  AfkMention[]
+}
+
+model AfkMention {
+  id        Int      @id @default(autoincrement())
+  afkId     Int
+  userId    String   // Who mentioned the AFK user
+  userTag   String
+  guildId   String
+  channelId String
+  messageId String   // For message link
+  createdAt DateTime @default(now())
+  afk       Afk      @relation(fields: [afkId], references: [id], onDelete: Cascade)
+}
+
+model TicketConfig {
+  id              Int      @id @default(autoincrement())
+  guildId         String
+  panelId         String   // Unique identifier for the panel (e.g. "support", "billing")
+  name            String   // Panel display name
+  description     String   @default("Click the button below to open a ticket.")
+  categoryId      String   // Where tickets are created
+  supportRoleId   String   // Role that can manage tickets
+  channelId       String?  // Where the panel is sent
+  messageId       String?  // The panel message ID
+  welcomeMessage  String?  @default("Hello {user}, welcome to your support ticket. Our staff will be with you shortly.")
+  
+  @@unique([guildId, panelId])
+}
+
+model Ticket {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  channelId  String   @unique
+  userId     String   // Creator
+  claimantId String?  // Staff who claimed it
+  status     String   @default("OPEN") // OPEN, CLOSED
+  openedAt   DateTime @default(now())
+}
+
+model VoiceConfig {
+  id              Int      @id @default(autoincrement())
+  guildId         String   @unique
+  createChannelId String   // "Join to Create" channel
+  categoryId      String   // Where temp VCs go
+  panelChannelId  String?  // Control panel location
+  panelMessageId  String?  // Control panel message ID
+}
+
+model TempVoice {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  channelId  String   @unique
+  ownerId    String
+  isLocked   Boolean  @default(false)
+  isHidden   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Suggestion {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  messageId   String   @unique
+  authorId    String
+  content     String
+  isAnonymous Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  guild       Guild    @relation(fields: [guildId], references: [id])
+  votes       SuggestionVote[]
+}
+
+model SuggestionVote {
+  id           Int        @id @default(autoincrement())
+  suggestionId Int
+  userId       String
+  type         String     // UP or DOWN
+  suggestion   Suggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+
+  @@unique([suggestionId, userId])
+}
