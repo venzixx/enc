@@ -1,4 +1,4 @@
-﻿import { EmbedBuilder, PermissionFlagsBits, parseEmoji } from 'discord.js';
+import { EmbedBuilder, PermissionFlagsBits, parseEmoji } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -30,6 +30,7 @@ export default class EmojiDelete extends Command {
 	}
 
 	public async run(_client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+		await ctx.deferReply();
 		const emojiStr = ctx.options.getString('emoji');
 		const parsed = parseEmoji(emojiStr);
 

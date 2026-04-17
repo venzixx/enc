@@ -85,6 +85,7 @@ export default class AICommand extends Command {
 			}
 
 			// Save Preset to Database
+			await ctx.deferReply();
 			await client.prisma.guild.update({
 				where: { id: ctx.guild.id },
 				data: { aiPersonality: preset }
@@ -101,6 +102,7 @@ export default class AICommand extends Command {
 		if (sub === 'search') {
 			const enabled = ctx.options.getBoolean('enabled');
 
+			await ctx.deferReply();
 			await client.prisma.guild.update({
 				where: { id: ctx.guild.id },
 				data: { aiSearchEnabled: enabled }

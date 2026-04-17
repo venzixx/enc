@@ -1,4 +1,4 @@
-﻿import { 
+import { 
     PermissionFlagsBits, 
     EmbedBuilder, 
     ApplicationCommandOptionType 
@@ -6,6 +6,7 @@
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { logModerationAction } from '../../utils/Logger';
+import { Resolver } from '../../utils/Resolver';
 
 export default class Unban extends Command {
 	constructor(client: ExtendedClient) {
@@ -41,33 +42,35 @@ export default class Unban extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-		const userId = ctx.options.getString('id') || args[0];
+        await ctx.deferReply();
+        
+        const user = await Resolver.resolveUser(ctx, ctx.options.getString('id') || args[0]);
 		const reason = ctx.options.getString('reason') || args.slice(1).join(' ') || 'No reason provided';
 
-		if (!userId) {
-			return await ctx.reply({ content: 'âŒ Please provide a user ID.', flags: [64] });
+		if (!user) {
+			return await ctx.reply({ content: '❌ Please provide a valid user ID or mention.', flags: [64] });
 		}
 
 		try {
-			const ban = await ctx.guild.bans.fetch(userId).catch(() => null);
+			const ban = await ctx.guild.bans.fetch(user.id).catch(() => null);
 			if (!ban) {
-				return await ctx.reply({ content: 'âŒ This user is not banned from this server.', flags: [64] });
+				return await ctx.reply({ content: '❌ This user is not banned from this server.', flags: [64] });
 			}
 
-			await ctx.guild.bans.remove(userId, `Unbanned by ${ctx.author.tag}: ${reason}`);
+			await ctx.guild.bans.remove(user.id, `Unbanned by ${ctx.author.tag}: ${reason}`);
 			
 			const embed = new EmbedBuilder()
-				.setTitle('ðŸ”“ Member Unbanned')
-				.setDescription(`**${ban.user.tag}** (\`${userId}\`) has been unbanned.`)
-				.addFields({ name: 'ðŸ’¬ Reason', value: reason })
+				.setTitle('🔊 Member Unbanned')
+				.setDescription(`**${user.tag}** (\`${user.id}\`) has been unbanned.`)
+				.addFields({ name: '💬 Reason', value: reason })
 				.setColor(client.color.main)
 				.setTimestamp();
 
 			await ctx.reply({ embeds: [embed] });
 
-            await logModerationAction(client, ctx.guild, 'UNBAN', ctx.author, ban.user, reason);
+            await logModerationAction(client, ctx.guild, 'UNBAN', ctx.author, user, reason);
 		} catch (error: any) {
-			await ctx.reply({ content: `âŒ Failed to unban: ${error.message}`, flags: [64] });
+			await ctx.reply({ content: `❌ Failed to unban: ${error.message}`, flags: [64] });
 		}
 	}
 }

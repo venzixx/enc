@@ -1,83 +1,104 @@
-﻿import { EmbedBuilder } from 'discord.js';
+import { 
+    EmbedBuilder, 
+    ApplicationCommandOptionType 
+} from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
+import { Resolver } from '../../utils/Resolver';
 
 export default class Messages extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'messages',
 			description: {
-				content: 'View your total message count or the server leaderboard.',
+				content: 'Check message statistics or leaderboard.',
 				usage: 'messages [leaderboard/user]',
-				examples: ['messages', 'messages leaderboard']
+				examples: ['messages', 'messages leaderboard', 'messages @User']
 			},
-			category: 'general',
-			cooldown: 3,
+			category: 'tools',
+			cooldown: 5,
 			slashCommand: true,
 			options: [
 				{
-					name: 'user',
-					description: 'The user to view message count for',
-					type: 6, // USER
-					required: false
+					name: 'leaderboard',
+					description: 'Show the message leaderboard',
+					type: ApplicationCommandOptionType.Subcommand
 				},
 				{
-					name: 'leaderboard',
-					description: 'Show top 10 message senders',
-					type: 5, // BOOLEAN
-					required: false
+					name: 'user',
+					description: 'Check message count for a specific user',
+					type: ApplicationCommandOptionType.Subcommand,
+					options: [
+						{
+							name: 'target',
+							description: 'The user to check',
+							type: ApplicationCommandOptionType.User,
+							required: false
+						}
+					]
 				}
 			]
 		});
 	}
 
-	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
-		const showLb = ctx.options.getBoolean('leaderboard');
-		
-		if (showLb) {
-			const top = await client.prisma.member.findMany({
+	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+        await ctx.deferReply();
+		const sub = ctx.options.getSubcommand() || args[0];
+
+		if (sub === 'leaderboard') {
+			const topMembers = await client.prisma.member.findMany({
 				where: { guildId: ctx.guild.id },
 				orderBy: { messages: 'desc' },
 				take: 10
 			});
 
-			if (top.length === 0) {
-                const errorEmbed = new EmbedBuilder()
-                    .setTitle('âŒ No Data')
-                    .setDescription('No message data found for this server yet.')
-                    .setColor(client.color.red);
-                return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
-            }
+			if (topMembers.length === 0) {
+				const embed = new EmbedBuilder()
+                    .setTitle('❌ No Data')
+					.setDescription('No message data found for this server.')
+					.setColor(client.color.main);
+				return await ctx.reply({ embeds: [embed] });
+			}
 
-			const lb = top.map((m, i) => `**#${i + 1}** <@${m.userId}> - \`${m.messages}\` messages`).join('\n');
+			const leaderboard = await Promise.all(topMembers.map(async (m, i) => {
+				const user = await client.users.fetch(m.userId).catch(() => null);
+				return `**${i + 1}.** ${user ? user.tag : 'Unknown'} — \`${m.messages}\` messages`;
+			}));
+
 			const embed = new EmbedBuilder()
-				.setTitle(`ðŸ† Message Leaderboard: ${ctx.guild.name}`)
-				.setDescription(lb)
+				.setTitle(`🏆 Message Leaderboard: ${ctx.guild.name}`)
+				.setDescription(leaderboard.join('\n'))
 				.setColor(client.color.main)
-                .setTimestamp();
+				.setTimestamp();
+
+			return await ctx.reply({ embeds: [embed] });
+
+		} else {
+            const member = await Resolver.resolveMember(ctx, ctx.options.getMember('target') || args[1]);
+            const target = member?.user || ctx.author;
+
+			const data = await client.prisma.member.findUnique({
+				where: { guildId_userId: { guildId: ctx.guild.id, userId: target.id } }
+			});
+
+			if (!data) {
+				const embed = new EmbedBuilder()
+                    .setTitle('❌ No History')
+					.setDescription(`**${target.tag}** has no message history in this server.`)
+					.setColor(client.color.main);
+				return await ctx.reply({ embeds: [embed] });
+			}
+
+			const embed = new EmbedBuilder()
+                .setTitle('💬 Message Statistics')
+				.setAuthor({ name: target.tag, iconURL: target.displayAvatarURL() })
+				.addFields(
+					{ name: 'Total Messages', value: `\`${data.messages}\``, inline: true }
+				)
+				.setColor(client.color.main)
+				.setTimestamp();
+
 			return await ctx.reply({ embeds: [embed] });
 		}
-
-		const user = ctx.options.getUser('user') || ctx.author;
-		const data = await client.prisma.member.findUnique({
-			where: { guildId_userId: { guildId: ctx.guild.id, userId: user.id } }
-		});
-
-		if (!data) {
-            const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ No History')
-                .setDescription(`**${user.tag}** has no recorded messages in this server yet.`)
-                .setColor(client.color.red);
-			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
-		}
-
-        const successEmbed = new EmbedBuilder()
-            .setTitle('ðŸ’¬ Message Statistics')
-            .setDescription(`**${user.tag}** has sent \`${data.messages}\` messages in this server.`)
-            .setColor(client.color.main)
-            .setTimestamp();
-
-		await ctx.reply({ embeds: [successEmbed], flags: [64] });
 	}
 }
-

@@ -1,6 +1,7 @@
 import { Events, Message, EmbedBuilder } from 'discord.js';
 import { Event } from '../structures';
 import { LavamusicEventType } from '../types/events';
+import { AuditLogger, AuditLogType, AuditLogStatus } from '../utils/AuditLogger';
 import type { ExtendedClient } from '../client';
 
 export default class MessageDelete extends Event {
@@ -13,6 +14,19 @@ export default class MessageDelete extends Event {
 
     public async run(message: Message): Promise<void> {
         if (!message.guild || message.author?.bot) return;
+
+        // Log to Data Core Manifest
+        await AuditLogger.log(this.client, message.guild, {
+            type: AuditLogType.MODERATION,
+            event: 'Message Deleted',
+            status: AuditLogStatus.INFO,
+            executorId: message.author?.id,
+            executorTag: message.author?.tag,
+            targetId: message.channelId,
+            targetName: (message.channel as any).name || 'Unknown Channel',
+            details: `Content: ${message.content || '[No Text/Embed Only]'}\nAuthor: ${message.author?.tag} (${message.author?.id})`,
+            color: this.client.color.red
+        });
 
         const guildData = await this.client.prisma.guild.findUnique({
             where: { id: message.guildId! }

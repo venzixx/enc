@@ -1,4 +1,4 @@
-﻿import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -30,6 +30,7 @@ export default class JoindmSetup extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+		await ctx.deferReply();
 		const message = ctx.options.getString('message');
 
 		await client.prisma.guild.upsert({
@@ -38,9 +39,11 @@ export default class JoindmSetup extends Command {
 			create: { id: ctx.guild.id, joinDmMessage: message }
 		});
 
+        const preview = message?.replace(/{user}/g, ctx.author.toString()).replace(/{server}/g, ctx.guild.name) || 'No message provided';
+
         const successEmbed = new EmbedBuilder()
             .setTitle('âœ… Setup Complete')
-            .setDescription(`Join DM message has been successfully configured!\n\n**Preview:**\n${message.replace(/{user}/g, ctx.author.toString()).replace(/{server}/g, ctx.guild.name)}`)
+            .setDescription(`Join DM message has been successfully configured!\n\n**Preview:**\n${preview}`)
             .setColor(client.color.main)
             .setTimestamp();
 

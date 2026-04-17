@@ -1,4 +1,9 @@
-﻿import { PermissionFlagsBits, parseEmoji, EmbedBuilder } from 'discord.js';
+import { 
+    EmbedBuilder, 
+    PermissionFlagsBits, 
+    ApplicationCommandOptionType,
+    parseEmoji 
+} from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -7,12 +12,12 @@ export default class Steal extends Command {
 		super(client, {
 			name: 'steal',
 			description: {
-				content: 'Steal an emoji or sticker from another server.',
-				usage: 'steal <emoji> <name> OR reply with "steal <name>"',
-				examples: ['steal :kekw: kekw', 'steal kekw (as reply)']
+				content: 'Add an emoji or sticker from another server.',
+				usage: 'steal <emoji/sticker_url> <name>',
+				examples: ['steal :emoji: cool_emoji', 'steal https://image.url/sticker.png sticker_name']
 			},
 			category: 'tools',
-			cooldown: 3,
+			cooldown: 5,
 			slashCommand: true,
 			permissions: {
 				user: [PermissionFlagsBits.ManageEmojisAndStickers],
@@ -20,99 +25,74 @@ export default class Steal extends Command {
 			},
 			options: [
 				{
-					name: 'name',
-					description: 'Name for the new emoji/sticker',
-					type: 3, // STRING
+					name: 'emoji',
+					description: 'The emoji to steal (or sticker URL)',
+					type: ApplicationCommandOptionType.String,
 					required: true
 				},
 				{
-					name: 'emoji',
-					description: 'The emoji to steal (direct input)',
-					type: 3, // STRING
-					required: false
+					name: 'name',
+					description: 'The name for the new emoji/sticker',
+					type: ApplicationCommandOptionType.String,
+					required: true
 				}
 			]
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-		let emojiUrl: string | null = null;
-		let isSticker = false;
-		let name = ctx.options.getString('name', 0) || args[0]; // Name is now 0th option/arg
+	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+		await ctx.deferReply();
+		
+		const input = ctx.options.getString('emoji') || args[0];
+		const name = ctx.options.getString('name') || args[1];
 
-		// Check for Reply logic
-		if (!ctx.interaction && ctx.message?.reference?.messageId) {
-			const refMessage = await ctx.channel.messages.fetch(ctx.message.reference.messageId);
-			
-			// Try Sticker first
-			if (refMessage.stickers.size > 0) {
-				const sticker = refMessage.stickers.first()!;
-				emojiUrl = sticker.url;
-				isSticker = true;
-				if (!name) name = sticker.name;
-			} 
-			// Try Emoji in content
-			else {
-				const emojiRegex = /<a?:(\w{2,32}):(\d{17,20})>/;
-				const match = refMessage.content.match(emojiRegex);
-				if (match) {
-					emojiUrl = `https://cdn.discordapp.com/emojis/${match[2]}.${refMessage.content.includes('<a:') ? 'gif' : 'png'}`;
-					if (!name) name = match[1];
-				}
-			}
+		if (!input || !name) {
+			return await ctx.reply({ content: '❌ Please provide an emoji/url and a name.', flags: [64] });
 		}
-
-		// Fallback to Slash/Direct args if no reply or reply had nothing
-		if (!emojiUrl) {
-			const emojiStr = ctx.options.getString('emoji', 1) || args[1]; // Emoji is now 1st option/arg
-			if (emojiStr) {
-				const parsed = parseEmoji(emojiStr);
-				if (parsed?.id) {
-					emojiUrl = `https://cdn.discordapp.com/emojis/${parsed.id}.${parsed.animated ? 'gif' : 'png'}`;
-					if (!name) name = parsed.name;
-				}
-			}
-		}
-
-		if (!emojiUrl) {
-			const errorEmbed = new EmbedBuilder()
-				.setTitle('âŒ Steal Error')
-				.setDescription('Could not find an emoji or sticker to steal. Please provide a valid emoji or reply to a message containing one.')
-				.setColor(_client.color.red);
-			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
-		}
-
-		if (!name) {
-            const errorEmbed = new EmbedBuilder()
-				.setTitle('âŒ Steal Error')
-				.setDescription('Please provide a name for the stolen emoji/sticker.')
-				.setColor(_client.color.red);
-			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
-        }
 
 		try {
-			const resEmbed = new EmbedBuilder().setColor(_client.color.main);
-			
-			if (isSticker) {
-				const sticker = await ctx.guild.stickers.create({ file: emojiUrl, name, tags: name });
-				resEmbed.setTitle('âœ… Sticker Stolen')
-					.setDescription(`Successfully stolen the sticker: **${sticker.name}**`)
-					.setImage(emojiUrl);
-			} else {
-				const emoji = await ctx.guild.emojis.create({ attachment: emojiUrl, name });
-				resEmbed.setTitle('âœ… Emoji Stolen')
-					.setDescription(`Successfully stolen the emoji: ${emoji} (**${name}**)`)
-					.setThumbnail(emojiUrl);
+			if (input.startsWith('https://')) {
+				// Handle sticker or image URL
+				if (input.includes('/stickers/')) {
+					await ctx.guild.stickers.create({ file: input, name });
+					const embed = new EmbedBuilder()
+						.setTitle('✅ Sticker Stolen')
+						.setDescription(`Successfully added sticker **${name}** to the server.`)
+						.setColor(client.color.main)
+						.setTimestamp();
+					return await ctx.reply({ embeds: [embed] });
+				} else {
+					await ctx.guild.emojis.create({ attachment: input, name });
+					const embed = new EmbedBuilder()
+						.setTitle('✅ Emoji Stolen')
+						.setDescription(`Successfully added emoji **${name}** to the server.`)
+						.setColor(client.color.main)
+						.setTimestamp();
+					return await ctx.reply({ embeds: [embed] });
+				}
 			}
 
-			await ctx.reply({ embeds: [resEmbed] });
-		} catch (e: any) {
+			const parsedEmoji = parseEmoji(input);
+			if (parsedEmoji?.id) {
+				const extension = parsedEmoji.animated ? '.gif' : '.png';
+				const url = `https://cdn.discordapp.com/emojis/${parsedEmoji.id}${extension}`;
+				await ctx.guild.emojis.create({ attachment: url, name: name || parsedEmoji.name });
+				
+				const embed = new EmbedBuilder()
+					.setTitle('✅ Emoji Stolen')
+					.setDescription(`Successfully added emoji **${name || parsedEmoji.name}** to the server.`)
+					.setColor(client.color.main)
+					.setTimestamp();
+				return await ctx.reply({ embeds: [embed] });
+			} else {
+				return await ctx.reply({ content: '❌ Invalid emoji or URL provided.', flags: [64] });
+			}
+		} catch (error: any) {
 			const errorEmbed = new EmbedBuilder()
-				.setTitle('âŒ Failed to Steal')
-				.setDescription(`Error: ${e.message}`)
-				.setColor(_client.color.red);
+				.setTitle('❌ Failed to Steal')
+				.setDescription(`An error occurred: ${error.message}`)
+				.setColor(client.color.red);
 			await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}
 	}
 }
-

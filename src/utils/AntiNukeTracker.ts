@@ -75,7 +75,20 @@ export class AntiNukeTracker {
 
             await member.roles.remove(rolesToRemove, 'Enc Anti-Nuke: Mass Action Detected');
 
-            // Log the incident
+            // Log the incident in Data Core
+            await AuditLogger.log(client, guild, {
+                type: AuditLogType.SECURITY,
+                event: 'Security Stoppage (Anti-Nuke)',
+                status: AuditLogStatus.CRITICAL,
+                executorId: client.user?.id,
+                executorTag: client.user?.tag,
+                targetId: member.id,
+                targetName: member.user.tag,
+                details: `Mass ${category.replace('antiNuke', '')} action detected. Count: ${count}`,
+                color: client.color.red
+            });
+
+            // Log the incident in Discord
             const guildData = await client.prisma.guild.findUnique({ where: { id: guild.id } });
             if (guildData?.logChannelId) {
                 const logChannel = await guild.channels.fetch(guildData.logChannelId).catch(() => null) as TextChannel;

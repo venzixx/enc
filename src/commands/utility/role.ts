@@ -1,6 +1,7 @@
-﻿import { EmbedBuilder, PermissionFlagsBits, GuildMember, Role } from 'discord.js';
+import { EmbedBuilder, PermissionFlagsBits, GuildMember, Role } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
+import { Resolver } from '../../utils/Resolver';
 
 export default class RoleCommand extends Command {
 	constructor(client: ExtendedClient) {
@@ -41,14 +42,17 @@ export default class RoleCommand extends Command {
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+	public async run(_client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+		await ctx.deferReply();
 		const sub = ctx.options.getSubcommand();
-		const target = ctx.options.getMember('user') as GuildMember;
-		const role = ctx.options.getRole('role') as Role;
+		
+		const target = await Resolver.resolveMember(ctx);
+		const roleId = ctx.options.getRole('role') as string || args[1]?.replace(/[<@&>]/g, '');
+		const role = roleId ? (ctx.guild.roles.cache.get(roleId) || await ctx.guild.roles.fetch(roleId).catch(() => null)) : null;
 
 		if (!target || !role) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Not Found')
+                .setTitle('❌ Not Found')
                 .setDescription('Could not find that member or role.')
                 .setColor(_client.color.red);
 			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
@@ -56,7 +60,7 @@ export default class RoleCommand extends Command {
 
 		if (role.position >= (ctx.member as GuildMember).roles.highest.position && ctx.guild.ownerId !== ctx.author.id) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Permission Denied')
+                .setTitle('❌ Permission Denied')
                 .setDescription('You cannot manage a role higher than or equal to your own.')
                 .setColor(_client.color.red);
 			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
@@ -64,7 +68,7 @@ export default class RoleCommand extends Command {
 
 		if (role.position >= (ctx.guild.members.me as GuildMember).roles.highest.position) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Hierarchy Error')
+                .setTitle('❌ Hierarchy Error')
                 .setDescription('I cannot manage this role. Check my role position and ensure it is below mine.')
                 .setColor(_client.color.red);
 			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
@@ -74,14 +78,14 @@ export default class RoleCommand extends Command {
 			if (sub === 'add') {
 				if (target.roles.cache.has(role.id)) {
                     const errorEmbed = new EmbedBuilder()
-                        .setTitle('âŒ Already Has Role')
+                        .setTitle('❌ Already Has Role')
                         .setDescription(`**${target.user.tag}** already has the ${role} role.`)
                         .setColor(_client.color.red);
 					return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 				}
 				await target.roles.add(role);
                 const successEmbed = new EmbedBuilder()
-                    .setTitle('âœ… Role Added')
+                    .setTitle('✅ Role Added')
                     .setDescription(`Successfully added the ${role} role to **${target.user.tag}**.`)
                     .setColor(_client.color.main)
                     .setTimestamp();
@@ -89,14 +93,14 @@ export default class RoleCommand extends Command {
 			} else {
 				if (!target.roles.cache.has(role.id)) {
                     const errorEmbed = new EmbedBuilder()
-                        .setTitle('âŒ Missing Role')
+                        .setTitle('❌ Missing Role')
                         .setDescription(`**${target.user.tag}** does not have the ${role} role.`)
                         .setColor(_client.color.red);
 					return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 				}
 				await target.roles.remove(role);
                 const successEmbed = new EmbedBuilder()
-                    .setTitle('âœ… Role Removed')
+                    .setTitle('✅ Role Removed')
                     .setDescription(`Successfully removed the ${role} role from **${target.user.tag}**.`)
                     .setColor(_client.color.main)
                     .setTimestamp();
@@ -104,11 +108,10 @@ export default class RoleCommand extends Command {
 			}
 		} catch (e: any) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Execution Error')
+                .setTitle('❌ Execution Error')
                 .setDescription(`An error occurred: ${e.message}`)
                 .setColor(_client.color.red);
 			await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}
 	}
 }
-

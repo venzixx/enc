@@ -1,4 +1,4 @@
-﻿import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { PermissionFlagsBits, TextChannel } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -30,14 +30,16 @@ export default class LogSetup extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
-		const channel = ctx.options.getChannel('channel');
+		const channel = ctx.options.getChannel('channel') as TextChannel;
 
-		if (!channel.isTextBased()) {
-            const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Setup Error')
-                .setDescription('Please select a text-based channel.')
-                .setColor(client.color.red);
-			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
+		if (!channel || !channel.isTextBased()) {
+			return await ctx.replyV2({ 
+                title: '❌ Setup Error', 
+                description: 'Please select a text-based channel.', 
+                isAlert: true,
+                color: client.color.red,
+                ephemeral: true
+            });
 		}
 
 		await client.prisma.guild.upsert({
@@ -46,13 +48,11 @@ export default class LogSetup extends Command {
 			create: { id: ctx.guild.id, logChannelId: channel.id }
 		});
 
-        const successEmbed = new EmbedBuilder()
-            .setTitle('âœ… Setup Complete')
-            .setDescription(`Server logs will now be sent in ${channel}.`)
-            .setColor(client.color.main)
-            .setTimestamp();
-
-		await ctx.reply({ embeds: [successEmbed] });
+		await ctx.replyV2({ 
+            title: '✅ Setup Complete', 
+            description: `Server logs will now be sent in ${channel}.`,
+            isAlert: true,
+            color: client.color.main
+        });
 	}
 }
-

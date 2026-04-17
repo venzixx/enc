@@ -1,4 +1,4 @@
-﻿import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { PermissionFlagsBits } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -12,11 +12,12 @@ export default class WhoConfessed extends Command {
 				examples: ['whoconfessed 1', 'whoconfessed 5']
 			},
 			category: 'moderation',
+			aliases: ['whoc'],
 			cooldown: 3,
 			slashCommand: true,
 			permissions: {
 				user: [PermissionFlagsBits.Administrator],
-				client: []
+				client: [PermissionFlagsBits.EmbedLinks]
 			},
 			options: [
 				{
@@ -29,12 +30,16 @@ export default class WhoConfessed extends Command {
 		});
 	}
 
-	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
-		const number = ctx.options.getInteger('number');
+	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+        await ctx.deferReply(true);
+		const number = ctx.options.getInteger('number') || parseInt(args[0]);
 
-		if (!number || number < 1) {
-			return await ctx.sendMessage({
-				content: 'âŒ Please provide a valid confession number.',
+		if (!number || isNaN(number) || number < 1) {
+			return await ctx.replyV2({
+				title: '❌ Invalid Number',
+                description: 'Please provide a valid confession number to look up.',
+                isAlert: true,
+                ephemeral: true
 			});
 		}
 
@@ -48,28 +53,25 @@ export default class WhoConfessed extends Command {
 		});
 
 		if (!confession) {
-			const embed = new EmbedBuilder()
-				.setTitle('ðŸ” Confession Lookup')
-				.setDescription(`âŒ Confession **#${number}** was not found in this server.`)
-				.setColor(client.color.red);
-			return await ctx.sendMessage({ embeds: [embed] });
+			return await ctx.replyV2({
+                title: '🔍 Confession Lookup',
+                description: `❌ Confession **#${number}** was not found in this server.`,
+                isAlert: true,
+                color: client.color.red,
+                ephemeral: true
+            });
 		}
 
-		const embed = new EmbedBuilder()
-			.setTitle(`ðŸ” Confession #${confession.number} â€” Author Revealed`)
-			.setColor(0x2B2D31)
-			.addFields(
-				{ name: 'ðŸ‘¤ Author', value: `${confession.userTag} (<@${confession.userId}>)`, inline: true },
-				{ name: 'ðŸ“… Date', value: `<t:${Math.floor(confession.createdAt.getTime() / 1000)}:R>`, inline: true },
-				{ name: 'ðŸ’¬ Content', value: confession.content }
-			)
-			.setFooter({ text: 'This information is only visible to you.' })
-			.setTimestamp();
-
-		// Reply ephemerally so only the admin sees it
-		if (ctx.interaction) {
-			return await ctx.interaction.reply({ embeds: [embed], ephemeral: true });
-		}
-		return await ctx.sendMessage({ embeds: [embed] });
+		return await ctx.replyV2({
+            title: `🔍 Confession #${confession.number} — Author Revealed`,
+            description: confession.content,
+            fields: [
+                { name: '👤 Author', value: `${confession.userTag} (<@${confession.userId}>)`, inline: true },
+                { name: '📅 Date', value: `<t:${Math.floor(confession.createdAt.getTime() / 1000)}:R>`, inline: true }
+            ],
+            color: 0x2B2D31,
+            footer: 'This information is only visible to you.',
+            ephemeral: true
+        });
 	}
 }

@@ -14,6 +14,8 @@ const client = new ExtendedClient({
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.GuildInvites,
+        GatewayIntentBits.GuildBans,
+        GatewayIntentBits.GuildWebhooks,
     ],
     partials: [
         Partials.Message,

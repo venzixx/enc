@@ -299,8 +299,9 @@ export default class MessageCreate extends Event {
 		}
 
 		// ════════ PATH B: AI RESPONSE ════════
-		const isReplyToBot = message.reference?.messageId && 
-			(await message.channel.messages.fetch(message.reference.messageId)).author.id === this.client.user!.id;
+		const repliedMessage = message.reference?.messageId ? 
+			await message.channel.messages.fetch(message.reference.messageId).catch(() => null) : null;
+		const isReplyToBot = repliedMessage?.author.id === this.client.user!.id;
 		const isMentionOnly = message.content.match(mentionPrefixRegex) && !cmd;
 
 		if (isMentionOnly || isReplyToBot) {

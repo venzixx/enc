@@ -1,4 +1,4 @@
-﻿import { parseEmoji, PermissionFlagsBits } from "discord.js";
+import { parseEmoji, PermissionFlagsBits } from "discord.js";
 import { ExtendedClient } from "../../client";
 import { Command, Context } from "../../structures";
 
@@ -43,6 +43,7 @@ export default class ReactionRole extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+		await ctx.deferReply();
 		const sub = ctx.options.getSubcommand();
 		const messageId = ctx.options.getString('message_id');
 		const emoji = ctx.options.getString('emoji');

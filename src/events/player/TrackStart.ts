@@ -19,8 +19,7 @@ import { Event } from "../../structures";
 import type { Requester } from "../../types";
 import { LavamusicEventType } from "../../types/events";
 import { trackStart as updateSetupTrackStart } from "../../utils/SetupSystem";
-import { ExtendedClient } from "../../client";
-import { V2Helper } from "../../utils/V2Helper";
+import { ExtendedClient } from '../../client';
 
 export default class TrackStart extends Event {
 	constructor(client: ExtendedClient, file: string) {
@@ -77,40 +76,31 @@ export default class TrackStart extends Event {
 				await updateSetupTrackStart(setup.messageId, textChannel, player, track, this.client, locale);
 			}
 		} else {
-            const layout = V2Helper.createLayout({
-                title: t(I18N.player.trackStart.now_playing, { lng: locale }),
-                description: `**[${track.info.title}](${track.info.uri})**\n` +
-					`-# ${t(I18N.player.trackStart.author, { lng: locale })}: ${track.info.author}\n` +
-					`-# ${t(I18N.player.trackStart.duration, { lng: locale })}: ${track.info.isStream ? "LIVE" : this.client.utils.formatTime(track.info.duration)}\n` +
-					`-# ${t(I18N.player.trackStart.requested_by, { lng: locale, user: requester.username })}`,
-                color: this.client.config.color.main as ColorResolvable,
-                thumbnail: track.info.artworkUrl || undefined,
-                buttons: [
-                    new ButtonBuilder()
-                        .setCustomId("resume")
-                        .setLabel(player.paused ? t(I18N.buttons.resume) : t(I18N.buttons.pause))
-                        .setStyle(player.paused ? ButtonStyle.Success : ButtonStyle.Secondary),
-                    new ButtonBuilder()
-                        .setCustomId("previous")
-                        .setLabel(t(I18N.buttons.previous))
-                        .setStyle(ButtonStyle.Secondary)
-                        .setDisabled(!player.queue.previous || player.queue.previous.length === 0),
-                    new ButtonBuilder()
-                        .setCustomId("stop")
-                        .setLabel(t(I18N.buttons.stop))
-                        .setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder()
-                        .setCustomId("skip")
-                        .setLabel(t(I18N.buttons.skip))
-                        .setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder()
-                        .setCustomId("loop")
-                        .setLabel(t(I18N.buttons.loop))
-                        .setStyle(player.repeatMode !== "off" ? ButtonStyle.Success : ButtonStyle.Secondary),
-                ]
-            });
+            const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder()
+                    .setCustomId("resume")
+                    .setLabel(player.paused ? t(I18N.buttons.resume) : t(I18N.buttons.pause))
+                    .setStyle(player.paused ? ButtonStyle.Success : ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId("previous")
+                    .setLabel(t(I18N.buttons.previous))
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(!player.queue.previous || player.queue.previous.length === 0),
+                new ButtonBuilder()
+                    .setCustomId("stop")
+                    .setLabel(t(I18N.buttons.stop))
+                    .setStyle(ButtonStyle.Danger),
+                new ButtonBuilder()
+                    .setCustomId("skip")
+                    .setLabel(t(I18N.buttons.skip))
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId("loop")
+                    .setLabel(t(I18N.buttons.loop))
+                    .setStyle(player.repeatMode !== "off" ? ButtonStyle.Success : ButtonStyle.Secondary),
+            );
 
-			const message = await channel.send(layout as any);
+			const message = await channel.send({ embeds: [embed], components: [buttons] });
 			player.set("messageId", message.id);
 		}
 	}
@@ -165,4 +155,3 @@ export async function checkDj(
 	}
 	return true;
 }
-

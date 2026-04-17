@@ -1,4 +1,4 @@
-﻿import { PermissionFlagsBits, EmbedBuilder } from 'discord.js';
+import { PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -46,6 +46,7 @@ export default class Customrole extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+		await ctx.deferReply();
 		const sub = ctx.options.getSubcommand();
 		const userId = ctx.author.id;
 

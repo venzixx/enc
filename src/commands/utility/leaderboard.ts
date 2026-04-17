@@ -30,6 +30,7 @@ export default class Leaderboard extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+		await ctx.deferReply();
 		const type = ctx.options.getString('category') || 'level';
 		
 		let title = '';

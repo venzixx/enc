@@ -1,4 +1,4 @@
-﻿import { 
+import { 
     PermissionFlagsBits, 
     EmbedBuilder, 
     GuildMember, 
@@ -7,6 +7,7 @@
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { logModerationAction } from '../../utils/Logger';
+import { Resolver } from '../../utils/Resolver';
 import ms from 'ms';
 
 export default class Mute extends Command {
@@ -49,38 +50,40 @@ export default class Mute extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-		const target = ctx.options.getMember('user') as GuildMember;
+        await ctx.deferReply();
+
+        const target = await Resolver.resolveMember(ctx);
 		const durationStr = ctx.options.getString('duration') || args[1];
 		const reason = ctx.options.getString('reason') || args.slice(2).join(' ') || 'No reason provided';
 
 		if (!target) {
-			return await ctx.reply({ content: 'âŒ Could not find that member.', flags: [64] });
+			return await ctx.reply({ content: '❌ Could not find that member.', flags: [64] });
 		}
 
 		if (target.id === ctx.author.id) {
-			return await ctx.reply({ content: 'âŒ You cannot mute yourself.', flags: [64] });
+			return await ctx.reply({ content: '❌ You cannot mute yourself.', flags: [64] });
 		}
 
-		if (target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
-			return await ctx.reply({ content: 'âŒ You cannot mute someone with a higher or equal role.', flags: [64] });
+		if (ctx.author.id !== ctx.guild.ownerId && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
+			return await ctx.reply({ content: '❌ You cannot mute someone with a higher or equal role.', flags: [64] });
 		}
 
 		if (!target.manageable) {
-			return await ctx.reply({ content: 'âŒ I cannot mute this user. Check my role position.', flags: [64] });
+			return await ctx.reply({ content: '❌ I cannot mute this user. Check my role position.', flags: [64] });
 		}
 
 		const time = durationStr ? ms(durationStr) : null;
 		if (!time || (time as any) < 10000 || (time as any) > 2419200000) {
-			return await ctx.reply({ content: 'âŒ Invalid duration. Must be between 10s and 28 days.', flags: [64] });
+			return await ctx.reply({ content: '❌ Invalid duration. Must be between 10s and 28 days.', flags: [64] });
 		}
 
 		try {
 			await target.timeout(time as any, `Muted by ${ctx.author.tag}: ${reason}`);
 			
 			const embed = new EmbedBuilder()
-				.setTitle('ðŸ”‡ Member Muted')
+				.setTitle('🔇 Member Muted')
 				.setDescription(`**${target.user.tag}** has been timed out for **${durationStr}**.`)
-				.addFields({ name: 'ðŸ’¬ Reason', value: reason })
+				.addFields({ name: '💬 Reason', value: reason })
 				.setColor(client.color.main)
 				.setTimestamp();
 
@@ -88,7 +91,7 @@ export default class Mute extends Command {
 
             await logModerationAction(client, ctx.guild, 'MUTE', ctx.author, target.user, reason, durationStr);
 		} catch (error: any) {
-			await ctx.reply({ content: `âŒ Failed to mute: ${error.message}`, flags: [64] });
+			await ctx.reply({ content: `❌ Failed to mute: ${error.message}`, flags: [64] });
 		}
 	}
 }

@@ -16,6 +16,7 @@ import {
 import { I18N, t } from "../../structures/I18n";
 import { Context, Event } from "../../structures";
 import logger from "../../structures/Logger";
+import { AuditLogger, AuditLogType, AuditLogStatus } from "../../utils/AuditLogger";
 import { LavamusicEventType } from "../../types/events";
 import { ExtendedClient } from "../../client";
 
@@ -251,6 +252,22 @@ export default class InteractionCreate extends Event {
 
 			try {
 				const args = (interaction as any).options.data.map((opt: any) => opt.value?.toString()).filter(Boolean);
+				
+				// Audit Moderation Commands (Non-blocking)
+				if (command.category === 'moderation') {
+					AuditLogger.log(this.client, interaction.guild!, {
+						type: AuditLogType.MODERATION,
+						event: `Command Executed: /${interaction.commandName}`,
+						status: AuditLogStatus.MOD,
+						executorId: interaction.user.id,
+						executorTag: interaction.user.tag,
+						targetId: (interaction as any).options.getMember('user')?.id || (interaction as any).options.getMember('member')?.id || interaction.options.get('user')?.value?.toString(),
+						targetName: interaction.options.get('user')?.value?.toString() || interaction.options.get('member')?.value?.toString() || 'N/A',
+						details: `Parameters: ${interaction.options.data.map(o => `${o.name}:${o.value}`).join(', ')}`,
+						color: this.client.color.main
+					}).catch(err => logger.error(`[AUDIT_LOG_ERROR] ${err}`));
+				}
+
 				await command.run(this.client, ctx, args);
 			} catch (error) {
 				logger.error(error);

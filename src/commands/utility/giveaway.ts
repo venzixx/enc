@@ -1,4 +1,4 @@
-﻿import { ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits } from "discord.js";
+import { ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits } from "discord.js";
 import ms from "ms";
 import { ExtendedClient } from "../../client";
 import { Command, Context } from "../../structures";
@@ -53,6 +53,7 @@ export default class Giveaway extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+		await ctx.deferReply({ ephemeral: true });
 		const sub = ctx.options.getSubcommand();
 
 		if (sub === 'start') {

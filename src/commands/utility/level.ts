@@ -1,96 +1,97 @@
-﻿import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
+import { 
+    ApplicationCommandOptionType,
+    AttachmentBuilder
+} from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
-import { generateRankCard } from '../../services/imageBuilder';
+import { Resolver } from '../../utils/Resolver';
+import { RankCardGenerator } from '../../utils/RankCardGenerator';
 
 export default class Level extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'level',
 			description: {
-				content: 'Shows your current level and XP.',
+				content: 'Check your current level and XP with a premium status card.',
 				usage: 'level [user]',
-				examples: ['level', 'level @Member']
+				examples: ['level', 'level @User']
 			},
-			category: 'info',
-			cooldown: 3,
+			category: 'tools',
+			cooldown: 5,
 			slashCommand: true,
 			options: [
 				{
 					name: 'user',
-					description: 'The user to view level for',
-					type: 6, // USER
+					description: 'The user to check level for',
+					type: ApplicationCommandOptionType.User,
 					required: false
 				}
 			]
 		});
 	}
 
-	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
-		const user = ctx.options.getUser('user') || ctx.author;
+	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+        await ctx.deferReply();
 
+        // 1. Resolve target member (Fallback to author if no input is provided)
+        let member = await Resolver.resolveMember(ctx);
+        if (!member) {
+            // Check if there was actually an input attempted
+            const input = ctx.isInteraction ? null : args[0];
+            if (!input) {
+                // Singleton execution (No input, show author)
+                member = ctx.member!;
+            } else {
+                // Failed to resolve a specific search term
+                return await ctx.reply({ content: '❌ Could not find that member.', flags: [64] });
+            }
+        }
+
+        const user = member.user;
 		const data = await client.prisma.member.findUnique({
 			where: { guildId_userId: { guildId: ctx.guild.id, userId: user.id } }
 		});
 
 		if (!data) {
-			const noDataEmbed = new EmbedBuilder()
-				.setTitle('ðŸ“Š Level Status')
-				.setDescription(`âŒ **${user.tag}** has no rank record yet. Start chatting to gain XP!`)
-				.setColor(client.color.red);
-			return await ctx.reply({ embeds: [noDataEmbed], flags: [64] });
+			return await ctx.reply({ 
+                content: user.id === ctx.author.id 
+                    ? '📊 You have no rank record yet. Start chatting to gain XP!'
+                    : `❌ **${user.username}** has no rank record yet.`,
+                flags: [64]
+            });
 		}
 
-		// Calculate Rank
-		const rank = await client.prisma.member.count({
-			where: {
-				guildId: ctx.guild.id,
-				xp: { gt: data.xp }
-			}
-		}) + 1;
+        // 2. Calculate Rank (Position in Guild)
+        const rank = await client.prisma.member.count({
+            where: {
+                guildId: ctx.guild.id,
+                xp: { gt: data.xp }
+            }
+        }) + 1;
 
 		const nextLevelXP = (data.level + 1) * (data.level + 1) * 100;
-		
-		// Deferred reply as image generation might take a second
-		await ctx.interaction?.deferReply();
 
-		try {
-			const imageBuffer = await generateRankCard({
-				username: user.username,
-				avatarUrl: user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true }),
-				level: data.level,
-				rank: rank,
-				currentXp: data.xp,
-				requiredXp: nextLevelXP,
-				status: (ctx.guild.members.cache.get(user.id)?.presence?.status as any) || 'offline'
-			});
+        // 3. Manifest the Card
+        try {
+            const cardBuffer = await RankCardGenerator.generate({
+                username: user.username,
+                avatarUrl: user.displayAvatarURL({ extension: 'png', size: 256 }),
+                level: data.level,
+                rank: rank,
+                currentXp: data.xp,
+                requiredXp: nextLevelXP
+            });
 
-			const attachment = new AttachmentBuilder(imageBuffer, { name: 'rank.png' });
-			
-			if (ctx.interaction) {
-				await ctx.interaction.editReply({ files: [attachment] });
-			} else {
-				await ctx.reply({ files: [attachment] });
-			}
-		} catch (error) {
-			console.error('Rank Card Error:', error);
-			const embed = new EmbedBuilder()
-				.setTitle(`ðŸ“Š Rank: ${user.username}`)
-				.setColor(0x000000)
-				.setThumbnail(user.displayAvatarURL())
-				.addFields(
-					{ name: 'âœ¨ Level', value: `\`${data.level}\``, inline: true },
-					{ name: 'ðŸ’« XP', value: `\`${data.xp} / ${nextLevelXP}\``, inline: true },
-					{ name: 'ðŸ“ˆ Progress', value: `\`${Math.floor((data.xp / nextLevelXP) * 100)}%\``, inline: true }
-				)
-				.setFooter({ text: `Keep chatting to level up!` });
-
-			if (ctx.interaction) {
-				await ctx.interaction.editReply({ embeds: [embed] });
-			} else {
-				await ctx.reply({ embeds: [embed] });
-			}
-		}
+            const attachment = new AttachmentBuilder(cardBuffer, { name: `rank-${user.id}.png` });
+            
+            await ctx.reply({ 
+                files: [attachment] 
+            });
+        } catch (error) {
+            console.error('Level Command Error:', error);
+            await ctx.reply({
+                content: `📊 **${user.username}** — **Level ${data.level}** | **XP: ${data.xp}/${nextLevelXP}** | **Rank #${rank}**`,
+            });
+        }
 	}
 }
-

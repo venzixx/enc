@@ -135,7 +135,7 @@ export class V2Helper {
 
         return {
             components: [container],
-            flags: [MessageFlags.IsComponentsV2] as any
+            flags: options.ephemeral ? (MessageFlags.Ephemeral | MessageFlags.IsComponentsV2) : MessageFlags.IsComponentsV2
         };
     }
 }

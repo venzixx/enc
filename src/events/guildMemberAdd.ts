@@ -2,6 +2,7 @@ import { Events, GuildMember, Collection, EmbedBuilder, AttachmentBuilder } from
 import { Event } from '../structures';
 import { LavamusicEventType } from '../types/events';
 import { ExtendedClient } from '../client';
+import { AuditLogger, AuditLogType, AuditLogStatus } from '../utils/AuditLogger';
 
 export default class GuildMemberAdd extends Event {
     constructor(client: ExtendedClient, file: string) {

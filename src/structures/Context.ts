@@ -102,6 +102,10 @@ export default class Context {
 				return await this.interaction.editReply(options as InteractionEditReplyOptions);
 			}
 			this.replied = true;
+            if (typeof options === 'object' && (options as any).ephemeral) {
+                const { ephemeral, ...rest } = options as any;
+                return await this.interaction.reply({ ...rest, flags: [MessageFlags.Ephemeral] });
+            }
 			return await this.interaction.reply(options as InteractionReplyOptions);
 		}
 		return await this.channel?.send(options as MessageCreateOptions);
@@ -138,7 +142,7 @@ export default class Context {
 	public async deferReply(ephemeral = false) {
 		if (this.interaction) {
 			this.deferred = true;
-			return await this.interaction.deferReply({ ephemeral });
+			return await this.interaction.deferReply({ flags: ephemeral ? [MessageFlags.Ephemeral] : undefined });
 		}
 		return null;
 	}
