@@ -21,16 +21,16 @@ export async function logModerationAction(
 
     const embed = new EmbedBuilder()
         .setAuthor({ name: `${moderator.tag} (${moderator.id})`, iconURL: moderator.displayAvatarURL() })
-        .setTitle(`🛡️ Moderation Action: ${action}`)
+        .setTitle(`${client.emoji.shield} Moderation Action: ${action}`)
         .setColor(client.color.main)
         .addFields(
-            { name: '👤 Target', value: `${target.tag} (\`${target.id}\`)`, inline: true },
-            { name: '🛡️ Moderator', value: `${moderator.tag} (\`${moderator.id}\`)`, inline: true }
+            { name: `${client.emoji.user} Target`, value: `${target.tag} (\`${target.id}\`)`, inline: true },
+            { name: `${client.emoji.shield} Moderator`, value: `${moderator.tag} (\`${moderator.id}\`)`, inline: true }
         )
         .setTimestamp();
 
-    if (duration) embed.addFields({ name: '⏳ Duration', value: duration, inline: true });
-    embed.addFields({ name: '💬 Reason', value: reason });
+    if (duration) embed.addFields({ name: `${client.emoji.clock} Duration`, value: duration, inline: true });
+    embed.addFields({ name: `${client.emoji.mic} Reason`, value: reason });
 
     try {
         await channel.send({ embeds: [embed] });

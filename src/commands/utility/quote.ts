@@ -37,7 +37,7 @@ export default class QuoteCommand extends Command {
 					targetMessage = await ctx.channel.messages.fetch(ctx.message.reference.messageId);
 				} catch (err) {
 					return await ctx.replyV2({
-                        description: '❌ I couldn\'t fetch the message you replied to.',
+                        description: `${client.emoji.cross} I couldn\'t fetch the message you replied to.`,
                         isAlert: true,
                         color: client.color.red
                     });
@@ -47,7 +47,7 @@ export default class QuoteCommand extends Command {
 
 		if (!targetMessage) {
 			return await ctx.replyV2({
-                description: '❌ Please **reply** to the message you want to quote, or use the right-click menu!',
+                description: `${client.emoji.cross} Please **reply** to the message you want to quote, or use the right-click menu!`,
                 isAlert: true,
                 color: client.color.red
             });
@@ -55,7 +55,7 @@ export default class QuoteCommand extends Command {
 
 		if (!targetMessage.content && !targetMessage.attachments.size) {
 			return await ctx.replyV2({
-                description: '❌ That message has no text to quote!',
+                description: `${client.emoji.cross} That message has no text to quote!`,
                 isAlert: true,
                 color: client.color.red
             });
@@ -86,7 +86,7 @@ export default class QuoteCommand extends Command {
 		} catch (error) {
 			console.error('Quote Command Error:', error);
 			return await ctx.replyV2({
-                description: '❌ Something went wrong while generating the quote.',
+                description: `${client.emoji.cross} Something went wrong while generating the quote.`,
                 isAlert: true,
                 color: client.color.red
             });

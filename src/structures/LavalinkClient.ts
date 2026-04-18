@@ -47,8 +47,23 @@ export class LavalinkClient extends LavalinkManager {
 			}
 		}
 
-		const node = this.nodeManager.leastUsedNodes()?.[0];
-		if (!node) throw new Error("No available Lavalink nodes");
-		return await node.search(searchQuery, user);
+		let lastError: any;
+		const nodes = this.nodeManager.leastUsedNodes();
+		if (!nodes || nodes.length === 0) throw new Error("No available Lavalink nodes");
+
+		// Attempt search on multiple nodes if necessary to bypass localized timeouts
+		for (const node of nodes.slice(0, 2)) {
+			try {
+				return await node.search(searchQuery, user);
+			} catch (error: any) {
+				lastError = error;
+				if (error.name === "TimeoutError" || error.message?.includes("aborted")) {
+					continue; // Try next node
+				}
+				throw error; // Re-throw if it's a fatal error
+			}
+		}
+		throw lastError;
 	}
 }
+

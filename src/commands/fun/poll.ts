@@ -1,4 +1,4 @@
-﻿import { PermissionFlagsBits, EmbedBuilder } from 'discord.js';
+import { PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -55,7 +55,7 @@ export default class Poll extends Command {
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
 		const question = ctx.options.getString('question');
 		const multiselect = ctx.options.getBoolean('multiselect') ?? false;
 
@@ -67,9 +67,9 @@ export default class Poll extends Command {
 
 		if (options.length < 2) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Poll Error')
+                .setTitle(' Poll Error')
                 .setDescription('A poll must have at least 2 options.')
-                .setColor(_client.color.red);
+                .setColor(client.color.red);
 			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}
 
@@ -90,17 +90,17 @@ export default class Poll extends Command {
 			});
 
             const successEmbed = new EmbedBuilder()
-                .setTitle('âœ… Poll Created')
+                .setTitle(`${client.emoji.success} Poll Created`)
                 .setDescription(`Your poll has been successfully created in this channel.\n\n[Click here to jump to the poll](${pollMessage.url})`)
-                .setColor(_client.color.main)
+                .setColor(client.color.main)
                 .setTimestamp();
 
 			await ctx.reply({ embeds: [successEmbed], flags: [64] });
 		} catch (error: any) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Poll Failure')
+                .setTitle(' Poll Failure')
                 .setDescription(`Failed to create poll: ${error.message}`)
-                .setColor(_client.color.red);
+                .setColor(client.color.red);
 			await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}
 	}

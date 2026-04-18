@@ -1,4 +1,4 @@
-﻿import { EmbedBuilder, PermissionFlagsBits, ChannelType } from 'discord.js';
+import { EmbedBuilder, PermissionFlagsBits, ChannelType } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -40,7 +40,7 @@ export default class StorySetup extends Command {
 		});
 
         const successEmbed = new EmbedBuilder()
-            .setTitle('âœ… Setup Complete')
+            .setTitle(`${client.emoji.success} Setup Complete`)
             .setDescription(`Collaborative story game has been set to ${channel}. Start by writing a word!`)
             .setColor(client.color.main)
             .setTimestamp();

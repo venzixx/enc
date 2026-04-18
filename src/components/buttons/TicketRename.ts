@@ -24,7 +24,7 @@ export default class TicketRename extends Component {
         const isStaff = member.roles.cache.has(config?.supportRoleId) || member.permissions.has(PermissionFlagsBits.Administrator);
 
         if (!isStaff) {
-            return await interaction.reply({ content: '❌ Only staff can rename tickets.', ephemeral: true });
+            return await interaction.reply({ content: `${client.emoji.cross} Only staff can rename tickets.`, ephemeral: true });
         }
 
 		const modal = new ModalBuilder()

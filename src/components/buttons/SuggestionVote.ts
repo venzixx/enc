@@ -22,7 +22,7 @@ export default class SuggestionVote extends Component {
         });
 
         if (!suggestion) {
-            return await interaction.reply({ content: '❌ Suggestion data not found in database.', ephemeral: true });
+            return await interaction.reply({ content: `${client.emoji.cross} Suggestion data not found in database.`, ephemeral: true });
         }
 
         const existingVote = suggestion.votes.find(v => v.userId === interaction.user.id);
@@ -33,7 +33,7 @@ export default class SuggestionVote extends Component {
             const oppositeName = type === 'UP' ? 'Downvote' : 'Upvote';
             
             return await interaction.reply({ 
-                content: `ℹ️ You have already ${voteName}. To change your vote, click the **${oppositeName}** button.`, 
+                content: `${client.emoji.info} You have already ${voteName}. To change your vote, click the **${oppositeName}** button.`, 
                 ephemeral: true 
             });
         }
@@ -66,7 +66,7 @@ export default class SuggestionVote extends Component {
         const oldEmbed = interaction.message.embeds[0];
         const newEmbed = EmbedBuilder.from(oldEmbed)
             .setFields([
-                { name: '📊 Statistics', value: `🧪 Upvotes: \`${upvotes}\` | ⛔ Downvotes: \`${downvotes}\`` }
+                { name: ' Statistics', value: ` Upvotes: \`${upvotes}\` |  Downvotes: \`${downvotes}\`` }
             ]);
 
         await interaction.update({ embeds: [newEmbed] });

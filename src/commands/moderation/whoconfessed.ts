@@ -36,7 +36,7 @@ export default class WhoConfessed extends Command {
 
 		if (!number || isNaN(number) || number < 1) {
 			return await ctx.replyV2({
-				title: '❌ Invalid Number',
+				title: `${client.emoji.cross} Invalid Number`,
                 description: 'Please provide a valid confession number to look up.',
                 isAlert: true,
                 ephemeral: true
@@ -54,8 +54,8 @@ export default class WhoConfessed extends Command {
 
 		if (!confession) {
 			return await ctx.replyV2({
-                title: '🔍 Confession Lookup',
-                description: `❌ Confession **#${number}** was not found in this server.`,
+                title: ' Confession Lookup',
+                description: `${client.emoji.cross} Confession **#${number}** was not found in this server.`,
                 isAlert: true,
                 color: client.color.red,
                 ephemeral: true
@@ -63,11 +63,11 @@ export default class WhoConfessed extends Command {
 		}
 
 		return await ctx.replyV2({
-            title: `🔍 Confession #${confession.number} — Author Revealed`,
+            title: ` Confession #${confession.number}  Author Revealed`,
             description: confession.content,
             fields: [
-                { name: '👤 Author', value: `${confession.userTag} (<@${confession.userId}>)`, inline: true },
-                { name: '📅 Date', value: `<t:${Math.floor(confession.createdAt.getTime() / 1000)}:R>`, inline: true }
+                { name: `${client.emoji.user} Author`, value: `${confession.userTag} (<@${confession.userId}>)`, inline: true },
+                { name: ' Date', value: `<t:${Math.floor(confession.createdAt.getTime() / 1000)}:R>`, inline: true }
             ],
             color: 0x2B2D31,
             footer: 'This information is only visible to you.',

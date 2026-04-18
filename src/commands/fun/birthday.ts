@@ -1,4 +1,4 @@
-﻿import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -64,7 +64,7 @@ export default class Birthday extends Command {
 		});
 
         const successEmbed = new EmbedBuilder()
-            .setTitle('ðŸŽ‚ Birthday Set!')
+            .setTitle(' Birthday Set!')
             .setDescription(`Successfully saved your birthday as **${day}/${month}${year ? `/${year}` : ''}**.`)
             .setColor(client.color.main)
             .setTimestamp();

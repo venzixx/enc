@@ -49,24 +49,24 @@ export default class Unmute extends Command {
 		const reason = ctx.options.getString('reason') || args.slice(1).join(' ') || 'No reason provided';
 
 		if (!target) {
-			return await ctx.reply({ content: '❌ Could not find that member.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} Could not find that member.`, flags: [64] });
 		}
 
 		if (ctx.author.id !== ctx.guild.ownerId && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
-			return await ctx.reply({ content: '❌ You cannot unmute someone with a higher or equal role.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} You cannot unmute someone with a higher or equal role.`, flags: [64] });
 		}
 
 		if (!target.communicationDisabledUntilTimestamp) {
-			return await ctx.reply({ content: '❌ This user is not timed out.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} This user is not timed out.`, flags: [64] });
 		}
 
 		try {
 			await target.timeout(null, `Unmuted by ${ctx.author.tag}: ${reason}`);
 			
 			const embed = new EmbedBuilder()
-				.setTitle('🔊 Member Unmuted')
+				.setTitle(`${client.emoji.volmore} Member Unmuted`)
 				.setDescription(`**${target.user.tag}**'s timeout has been removed.`)
-				.addFields({ name: '💬 Reason', value: reason })
+				.addFields({ name: `${client.emoji.mic} Reason`, value: reason })
 				.setColor(client.color.main)
 				.setTimestamp();
 
@@ -74,7 +74,7 @@ export default class Unmute extends Command {
 
             await logModerationAction(client, ctx.guild, 'UNMUTE', ctx.author, target.user, reason);
 		} catch (error: any) {
-			await ctx.reply({ content: `❌ Failed to unmute: ${error.message}`, flags: [64] });
+			await ctx.reply({ content: `${client.emoji.cross} Failed to unmute: ${error.message}`, flags: [64] });
 		}
 	}
 }

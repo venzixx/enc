@@ -1,4 +1,4 @@
-﻿import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -35,7 +35,7 @@ export default class Decode extends Command {
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
 		const text = ctx.options.getString('text');
 		const format = ctx.options.getString('format');
 
@@ -49,21 +49,21 @@ export default class Decode extends Command {
 			}
             
             const embed = new EmbedBuilder()
-                .setTitle('âœ¨ Text Decoded')
+                .setTitle(`${client.emoji.random} Text Decoded`)
                 .setDescription(`Successfully decoded your text from **${format.toUpperCase()}**.`)
                 .addFields(
                     { name: 'Encoded Input', value: `\`\`\`${text}\`\`\`` },
                     { name: 'Decoded Result', value: `\`\`\`${result || 'None (Empty or Invalid)'}\`\`\`` }
                 )
-                .setColor(_client.color.main)
+                .setColor(client.color.main)
                 .setTimestamp();
 
 			await ctx.reply({ embeds: [embed] });
 		} catch (e) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Decoding Error')
+                .setTitle(' Decoding Error')
                 .setDescription(`Failed to decode text. Please ensure it is valid **${format.toUpperCase()}** format.`)
-                .setColor(_client.color.red);
+                .setColor(client.color.red);
 
 			await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}

@@ -48,7 +48,9 @@ export default class MessageReactionRemove extends Event {
                 if (role) {
                     if (!member.roles.cache.has(role.id)) continue;
                     
-                    await member.roles.remove(role).catch(e => {
+                    await member.roles.remove(role).then(() => {
+                        member.send(`You lost the **${role.name}** role!`).catch(() => {});
+                    }).catch(e => {
                         console.error(`[ReactionRole] Failed to remove role ${role.name} from ${user.tag}:`, e.message);
                     });
                 }

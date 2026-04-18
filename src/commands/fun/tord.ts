@@ -49,16 +49,16 @@ export default class Tord extends Command {
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
 		const type = ctx.options.getString('type');
 		const list = type === 'truth' ? truths : dares;
 		const random = list[Math.floor(Math.random() * list.length)];
 
 		const embed = new EmbedBuilder()
-			.setTitle(type === 'truth' ? 'ðŸ’¡ Truth' : 'ðŸ”¥ Dare')
+			.setTitle(type === 'truth' ? ' Truth' : ' Dare')
 			.setDescription(`**${random}**`)
-			.setColor(_client.color.main)
-			.setFooter({ text: 'Truth or Dare â€¢ Interactive Games', iconURL: ctx.guild.iconURL() })
+			.setColor(client.color.main)
+			.setFooter({ text: 'Truth or Dare  Interactive Games', iconURL: ctx.guild.iconURL() })
             .setTimestamp();
 
 		await ctx.reply({ embeds: [embed] });

@@ -19,7 +19,7 @@ export default class TicketRenameModal extends Component {
 
         const embed = new EmbedBuilder()
             .setColor(this.client.color.main)
-            .setDescription(`📝 Ticket renamed from \`${oldName}\` to \`${newName}\` by ${interaction.user}`)
+            .setDescription(`${client.emoji.edit} Ticket renamed from \`${oldName}\` to \`${newName}\` by ${interaction.user}`)
             .setTimestamp();
 
         await interaction.reply({ embeds: [embed] });

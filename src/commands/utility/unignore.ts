@@ -39,13 +39,13 @@ export default class Unignore extends Command {
 
         if (deleted.count === 0) {
             return await ctx.reply({ 
-                content: `ℹ️ ${channel} was not in the ignore list.`, 
+                content: `${client.emoji.info} ${channel} was not in the ignore list.`, 
                 ephemeral: true 
             });
         }
 
         const embed = new EmbedBuilder()
-            .setTitle('✅ Channel Unignored')
+            .setTitle(`${client.emoji.success} Channel Unignored`)
             .setDescription(`Successfully removed ${channel} from the ignore list. The bot will now respond and track XP there again.`)
             .setColor(client.color.main)
             .setTimestamp();

@@ -1,4 +1,4 @@
-﻿import { PermissionFlagsBits, ChannelType, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { PermissionFlagsBits, ChannelType, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { V2Helper } from '../../utils/V2Helper';
@@ -38,17 +38,17 @@ export default class VoiceSetup extends Command {
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
 		const category = ctx.options.getChannel('category') as any;
 		const panelChannel = ctx.options.getChannel('panel_channel') as any;
 
 		if (!category || !panelChannel) {
-			return await ctx.reply({ content: 'âŒ Missing required arguments.', ephemeral: true });
+			return await ctx.reply({ content: ' Missing required arguments.', ephemeral: true });
 		}
 
         // Create the "Join to Create" channel
         const createChannel = await ctx.guild?.channels.create({
-            name: 'âž• Create Voice',
+            name: ' Create Voice',
             type: ChannelType.GuildVoice,
             parent: category.id,
             permissionOverwrites: [
@@ -60,28 +60,28 @@ export default class VoiceSetup extends Command {
         });
 
 		const buttons = [
-			new ButtonBuilder().setCustomId('vc_hide').setEmoji('ðŸ‘ï¸').setStyle(ButtonStyle.Secondary),
-			new ButtonBuilder().setCustomId('vc_lock').setEmoji('ðŸ”’').setStyle(ButtonStyle.Secondary),
-			new ButtonBuilder().setCustomId('vc_rename').setEmoji('ðŸ“').setStyle(ButtonStyle.Secondary),
-			new ButtonBuilder().setCustomId('vc_limit_up').setEmoji('âž•').setStyle(ButtonStyle.Secondary),
-			new ButtonBuilder().setCustomId('vc_limit_down').setEmoji('âž–').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('vc_add').setEmoji('ðŸ‘¤').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('vc_claim').setEmoji('âœ‹').setStyle(ButtonStyle.Primary),
-			new ButtonBuilder().setCustomId('vc_info').setEmoji('â—').setStyle(ButtonStyle.Secondary),
-			new ButtonBuilder().setCustomId('vc_delete').setEmoji('ðŸ—‘ï¸').setStyle(ButtonStyle.Danger)
+			new ButtonBuilder().setCustomId('vc_hide').setEmoji('').setStyle(ButtonStyle.Secondary),
+			new ButtonBuilder().setCustomId('vc_lock').setEmoji('').setStyle(ButtonStyle.Secondary),
+			new ButtonBuilder().setCustomId('vc_rename').setEmoji('').setStyle(ButtonStyle.Secondary),
+			new ButtonBuilder().setCustomId('vc_limit_up').setEmoji('').setStyle(ButtonStyle.Secondary),
+			new ButtonBuilder().setCustomId('vc_limit_down').setEmoji('').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('vc_add').setEmoji(client.emoji.user).setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('vc_claim').setEmoji('').setStyle(ButtonStyle.Primary),
+			new ButtonBuilder().setCustomId('vc_info').setEmoji('').setStyle(ButtonStyle.Secondary),
+			new ButtonBuilder().setCustomId('vc_delete').setEmoji('').setStyle(ButtonStyle.Danger)
 		];
 
         // Create the ultra-sleek minimalist layout: Banner + Buttons only (no text Body)
         const layout = V2Helper.createLayout({
             image: 'https://i.imgur.com/8Q9S9Ym.png', // Premium monochromatic VC control banner
-            color: _client.color.main,
+            color: client.color.main,
             buttons
         });
 
         const panelMsg = await (panelChannel as any).send(layout);
 
         // Save to Database
-        await (_client.prisma as any).voiceConfig.upsert({
+        await (client.prisma as any).voiceConfig.upsert({
             where: { guildId: ctx.guild?.id! },
             update: {
                 createChannelId: createChannel?.id!,
@@ -98,6 +98,6 @@ export default class VoiceSetup extends Command {
             }
         });
 
-		await ctx.reply({ content: `âœ… Voice system setup complete!\n- **Create Channel**: ${createChannel}\n- **Panel Channel**: ${panelChannel}`, ephemeral: true });
+		await ctx.reply({ content: `${client.emoji.success} Voice system setup complete!\n- **Create Channel**: ${createChannel}\n- **Panel Channel**: ${panelChannel}`, ephemeral: true });
 	}
 }

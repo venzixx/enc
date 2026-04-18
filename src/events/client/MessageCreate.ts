@@ -29,8 +29,8 @@ export default class MessageCreate extends Event {
 		if (message.author.bot) return;
 		if (!(message.guild && message.guildId)) return;
 
-		// ═══════ AFK SYSTEM ═══════
-		// 1) If the message author is AFK → remove their AFK and show missed mentions
+		//  AFK SYSTEM 
+		// 1) If the message author is AFK  remove their AFK and show missed mentions
 		const authorAfk = await (this.client.prisma as any).afk.findUnique({
 			where: { userId: message.author.id },
 			include: { mentions: true }
@@ -45,9 +45,9 @@ export default class MessageCreate extends Event {
 				if (authorAfk.mentions.length > 0) {
 					const mentionLines = authorAfk.mentions.slice(-10).map((m: any) => {
 						const link = `https://discord.com/channels/${m.guildId}/${m.channelId}/${m.messageId}`;
-						return `• **${m.userTag}** — [Jump to message](${link}) <t:${Math.floor(m.createdAt.getTime() / 1000)}:R>`;
+						return ` **${m.userTag}**  [Jump to message](${link}) <t:${Math.floor(m.createdAt.getTime() / 1000)}:R>`;
 					});
-					mentionSummary = `\n\n📬 **You were mentioned ${authorAfk.mentions.length} time(s) while AFK:**\n${mentionLines.join('\n')}`;
+					mentionSummary = `\n\n **You were mentioned ${authorAfk.mentions.length} time(s) while AFK:**\n${mentionLines.join('\n')}`;
 					if (authorAfk.mentions.length > 10) {
 						mentionSummary += `\n... and ${authorAfk.mentions.length - 10} more`;
 					}
@@ -58,14 +58,14 @@ export default class MessageCreate extends Event {
 
 				const embed = new EmbedBuilder()
 					.setColor(this.client.color.main)
-					.setDescription(`👋 Welcome back **${message.author.displayName || message.author.username}**! Your AFK has been removed.${mentionSummary}`)
+					.setDescription(` Welcome back **${message.author.displayName || message.author.username}**! Your AFK has been removed.${mentionSummary}`)
 					.setTimestamp();
 
 				await message.reply({ embeds: [embed] }).catch(() => {});
 			}
 		}
 
-		// 2) If someone mentions an AFK user → notify the mentioner
+		// 2) If someone mentions an AFK user  notify the mentioner
 		if (message.mentions.users.size > 0) {
 			for (const [mentionedId] of message.mentions.users) {
 				if (mentionedId === message.author.id) continue; // Don't trigger on self-mention
@@ -89,12 +89,12 @@ export default class MessageCreate extends Event {
 
 					const afkTimestamp = Math.floor(mentionedAfk.timestamp.getTime() / 1000);
 					await message.reply({
-						content: `💤 **<@${mentionedId}>** is AFK: **${mentionedAfk.reason}** — <t:${afkTimestamp}:R>`
+						content: ` **<@${mentionedId}>** is AFK: **${mentionedAfk.reason}**  <t:${afkTimestamp}:R>`
 					}).catch(() => {});
 				}
 			}
 		}
-		// ═══════ END AFK SYSTEM ═══════
+		//  END AFK SYSTEM 
 
 		const [setup, locale, guild] = await Promise.all([
 			this.client.db.getSetup(message.guildId),
@@ -202,8 +202,8 @@ export default class MessageCreate extends Event {
 			}
 
 			if (num !== expected || message.author.id === guildData.countingLastUser) {
-				await message.react('❌');
-				await message.reply(`❌ Wrong number! The next number was **${expected}**. The game has been reset to **1**.`);
+				await message.react(this.client.emoji.cross);
+				await message.reply(`${this.client.emoji.cross} Wrong number! The next number was **${expected}**. The game has been reset to **1**.`);
 				await this.client.prisma.guild.update({
 					where: { id: message.guildId },
 					data: { countingCurrent: 0, countingLastUser: null }
@@ -211,7 +211,7 @@ export default class MessageCreate extends Event {
 				return;
 			}
 
-			await message.react('✅');
+			await message.react(this.client.emoji.success);
 			await this.client.prisma.guild.update({
 				where: { id: message.guildId },
 				data: { 
@@ -235,7 +235,7 @@ export default class MessageCreate extends Event {
 			if (words.length > 1) {
 				await message.delete().catch(() => {});
 				if (message.channel.isTextBased() && 'send' in message.channel) {
-					return await message.channel.send({ content: `❌ ${message.author}, you can only contribute **one word** at a time!` }).then((m: Message) => setTimeout(() => m.delete().catch(() => {}), 5000));
+					return await message.channel.send({ content: `${this.client.emoji.cross} ${message.author}, you can only contribute **one word** at a time!` }).then((m: Message) => setTimeout(() => m.delete().catch(() => {}), 5000));
 				}
 				return;
 			}
@@ -243,7 +243,7 @@ export default class MessageCreate extends Event {
 			if (message.author.id === storyData.lastUser) {
 				await message.delete().catch(() => {});
 				if (message.channel.isTextBased() && 'send' in message.channel) {
-					return await message.channel.send({ content: `❌ ${message.author}, you cannot contribute twice in a row!` }).then((m: Message) => setTimeout(() => m.delete().catch(() => {}), 5000));
+					return await message.channel.send({ content: `${this.client.emoji.cross} ${message.author}, you cannot contribute twice in a row!` }).then((m: Message) => setTimeout(() => m.delete().catch(() => {}), 5000));
 				}
 				return;
 			}
@@ -288,7 +288,7 @@ export default class MessageCreate extends Event {
 
 		// 2. Response Logic (Exclusive Paths)
 		
-		// ════════ PATH A: COMMAND EXECUTION ════════
+		//  PATH A: COMMAND EXECUTION 
 		if (command) {
 			const ctx = new Context(this.client, message);
 			ctx.lng = locale || "en-US";
@@ -298,7 +298,7 @@ export default class MessageCreate extends Event {
 			return await this.handleCommand(command, ctx, args, locale, message);
 		}
 
-		// ════════ PATH B: AI RESPONSE ════════
+		//  PATH B: AI RESPONSE 
 		const repliedMessage = message.reference?.messageId ? 
 			await message.channel.messages.fetch(message.reference.messageId).catch(() => null) : null;
 		const isReplyToBot = repliedMessage?.author.id === this.client.user!.id;
@@ -335,7 +335,7 @@ export default class MessageCreate extends Event {
 			return;
 		}
 
-		// ════════ PATH C: NO RELEVANT TRIGGER ════════
+		//  PATH C: NO RELEVANT TRIGGER 
 		return;
 	}
 

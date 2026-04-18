@@ -55,8 +55,9 @@ export default class Leave extends Command {
 			embeds: [
 				this.client.embed()
 					.setColor(this.client.config.color.main)
-					.setDescription(ctx.locale(I18N.commands.leave.left)),
+					.setDescription(ctx.locale(I18N.commands.leave.left, { channelId: ctx.memberVoiceChannel?.id || "unknown" })),
 			],
 		});
+
 	}
 }

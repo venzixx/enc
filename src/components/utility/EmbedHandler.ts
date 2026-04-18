@@ -100,7 +100,7 @@ export default class EmbedHandler extends Component {
 
             if (customId === 'embed_post') {
                 if (!draft.title && !draft.description) {
-                    return await interaction.reply({ content: '❌ You must at least have a title or description!', flags: [64] });
+                    return await interaction.reply({ content: `${this.client.emoji.cross} You must at least have a title or description!`, flags: [64] });
                 }
 
                 const embed = new EmbedBuilder()
@@ -117,7 +117,7 @@ export default class EmbedHandler extends Component {
                 }
                 this.client.embedDrafts.delete(interaction.user.id);
                 // @ts-ignore - interaction.update is valid here because it's a message component
-                return await interaction.update({ content: '✅ Embed posted successfully!', embeds: [], components: [] });
+                return await interaction.update({ content: `${this.client.emoji.success} Embed posted successfully!`, embeds: [], components: [] });
             }
         }
 

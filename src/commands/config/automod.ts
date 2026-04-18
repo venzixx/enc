@@ -47,7 +47,7 @@ export default class Automod extends Command {
             });
 
             const successEmbed = new EmbedBuilder()
-                .setTitle('âœ… Automod Initialized')
+                .setTitle(`${client.emoji.success} Automod Initialized`)
                 .setDescription('The default Discord profanity, slur, and sexual content filters have been enabled and set to block messages.')
                 .setColor(client.color.main)
                 .setTimestamp();
@@ -55,7 +55,7 @@ export default class Automod extends Command {
             await ctx.reply({ embeds: [successEmbed] });
         } catch (e) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Setup Failed')
+                .setTitle(' Setup Failed')
                 .setDescription('Failed to setup AutoMod rules. Please ensure I have **Administrator** permissions and that you haven\'t reached the rule limit.')
                 .setColor(client.color.red);
 

@@ -1,4 +1,4 @@
-﻿import {
+import {
 	ModalBuilder,
 	TextInputBuilder,
 	TextInputStyle,
@@ -26,13 +26,13 @@ export default class Confess extends Command {
 
 	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
 		if (!ctx.interaction) {
-			return await ctx.sendMessage('âŒ Please use the `/confess` slash command to send a confession.');
+			return await ctx.sendMessage(' Please use the `/confess` slash command to send a confession.');
 		}
 
-		// Show the modal IMMEDIATELY â€” Discord requires this within 3 seconds
+		// Show the modal IMMEDIATELY  Discord requires this within 3 seconds
 		const modal = new ModalBuilder()
 			.setCustomId('confession_modal')
-			.setTitle('ðŸ¤« Anonymous Confession');
+			.setTitle(' Anonymous Confession');
 
 		const confessionInput = new TextInputBuilder()
 			.setCustomId('confession_text')

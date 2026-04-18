@@ -49,7 +49,7 @@ export default class VerifySetup extends Command {
 
 		// Build the verification gate V2 layout
 		const gateLayout = V2Helper.createLayout({
-			title: 'ðŸ›¡ï¸ Verification Gate',
+			title: ' Verification Gate',
 			description: `Welcome to **${ctx.guild.name}**!\n\nPlease click the button below to verify yourself and gain access to the rest of the server.`,
 			color: client.color.main,
 			footer: 'Powered by Enc Security',
@@ -57,7 +57,7 @@ export default class VerifySetup extends Command {
 				new ButtonBuilder()
 					.setCustomId('verify_button')
 					.setLabel('Verify')
-					.setEmoji('âœ…')
+					.setEmoji(client.emoji.success)
 					.setStyle(ButtonStyle.Secondary)
 			]
 		});
@@ -65,7 +65,7 @@ export default class VerifySetup extends Command {
 		await channel.send(gateLayout as any);
 
 		await ctx.replyV2({ 
-            title: 'âœ… Setup Complete', 
+            title: `${client.emoji.success} Setup Complete`, 
             description: `Verification system has been set up in ${channel} with the ${role} role.`,
             isAlert: true,
             color: client.color.main

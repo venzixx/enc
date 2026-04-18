@@ -26,7 +26,7 @@ export default class TicketOpen extends Component {
         });
 
         if (!config) {
-            return await interaction.reply({ content: '❌ This ticket panel is no longer configured.', ephemeral: true });
+            return await interaction.reply({ content: `${client.emoji.cross} This ticket panel is no longer configured.`, ephemeral: true });
         }
 
 		const channelName = `${config.panelId}-${interaction.user.username}`;
@@ -62,7 +62,7 @@ export default class TicketOpen extends Component {
         });
 
 		const ticketLayout = V2Helper.createLayout({
-			title: '🎫 Ticket Dashboard',
+			title: ' Ticket Dashboard',
 			description: config.welcomeMessage.replace('{user}', interaction.user.toString()),
             fields: [
                 { name: 'Creator', value: interaction.user.toString(), inline: true },
@@ -74,22 +74,22 @@ export default class TicketOpen extends Component {
                 new ButtonBuilder()
                     .setCustomId(`ticket_claim_${ticket.id}`)
                     .setLabel('Claim')
-                    .setEmoji('🙋‍♂️')
+                    .setEmoji('')
                     .setStyle(ButtonStyle.Primary),
                 new ButtonBuilder()
                     .setCustomId(`ticket_close`)
                     .setLabel('Close')
-                    .setEmoji('🔒')
+                    .setEmoji('')
                     .setStyle(ButtonStyle.Danger),
                 new ButtonBuilder()
                     .setCustomId(`ticket_rename`)
                     .setLabel('Rename')
-                    .setEmoji('📝')
+                    .setEmoji(client.emoji.edit)
                     .setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder()
                     .setCustomId(`ticket_add`)
                     .setLabel('Add User')
-                    .setEmoji('➕')
+                    .setEmoji('')
                     .setStyle(ButtonStyle.Secondary)
             ]
 		});
@@ -101,7 +101,7 @@ export default class TicketOpen extends Component {
 
 		await interaction.reply({ 
             ...V2Helper.createLayout({
-                title: '✅ Ticket Opened',
+                title: `${client.emoji.success} Ticket Opened`,
                 description: `Your ticket has been opened in ${ticketChannel}!`,
                 isAlert: true,
                 color: this.client.color.main,

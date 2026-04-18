@@ -6,12 +6,16 @@ import {
 	MessageFlags,
 	type ModalSubmitInteraction,
     type ColorResolvable,
+    ButtonBuilder,
 } from "discord.js";
 import type { Player } from "lavalink-client";
 import { I18N, t } from "../structures/I18n";
 import { ExtendedClient } from "../client";
 import { checkDj, createButtonRow } from "../events/player/TrackStart";
 import { updateSetup } from "./SetupSystem";
+import { V2Helper } from "./V2Helper";
+import { getButtons } from "./Buttons";
+
 
 export async function handlePlayerInteraction(
 	client: ExtendedClient,
@@ -69,25 +73,17 @@ export async function updatePlayerMessage(
 
 	// Otherwise, edit the current message (normal player)
 	const track = player.queue.current!;
-	const embed = new EmbedBuilder()
-		.setAuthor({
-			name: t(I18N.player.trackStart.now_playing, { lng: locale }),
-			iconURL: client.config.icons[track.info.sourceName] || client.user?.displayAvatarURL(),
-		})
-		.setDescription(
-			`**[${track.info.title}](${track.info.uri})**\n` +
-				`-# ${text}\n` +
-				`${t(I18N.player.trackStart.author, { lng: locale })}: ${track.info.author}\n` +
-				`${t(I18N.player.trackStart.duration, { lng: locale })}: ${track.info.isStream ? "LIVE" : client.utils.formatTime(track.info.duration)}`,
-		)
-		.setColor(client.config.color.main as ColorResolvable);
+    const layout = V2Helper.createLayout({
+        title: t(I18N.player.trackStart.now_playing, { lng: locale }),
+        description: `**[${track.info.title}](${track.info.uri})**\n` +
+                     `-# ${text}\n` +
+                     `${t(I18N.player.trackStart.author, { lng: locale })}: ${track.info.author}\n` +
+                     `${t(I18N.player.trackStart.duration, { lng: locale })}: ${track.info.isStream ? "LIVE" : client.utils.formatTime(track.info.duration)}`,
+        color: client.config.color.main as ColorResolvable,
+        thumbnail: track.info.artworkUrl || undefined,
+        buttons: getButtons(player).flatMap(b => b.components as any).map(c => ButtonBuilder.from(c as any))
+    });
 
-	if (track.info.artworkUrl) {
-		embed.setThumbnail(track.info.artworkUrl);
-	}
-
-	await interaction.message.edit({
-		embeds: [embed],
-		components: [createButtonRow(player)],
-	});
+	await interaction.message.edit(layout as any);
 }
+

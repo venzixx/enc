@@ -36,7 +36,7 @@ export default class UserInfo extends Command {
 
         const member = await Resolver.resolveMember(ctx);
         if (!member) {
-            return await ctx.reply({ content: '❌ Could not find that member.', flags: [64] });
+            return await ctx.reply({ content: `${client.emoji.cross} Could not find that member.`, flags: [64] });
         }
 
 		const user = member.user;
@@ -50,9 +50,9 @@ export default class UserInfo extends Command {
 			.setThumbnail(user.displayAvatarURL())
 			.setColor(member.displayColor || client.color.main)
 			.addFields(
-				{ name: '👤 User', value: `**ID:** \`${user.id}\`\n**Bot:** \`${user.bot ? 'Yes' : 'No'}\`\n**Created:** <t:${Math.floor(user.createdTimestamp / 1000)}:R>`, inline: true },
-				{ name: '🏢 Membership', value: `**Joined:** <t:${Math.floor(member.joinedTimestamp! / 1000)}:R>\n**Top Role:** ${member.roles.highest}`, inline: true },
-				{ name: `🎭 Roles (${roles.length})`, value: roles.length > 10 ? roles.slice(0, 10).join(', ') + ` and ${roles.length - 10} more...` : roles.join(', ') || 'None', inline: false }
+				{ name: `${client.emoji.user} User`, value: `**ID:** \`${user.id}\`\n**Bot:** \`${user.bot ? 'Yes' : 'No'}\`\n**Created:** <t:${Math.floor(user.createdTimestamp / 1000)}:R>`, inline: true },
+				{ name: ' Membership', value: `**Joined:** <t:${Math.floor(member.joinedTimestamp! / 1000)}:R>\n**Top Role:** ${member.roles.highest}`, inline: true },
+				{ name: ` Roles (${roles.length})`, value: roles.length > 10 ? roles.slice(0, 10).join(', ') + ` and ${roles.length - 10} more...` : roles.join(', ') || 'None', inline: false }
 			)
 			.setTimestamp();
 

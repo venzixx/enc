@@ -1,4 +1,4 @@
-﻿import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -34,7 +34,7 @@ export default class WelcomeSetup extends Command {
 
 		if (!channel.isTextBased()) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Setup Error')
+                .setTitle(' Setup Error')
                 .setDescription('Please select a text-based channel.')
                 .setColor(client.color.red);
 			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
@@ -47,7 +47,7 @@ export default class WelcomeSetup extends Command {
 		});
 
         const successEmbed = new EmbedBuilder()
-            .setTitle('âœ… Setup Complete')
+            .setTitle(`${client.emoji.success} Setup Complete`)
             .setDescription(`Welcome messages will now be sent in ${channel}.`)
             .setColor(client.color.main)
             .setTimestamp();

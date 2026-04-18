@@ -53,7 +53,7 @@ export default class Giveaway extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
-		await ctx.deferReply({ ephemeral: true });
+		await ctx.deferReply(true);
 		const sub = ctx.options.getSubcommand();
 
 		if (sub === 'start') {
@@ -64,28 +64,28 @@ export default class Giveaway extends Command {
 
 			const time = duration ? ms(duration) : null;
 			if (!time || (time as any) < 10000) {
-                return await ctx.replyV2({ 
-                    title: 'âŒ Invalid Duration', 
-                    description: 'Please provide a valid duration (minimum 10 seconds). Example: `1h`, `1d`.',
-                    isAlert: true,
-                    color: client.color.red,
-                    ephemeral: true
-                });
-            }
+				return await ctx.replyV2({
+					title: ' Invalid Duration',
+					description: 'Please provide a valid duration (minimum 10 seconds). Example: `1h`, `1d`.',
+					isAlert: true,
+					color: client.color.red,
+					ephemeral: true
+				});
+			}
 
 			const endTime = new Date(Date.now() + (time as any));
-            const giveawayLayout = V2Helper.createLayout({
-                title: `ðŸŽ‰ Giveaway: ${prize} ðŸŽ‰`,
-                description: `Click the button below to enter!\n\nâŒ› **Ends:** <t:${Math.floor(endTime.getTime() / 1000)}:R>\nðŸŽ **Winners:** ${winners}\nðŸ‘¤ **Hosted by:** ${ctx.author}`,
-                color: client.color.main,
-                buttons: [
-                    new ButtonBuilder()
-                        .setCustomId('giveaway_enter')
-                        .setLabel('Enter')
-                        .setEmoji('ðŸŽ‰')
-                        .setStyle(ButtonStyle.Secondary)
-                ]
-            });
+			const giveawayLayout = V2Helper.createLayout({
+				title: ` Giveaway: ${prize} `,
+				description: `Click the button below to enter!\n\n${client.emoji.clock} **Ends:** <t:${Math.floor(endTime.getTime() / 1000)}:R>\n **Winners:** ${winners}\n${client.emoji.user} **Hosted by:** ${ctx.author}`,
+				color: client.color.main,
+				buttons: [
+					new ButtonBuilder()
+						.setCustomId('giveaway_enter')
+						.setLabel('Enter')
+						.setEmoji({ id: '1494693113216634880', name: 'success' })
+						.setStyle(ButtonStyle.Secondary)
+				]
+			});
 
 			const msg = await channel.send(giveawayLayout as any);
 
@@ -101,13 +101,13 @@ export default class Giveaway extends Command {
 				}
 			});
 
-			return await ctx.replyV2({ 
-                title: 'âœ… Giveaway Started', 
-                description: `The giveaway has been successfully started in ${channel}.`,
-                isAlert: true,
-                color: client.color.main,
-                ephemeral: true
-            });
+			return await ctx.replyV2({
+				title: `${client.emoji.success} Giveaway Started`,
+				description: `The giveaway has been successfully started in ${channel}.`,
+				isAlert: true,
+				color: client.color.main,
+				ephemeral: true
+			});
 		}
 
 		if (sub === 'end') {
@@ -115,13 +115,13 @@ export default class Giveaway extends Command {
 			const giveaway = await client.prisma.giveaway.findUnique({ where: { messageId } });
 
 			if (!giveaway || !giveaway.isActive) {
-				return await ctx.replyV2({ 
-                    title: 'âŒ Active Giveaway Not Found', 
-                    description: 'Could not find an active giveaway with that message ID.',
-                    isAlert: true,
-                    color: client.color.red,
-                    ephemeral: true
-                });
+				return await ctx.replyV2({
+					title: ' Active Giveaway Not Found',
+					description: 'Could not find an active giveaway with that message ID.',
+					isAlert: true,
+					color: client.color.red,
+					ephemeral: true
+				});
 			}
 
 			await client.prisma.giveaway.update({
@@ -129,59 +129,59 @@ export default class Giveaway extends Command {
 				data: { endTime: new Date() }
 			});
 
-			return await ctx.replyV2({ 
-                title: 'âœ… Ending Giveaway', 
-                description: 'The giveaway has been scheduled to end in the next cycle.',
-                isAlert: true,
-                color: client.color.main,
-                ephemeral: true
-            });
+			return await ctx.replyV2({
+				title: `${client.emoji.success} Ending Giveaway`,
+				description: 'The giveaway has been scheduled to end in the next cycle.',
+				isAlert: true,
+				color: client.color.main,
+				ephemeral: true
+			});
 		}
 
 		if (sub === 'reroll') {
 			const messageId = ctx.options.getString('message_id');
-			const giveaway = await client.prisma.giveaway.findUnique({ 
+			const giveaway = await client.prisma.giveaway.findUnique({
 				where: { messageId },
 				include: { entries: true }
 			});
 
 			if (!giveaway) {
-                return await ctx.replyV2({ 
-                    title: 'âŒ Giveaway Not Found', 
-                    description: 'Could not find a giveaway with that message ID.',
-                    isAlert: true,
-                    color: client.color.red,
-                    ephemeral: true
-                });
-            }
+				return await ctx.replyV2({
+					title: ' Giveaway Not Found',
+					description: 'Could not find a giveaway with that message ID.',
+					isAlert: true,
+					color: client.color.red,
+					ephemeral: true
+				});
+			}
 			if (giveaway.isActive) {
-                return await ctx.replyV2({ 
-                    title: 'âŒ Still Active', 
-                    description: 'This giveaway is still active. Please end it before rerolling.',
-                    isAlert: true,
-                    color: client.color.red,
-                    ephemeral: true
-                });
-            }
+				return await ctx.replyV2({
+					title: ' Still Active',
+					description: 'This giveaway is still active. Please end it before rerolling.',
+					isAlert: true,
+					color: client.color.red,
+					ephemeral: true
+				});
+			}
 
 			const entries = giveaway.entries;
 			if (entries.length === 0) {
-                return await ctx.replyV2({ 
-                    title: 'âŒ No Entries', 
-                    description: 'No users entered this giveaway, so a winner cannot be rerolled.',
-                    isAlert: true,
-                    color: client.color.red,
-                    ephemeral: true
-                });
-            }
+				return await ctx.replyV2({
+					title: ' No Entries',
+					description: 'No users entered this giveaway, so a winner cannot be rerolled.',
+					isAlert: true,
+					color: client.color.red,
+					ephemeral: true
+				});
+			}
 
 			const winner = entries[Math.floor(Math.random() * entries.length)];
-            
-			return await ctx.replyV2({ 
-                title: 'ðŸŽ‰ New Winner Selected!', 
-                description: `Congratulations <@${winner.userId}>, you are the new winner of **${giveaway.prize}**!`,
-                color: client.color.main
-            });
+
+			return await ctx.replyV2({
+				title: ' New Winner Selected!',
+				description: `Congratulations <@${winner.userId}>, you are the new winner of **${giveaway.prize}**!`,
+				color: client.color.main
+			});
 		}
 	}
 }

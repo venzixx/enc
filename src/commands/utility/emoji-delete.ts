@@ -29,25 +29,25 @@ export default class EmojiDelete extends Command {
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
 		await ctx.deferReply();
 		const emojiStr = ctx.options.getString('emoji');
 		const parsed = parseEmoji(emojiStr);
 
 		if (!parsed?.id) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Invalid Emoji')
+                .setTitle(' Invalid Emoji')
                 .setDescription('Please provide a valid custom emoji from this server.')
-                .setColor(_client.color.red);
+                .setColor(client.color.red);
 			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}
 
 		const emoji = ctx.guild.emojis.cache.get(parsed.id);
 		if (!emoji) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Emoji Not Found')
+                .setTitle(' Emoji Not Found')
                 .setDescription('Could not find that emoji in this server.')
-                .setColor(_client.color.red);
+                .setColor(client.color.red);
 			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}
 
@@ -55,16 +55,16 @@ export default class EmojiDelete extends Command {
             const name = emoji.name;
 			await emoji.delete();
             const successEmbed = new EmbedBuilder()
-                .setTitle('âœ… Emoji Deleted')
+                .setTitle(`${client.emoji.success} Emoji Deleted`)
                 .setDescription(`Successfully removed the emoji: **${name}**`)
-                .setColor(_client.color.main)
+                .setColor(client.color.main)
                 .setTimestamp();
 			await ctx.reply({ embeds: [successEmbed] });
 		} catch (e: any) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Deletion Failed')
+                .setTitle(' Deletion Failed')
                 .setDescription(`Failed to delete emoji: ${e.message}`)
-                .setColor(_client.color.red);
+                .setColor(client.color.red);
 			await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}
 	}

@@ -1,4 +1,4 @@
-﻿import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -39,7 +39,7 @@ export default class Afk extends Command {
 				embeds: [
 					client.embed()
 						.setColor(client.color.main)
-						.setDescription(`ðŸ’¤ You are already AFK: **${existing.reason}**\n\nSend any message to remove your AFK status.`)
+						.setDescription(` You are already AFK: **${existing.reason}**\n\nSend any message to remove your AFK status.`)
 				]
 			});
 		}
@@ -53,7 +53,7 @@ export default class Afk extends Command {
 
 		const embed = new EmbedBuilder()
 			.setColor(client.color.main)
-			.setDescription(`ðŸ’¤ **${ctx.author.displayName || ctx.author.username}** is now AFK: **${reason}**`)
+			.setDescription(` **${ctx.author.displayName || ctx.author.username}** is now AFK: **${reason}**`)
 			.setFooter({ text: 'Send any message to remove your AFK status' })
 			.setTimestamp();
 

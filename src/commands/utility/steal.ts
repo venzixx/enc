@@ -47,7 +47,7 @@ export default class Steal extends Command {
 		const name = ctx.options.getString('name') || args[1];
 
 		if (!input || !name) {
-			return await ctx.reply({ content: '❌ Please provide an emoji/url and a name.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} Please provide an emoji/url and a name.`, flags: [64] });
 		}
 
 		try {
@@ -56,7 +56,7 @@ export default class Steal extends Command {
 				if (input.includes('/stickers/')) {
 					await ctx.guild.stickers.create({ file: input, name });
 					const embed = new EmbedBuilder()
-						.setTitle('✅ Sticker Stolen')
+						.setTitle(`${client.emoji.success} Sticker Stolen`)
 						.setDescription(`Successfully added sticker **${name}** to the server.`)
 						.setColor(client.color.main)
 						.setTimestamp();
@@ -64,7 +64,7 @@ export default class Steal extends Command {
 				} else {
 					await ctx.guild.emojis.create({ attachment: input, name });
 					const embed = new EmbedBuilder()
-						.setTitle('✅ Emoji Stolen')
+						.setTitle(`${client.emoji.success} Emoji Stolen`)
 						.setDescription(`Successfully added emoji **${name}** to the server.`)
 						.setColor(client.color.main)
 						.setTimestamp();
@@ -79,17 +79,17 @@ export default class Steal extends Command {
 				await ctx.guild.emojis.create({ attachment: url, name: name || parsedEmoji.name });
 				
 				const embed = new EmbedBuilder()
-					.setTitle('✅ Emoji Stolen')
+					.setTitle(`${client.emoji.success} Emoji Stolen`)
 					.setDescription(`Successfully added emoji **${name || parsedEmoji.name}** to the server.`)
 					.setColor(client.color.main)
 					.setTimestamp();
 				return await ctx.reply({ embeds: [embed] });
 			} else {
-				return await ctx.reply({ content: '❌ Invalid emoji or URL provided.', flags: [64] });
+				return await ctx.reply({ content: `${client.emoji.cross} Invalid emoji or URL provided.`, flags: [64] });
 			}
 		} catch (error: any) {
 			const errorEmbed = new EmbedBuilder()
-				.setTitle('❌ Failed to Steal')
+				.setTitle(`${client.emoji.cross} Failed to Steal`)
 				.setDescription(`An error occurred: ${error.message}`)
 				.setColor(client.color.red);
 			await ctx.reply({ embeds: [errorEmbed], flags: [64] });

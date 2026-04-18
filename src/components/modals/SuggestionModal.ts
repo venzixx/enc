@@ -25,21 +25,21 @@ export default class SuggestionModal extends Component {
         });
 
         if (!guildData?.suggestionChannelId) {
-            return await interaction.reply({ content: '❌ Suggestion channel is not configured.', ephemeral: true });
+            return await interaction.reply({ content: `${client.emoji.cross} Suggestion channel is not configured.`, ephemeral: true });
         }
 
         const channel = interaction.guild!.channels.cache.get(guildData.suggestionChannelId) as TextChannel;
         if (!channel) {
-            return await interaction.reply({ content: '❌ The suggestion channel no longer exists.', ephemeral: true });
+            return await interaction.reply({ content: `${client.emoji.cross} The suggestion channel no longer exists.`, ephemeral: true });
         }
 
         try {
             // Initial Embed
             const embed = new EmbedBuilder()
-                .setTitle('💡 New Suggestion')
+                .setTitle(' New Suggestion')
                 .setDescription(content)
                 .addFields(
-                    { name: '📊 Statistics', value: '🧪 Upvotes: `0` | ⛔ Downvotes: `0`' }
+                    { name: ' Statistics', value: ' Upvotes: `0` |  Downvotes: `0`' }
                 )
                 .setColor(this.client.color.main)
                 .setFooter({ text: 'Use the buttons below to vote!' })
@@ -58,12 +58,12 @@ export default class SuggestionModal extends Component {
                 new ButtonBuilder()
                     .setCustomId('suggest_up')
                     .setLabel('Upvote')
-                    .setEmoji('🧪')
+                    .setEmoji('')
                     .setStyle(ButtonStyle.Success),
                 new ButtonBuilder()
                     .setCustomId('suggest_down')
                     .setLabel('Downvote')
-                    .setEmoji('⛔')
+                    .setEmoji('')
                     .setStyle(ButtonStyle.Danger)
             );
 
@@ -81,13 +81,13 @@ export default class SuggestionModal extends Component {
             });
 
             await interaction.reply({ 
-                content: '✅ Your suggestion has been submitted successfully!', 
+                content: `${client.emoji.success} Your suggestion has been submitted successfully!`, 
                 ephemeral: true 
             });
 
         } catch (error) {
             console.error('Suggestion Error:', error);
-            await interaction.reply({ content: '❌ I failed to post your suggestion.', ephemeral: true });
+            await interaction.reply({ content: `${client.emoji.cross} I failed to post your suggestion.`, ephemeral: true });
         }
     }
 }

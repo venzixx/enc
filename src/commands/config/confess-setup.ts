@@ -40,7 +40,7 @@ export default class ConfessSetup extends Command {
 
 		if (!channel || !channel.isTextBased()) {
 			return await ctx.replyV2({ 
-                title: '❌ Setup Error', 
+                title: `${client.emoji.cross} Setup Error`, 
                 description: 'Please select a text-based channel.', 
                 isAlert: true,
                 color: client.color.red,
@@ -56,20 +56,20 @@ export default class ConfessSetup extends Command {
 
         // Send starter message to the confession channel via V2
         await channel.send(V2Helper.createLayout({
-            title: '🤫 Anonymous Confessions',
+            title: ' Anonymous Confessions',
             description: 'Share your deepest secrets anonymously! Click the button below to send a confession.',
             color: client.color.main,
             footer: 'Your identity will remain completely hidden.',
             buttons: [
                 new ButtonBuilder()
                     .setCustomId('confess_create')
-                    .setLabel('📝 Send Confession')
+                    .setLabel(`${client.emoji.edit} Send Confession`)
                     .setStyle(ButtonStyle.Primary)
             ]
         }) as any).catch(() => {});
 
 		await ctx.replyV2({ 
-            title: '✅ Setup Complete', 
+            title: `${client.emoji.success} Setup Complete`, 
             description: `Anonymous confessions will now be posted in ${channel}. A starter button has been sent there.`,
             isAlert: true,
             color: client.color.main

@@ -16,36 +16,36 @@ export default class GiveawayEnter extends Component {
 		});
 
 		if (!giveaway || !giveaway.isActive) {
-			return await interaction.reply({ 
-                ...V2Helper.createLayout({
-                    title: '❌ Giveaway Ended',
-                    description: 'This giveaway is no longer active.',
-                    isAlert: true,
-                    color: this.client.color.red,
-                    ephemeral: true
-                }) as any
-            });
+			return await interaction.reply({
+				...V2Helper.createLayout({
+					title: `${this.client.emoji.cross} Giveaway Ended`,
+					description: 'This giveaway is no longer active.',
+					isAlert: true,
+					color: this.client.color.red,
+					ephemeral: true
+				}) as any
+			});
 		}
 
 		const exists = await this.client.prisma.giveawayEntry.findUnique({
-			where: { 
-				giveawayId_userId: { 
-					giveawayId: giveaway.id, 
-					userId: interaction.user.id 
-				} 
+			where: {
+				giveawayId_userId: {
+					giveawayId: giveaway.id,
+					userId: interaction.user.id
+				}
 			}
 		});
 
 		if (exists) {
-			return await interaction.reply({ 
-                ...V2Helper.createLayout({
-                    title: '❌ Already Entered',
-                    description: 'You have already joined this giveaway!',
-                    isAlert: true,
-                    color: this.client.color.red,
-                    ephemeral: true
-                }) as any
-            });
+			return await interaction.reply({
+				...V2Helper.createLayout({
+					title: `${this.client.emoji.cross} Already Entered`,
+					description: 'You have already joined this giveaway!',
+					isAlert: true,
+					color: this.client.color.red,
+					ephemeral: true
+				}) as any
+			});
 		}
 
 		await this.client.prisma.giveawayEntry.create({
@@ -55,14 +55,14 @@ export default class GiveawayEnter extends Component {
 			}
 		});
 
-		await interaction.reply({ 
-            ...V2Helper.createLayout({
-                title: '✅ Entry Confirmed',
-                description: 'You have successfully entered the giveaway! Good luck! 🎉',
-                isAlert: true,
-                color: this.client.color.main,
-                ephemeral: true
-            }) as any
-        });
+		await interaction.reply({
+			...V2Helper.createLayout({
+				title: `${this.client.emoji.success} Entry Confirmed`,
+				description: 'You have successfully entered the giveaway! Good luck! ',
+				isAlert: true,
+				color: this.client.color.main,
+				ephemeral: true
+			}) as any
+		});
 	}
 }

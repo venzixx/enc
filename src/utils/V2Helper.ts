@@ -68,41 +68,48 @@ export class V2Helper {
             });
         }
 
-        // Add Thumbnail as a component (Type 11) if present
+        // Add Thumbnail as part of a Section (Type 9)
+        const primaryContent = (title ? `### ${title}\n` : "") + (description || "");
+
         if (thumbnail) {
             container.components.push({
-                type: 11,
-                url: thumbnail
+                type: 9, // Section
+                components: [ // Required by validator: components[0].components[0].components
+                    {
+                        type: 10, // Text Display
+                        content: primaryContent || "\u200b"
+                    }
+                ],
+                accessory: {
+                    type: 11, // Thumbnail accessory
+                    media: { // Required by validator: accessory.media
+                        url: thumbnail
+                    }
+                }
             });
-        }
-
-        // Build main text content (Type 10)
-        let primaryContent = '';
-        if (title) primaryContent += `## ${title}\n`;
-        if (description) primaryContent += description;
-
-        if (primaryContent) {
+        } else if (primaryContent) {
             container.components.push({
-                type: 10,
+                type: 10, // Text Display
                 content: primaryContent
             });
         }
 
-        // Add fields as individual text display components
+
+
+        // Add fields as compact text
         if (fields && fields.length > 0) {
-            for (const field of fields) {
-                container.components.push({
-                    type: 10,
-                    content: `**${field.name}**\n${field.value}`
-                });
-            }
+            const fieldContent = fields.map(f => `**${f.name}**: ${f.value}`).join("\n");
+            container.components.push({
+                type: 10,
+                content: fieldContent
+            });
         }
 
-        // Add footer component
+        // Add footer component (Type 10 with decoration)
         if (footer) {
             container.components.push({
                 type: 10,
-                content: `-# ${footer}`
+                content: `-# ${footer}` // Reduced size text
             });
         }
 
@@ -110,11 +117,11 @@ export class V2Helper {
         if (container.components.length === 0) {
             container.components.push({
                 type: 10,
-                content: '\u200b'
+                content: "\u200b"
             });
         }
 
-        // Add buttons in ActionRows (Type 1)
+        // Add action rows (Type 1) directly into the same card container
         if (buttons && buttons.length > 0) {
             for (let i = 0; i < buttons.length; i += 5) {
                 const chunk = buttons.slice(i, i + 5);
@@ -125,7 +132,6 @@ export class V2Helper {
             }
         }
 
-        // Add select menu in its own ActionRow
         if (selectMenu) {
             container.components.push({
                 type: 1,
@@ -134,6 +140,7 @@ export class V2Helper {
         }
 
         return {
+            content: "", // Clear legacy fields
             components: [container],
             flags: options.ephemeral ? (MessageFlags.Ephemeral | MessageFlags.IsComponentsV2) : MessageFlags.IsComponentsV2
         };

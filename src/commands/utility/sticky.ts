@@ -53,7 +53,7 @@ export default class Sticky extends Command {
 		if (sub === 'add') {
 			const content = ctx.options.getString('message') || args.slice(1).join(' ');
 			if (!content) {
-				return await ctx.reply({ content: '❌ Please provide a message to stick.', flags: [64] });
+				return await ctx.reply({ content: `${client.emoji.cross} Please provide a message to stick.`, flags: [64] });
 			}
 
 			await client.prisma.stickyMessage.upsert({
@@ -63,7 +63,7 @@ export default class Sticky extends Command {
 			});
 
 			const embed = new EmbedBuilder()
-				.setTitle('📌 Sticky Message Set')
+				.setTitle(' Sticky Message Set')
 				.setDescription(`The following message will now stick to the bottom of this channel:\n\n${content}`)
 				.setColor(client.color.main)
 				.setTimestamp();
@@ -77,14 +77,14 @@ export default class Sticky extends Command {
 
 			if (!data) {
 				const embed = new EmbedBuilder()
-					.setTitle('❌ No Sticky Message')
+					.setTitle(`${client.emoji.cross} No Sticky Message`)
 					.setDescription('There is no sticky message set for this channel.')
 					.setColor(client.color.red);
 				return await ctx.reply({ embeds: [embed] });
 			}
 
 			const embed = new EmbedBuilder()
-				.setTitle('📌 Current Sticky Message')
+				.setTitle(' Current Sticky Message')
 				.setDescription(data.content)
 				.setColor(client.color.main)
 				.setFooter({ text: 'Sticky Message' })
@@ -98,7 +98,7 @@ export default class Sticky extends Command {
 			}).catch(() => null);
 
 			const embed = new EmbedBuilder()
-				.setTitle('✅ Sticky Removed')
+				.setTitle(`${client.emoji.success} Sticky Removed`)
 				.setDescription('Successfully removed the sticky message from this channel.')
 				.setColor(client.color.main)
 				.setTimestamp();

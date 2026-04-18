@@ -62,33 +62,30 @@ export default class Ping extends Command {
 		}
 
 		const color = this.client.color.main;
-		const pulseEmoji = '\u26A1';
-		const ping = Date.now() - ctx.createdTimestamp;
-		const playerLatency = nodePing;
 		const uptime = `${Math.floor(client.uptime! / 86400000)}d ${Math.floor(client.uptime! / 3600000) % 24}h ${Math.floor(client.uptime! / 60000) % 60}m`;
 
 		return await ctx.replyV2({
-			title: `${pulseEmoji} **System Heartbeat**`,
+			title: `**System Heartbeat**`,
 			description: `Detailed diagnostics and latency benchmarks for **${client.user?.username}**.`,
 			media: 'https://i.imgur.com/u8M0C0F.png', // Premium pulse banner
 			fields: [
 				{
-					name: '\uD83D\uDCE1 **API LATENCY**',
+					name: `${client.emoji.info} **API LATENCY**`,
 					value: `> \`${wsPing}ms\` (Discord API)`,
 					inline: true
 				},
 				{
-					name: '\uD83D\uDCEC **REST LATENCY**',
-					value: `> \`${ping}ms\` (Message Loop)`,
+					name: `${client.emoji.info} **REST LATENCY**`,
+					value: `> \`${wsPing}ms\` (Message Loop)`,
 					inline: true
 				},
 				{
-					name: '\u2601\uFE0F **LAVALINK**',
-					value: `> \`${playerLatency}\` (Voice Node)`,
+					name: `${client.emoji.music} **LAVALINK**`,
+					value: `> \`${nodePing}\` (Voice Node)`,
 					inline: true
 				},
 				{
-					name: '\u2699\uFE0F **ENVIRONMENT**',
+					name: `${client.emoji.edit} **ENVIRONMENT**`,
 					value: `> \`NodeJS ${process.version}\` \u2022 \`Up ${uptime}\``,
 					inline: false
 				}

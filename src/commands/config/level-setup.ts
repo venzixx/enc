@@ -40,7 +40,7 @@ export default class LevelSetup extends Command {
 		});
 
         const successEmbed = new EmbedBuilder()
-            .setTitle('✅ Setup Complete')
+            .setTitle(`${client.emoji.success} Setup Complete`)
             .setDescription(`Level-up notifications will now be sent in ${channel}.`)
             .setColor(client.color.main)
             .setTimestamp();

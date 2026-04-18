@@ -23,12 +23,12 @@ export default class AICharacterModal extends Component {
 			});
 
 			await interaction.reply({ 
-                content: `✅ **Custom Personality Set!** I will now act as described in your prompt.`,
+                content: `${client.emoji.success} **Custom Personality Set!** I will now act as described in your prompt.`,
                 ephemeral: true 
             });
 		} catch (error) {
 			console.error('AI Character Modal error:', error);
-			await interaction.reply({ content: '❌ I failed to save your custom personality.', ephemeral: true });
+			await interaction.reply({ content: `${client.emoji.cross} I failed to save your custom personality.`, ephemeral: true });
 		}
 	}
 }

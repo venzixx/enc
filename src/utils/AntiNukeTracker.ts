@@ -1,5 +1,6 @@
 import { Guild, GuildMember, PermissionFlagsBits, EmbedBuilder, TextChannel } from 'discord.js';
 import { ExtendedClient } from '../client';
+import { AuditLogger, AuditLogType, AuditLogStatus } from './AuditLogger';
 
 /**
  * Wick-Style Anti-Nuke Action Tracker
@@ -94,13 +95,13 @@ export class AntiNukeTracker {
                 const logChannel = await guild.channels.fetch(guildData.logChannelId).catch(() => null) as TextChannel;
                 if (logChannel) {
                     const embed = new EmbedBuilder()
-                        .setTitle('🚨 SECURITY BREACH PREVENTED')
+                        .setTitle(`${client.emoji.exclamation} SECURITY BREACH PREVENTED`)
                         .setDescription(`A mass-action nuke attempt was detected and neutralized.`)
                         .addFields(
-                            { name: '👤 Offender', value: `<@${member.id}> (\`${member.id}\`)`, inline: true },
-                            { name: '🛡️ Category', value: `\`${category.replace('antiNuke', '')}\``, inline: true },
-                            { name: '📊 Intensity', value: `\`${count}\` actions in 30s`, inline: true },
-                            { name: '⚡ Punishment', value: 'Role Stripped (Demoted)', inline: false }
+                            { name: `${client.emoji.user} Offender`, value: `<@${member.id}> (\`${member.id}\`)`, inline: true },
+                            { name: `${client.emoji.shield} Category`, value: `\`${category.replace('antiNuke', '')}\``, inline: true },
+                            { name: ' Intensity', value: `\`${count}\` actions in 30s`, inline: true },
+                            { name: ' Punishment', value: 'Role Stripped (Demoted)', inline: false }
                         )
                         .setColor(client.color.red)
                         .setTimestamp();

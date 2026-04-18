@@ -52,7 +52,7 @@ export default class AntiNukeBotShield extends Event {
                 const logChannel = await guild.channels.fetch(guildData.logChannelId).catch(() => null) as any;
                 if (logChannel) {
                     await logChannel.send({
-                        content: `🚨 **Anti-Nuke Alert**: Unauthorized bot **${member.user.tag}** was added by <@${log.executorId}> and has been auto-kicked.`
+                        content: `${this.client.emoji.exclamation} **Anti-Nuke Alert**: Unauthorized bot **${member.user.tag}** was added by <@${log.executorId}> and has been auto-kicked.`
                     });
                 }
             }

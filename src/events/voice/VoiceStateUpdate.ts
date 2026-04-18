@@ -69,9 +69,10 @@ export default class VoiceStateUpdate extends Event {
                 if (tempVoice) {
                     try {
                         await oldChannel.delete();
-                        await (this.client.prisma as any).tempVoice.delete({
+                        await (this.client.prisma as any).tempVoice.deleteMany({
                             where: { channelId: oldChannel.id }
                         });
+
                     } catch (error) {
                         console.error('Error deleting empty temp voice channel:', error);
                     }

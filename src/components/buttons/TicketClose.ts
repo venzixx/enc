@@ -19,12 +19,12 @@ export default class TicketClose extends Component {
         });
 
         if (!ticket) {
-            return await interaction.reply({ content: '❌ Ticket data not found. I can only close processed tickets.', ephemeral: true });
+            return await interaction.reply({ content: `${this.client.emoji.cross} Ticket data not found. I can only close processed tickets.`, ephemeral: true });
         }
 
         const response = await interaction.reply({ 
             ...V2Helper.createLayout({
-                title: '🔒 Close Confirmation',
+                title: ' Close Confirmation',
                 description: `Are you sure you want to close this ticket?\n\n**Note:** A transcript will be sent to <@${ticket.userId}>, and the channel will be deleted.\n\n<@${ticket.userId}>, please confirm if this ticket can be closed.`,
                 isAlert: true,
                 color: 0xFFA500,
@@ -50,14 +50,14 @@ export default class TicketClose extends Component {
         collector.on('collect', async (i: ButtonInteraction) => {
             if (i.customId === 'cancel_close') {
                 if (i.user.id !== ticket.userId && !i.memberPermissions?.has('Administrator')) {
-                    return await i.reply({ content: '❌ Only the ticket creator or an Admin can cancel the closure.', ephemeral: true });
+                    return await i.reply({ content: `${this.client.emoji.cross} Only the ticket creator or an Admin can cancel the closure.`, ephemeral: true });
                 }
-                await i.update({ content: '✅ Closure cancelled.', embeds: [], components: [] });
+                await i.update({ content: `${this.client.emoji.success} Closure cancelled.`, embeds: [], components: [] });
                 return collector.stop('cancelled');
             }
 
             if (i.customId === 'confirm_close') {
-                await i.update({ content: '🔒 Closing ticket and generating transcript...', embeds: [], components: [] });
+                await i.update({ content: ' Closing ticket and generating transcript...', embeds: [], components: [] });
                 collector.stop('confirmed');
             }
         });
@@ -82,7 +82,7 @@ export default class TicketClose extends Component {
                 const creator = await interaction.guild?.members.fetch(ticket.userId);
                 if (creator) {
                     await creator.send({ 
-                        content: `👋 Your ticket **#${channel.name}** in **${interaction.guild?.name}** has been closed. Here is your transcript:`,
+                        content: ` Your ticket **#${channel.name}** in **${interaction.guild?.name}** has been closed. Here is your transcript:`,
                         files: [transcriptFile]
                     });
                 }

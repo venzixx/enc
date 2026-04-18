@@ -26,12 +26,12 @@ export default class TicketAddUserModal extends Component {
 
             const embed = new EmbedBuilder()
                 .setColor(this.client.color.main)
-                .setDescription(`➕ ${targetUser} has been added to the ticket by ${interaction.user}`)
+                .setDescription(` ${targetUser} has been added to the ticket by ${interaction.user}`)
                 .setTimestamp();
 
             await interaction.reply({ embeds: [embed] });
         } catch (error) {
-            await interaction.reply({ content: '❌ Invalid User ID or user not found in this server.', ephemeral: true });
+            await interaction.reply({ content: `${client.emoji.cross} Invalid User ID or user not found in this server.`, ephemeral: true });
         }
 	}
 }

@@ -78,17 +78,13 @@ export default class Play extends Command {
 		if (!player.connected) await player.connect();
 
 		const response = (await player.search({ query: query }, ctx.author)) as SearchResult;
-		const embed = this.client.embed();
-
 		if (!response || response.tracks?.length === 0) {
-			return await ctx.editMessage({
-				content: "",
-				embeds: [
-					embed
-						.setColor(this.client.config.color.red)
-						.setDescription(ctx.locale(I18N.commands.play.errors.search_error)),
-				],
-			});
+			return await ctx.editMessageV2({
+                title: `${client.emoji.cross} Search Error`,
+                description: ctx.locale(I18N.commands.play.errors.search_error),
+                isAlert: true,
+                color: this.client.config.color.red
+            });
 		}
 
 		await player.queue.add(response.loadType === "playlist" ? response.tracks : response.tracks[0]);
@@ -99,28 +95,22 @@ export default class Play extends Command {
 		}
 
 		if (response.loadType === "playlist") {
-			await ctx.editMessage({
-				content: "",
-				embeds: [
-					embed.setColor(this.client.config.color.main).setDescription(
-						ctx.locale(I18N.commands.play.added_playlist_to_queue, {
-							length: response.tracks.length,
-						}),
-					),
-				],
-			});
+			await ctx.editMessageV2({
+                title: `${client.emoji.music} Playlist Added`,
+                description: ctx.locale(I18N.commands.play.added_playlist_to_queue, {
+                    length: response.tracks.length,
+                }),
+                color: this.client.config.color.main
+            });
 		} else {
-			await ctx.editMessage({
-				content: "",
-				embeds: [
-					embed.setColor(this.client.config.color.main).setDescription(
-						ctx.locale(I18N.commands.play.added_to_queue, {
-							title: response.tracks[0].info.title,
-							uri: response.tracks[0].info.uri,
-						}),
-					),
-				],
-			});
+			await ctx.editMessageV2({
+                title: `${client.emoji.music} Track Added`,
+                description: ctx.locale(I18N.commands.play.added_to_queue, {
+                    title: response.tracks[0].info.title,
+                    uri: response.tracks[0].info.uri,
+                }),
+                color: this.client.config.color.main
+            });
 		}
 		if (!player.playing && player.queue.tracks.length > 0) await player.play({ paused: false });
 	}
@@ -132,19 +122,35 @@ export default class Play extends Command {
 			return await interaction.respond([]);
 		}
 
-		const res = await this.client.lavalink.search({ query: focusedValue.value.trim() }, interaction.user);
-		const songs: ApplicationCommandOptionChoiceData[] = [];
+		try {
+			// Hard 2.5s Timeout for Autocomplete to prevent Discord error 10062
+			const timeoutPromise = new Promise((_, reject) => 
+				setTimeout(() => reject(new Error("Autocomplete Timeout")), 2500)
+			);
+			
+			const res = await Promise.race([
+				this.client.lavalink.search({ query: focusedValue.value.trim() }, interaction.user),
+				timeoutPromise
+			]) as any;
 
-		if (res.loadType === "search") {
-			res.tracks.slice(0, 10).forEach((track: any) => {
-				const name = `${track.info.title} by ${track.info.author}`;
-				songs.push({
-					name: name.length > 100 ? `${name.substring(0, 97)}...` : name,
-					value: track.info.uri,
+			const songs: ApplicationCommandOptionChoiceData[] = [];
+
+			if (res.loadType === "search") {
+				res.tracks.slice(0, 10).forEach((track: any) => {
+					const name = `${track.info.title} by ${track.info.author}`;
+					songs.push({
+						name: name.length > 100 ? `${name.substring(0, 97)}...` : name,
+						value: track.info.uri,
+					});
 				});
-			});
-		}
+			}
 
-		return await interaction.respond(songs);
+			return await interaction.respond(songs);
+		} catch (error) {
+			// Gracefully handle timeouts or search errors by responding with an empty array
+			if (!interaction.responded) {
+				return await interaction.respond([]).catch(() => {});
+			}
+		}
 	}
 }

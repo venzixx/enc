@@ -63,14 +63,14 @@ export default class Lyrics extends Command {
 			const currentTrack = player?.queue?.current;
 
 			if (!currentTrack) {
-				return await ctx.editReply({
-					embeds: [
-						client.embed()
-							.setColor(client.color.red)
-							.setDescription("❌ Nothing is playing right now. Provide a song name: `/lyrics <song>`")
-					],
+				return await ctx.editMessageV2({
+					title: `${client.emoji.cross} Player Empty`,
+					description: `Nothing is playing right now. Provide a song name: \`/lyrics <song>\``,
+					isAlert: true,
+					color: client.color.red
 				});
 			}
+
 
 			searchTitle = currentTrack.info.title;
 			searchArtist = currentTrack.info.author;
@@ -115,7 +115,7 @@ export default class Lyrics extends Command {
 					embeds: [
 						client.embed()
 							.setColor(client.color.red)
-							.setDescription(`❌ No lyrics found for **${searchTitle}**`)
+							.setDescription(`${client.emoji.cross} No lyrics found for **${searchTitle}**`)
 					],
 				});
 			}
@@ -128,22 +128,20 @@ export default class Lyrics extends Command {
 				lyrics = lyrics.substring(0, 3900) + "\n\n... **(lyrics truncated)**";
 			}
 
-			const embed = client.embed()
-				.setColor(client.color.main)
-				.setTitle(`🎤 ${data.trackName || searchTitle}`)
-				.setDescription(lyrics)
-				.setFooter({ text: `Artist: ${data.artistName || searchArtist || "Unknown"} • Powered by LRCLIB` })
-				.setTimestamp();
-
-			return await ctx.editReply({ embeds: [embed] });
+			return await ctx.editMessageV2({
+				title: `${client.emoji.music} ${data.trackName || searchTitle}`,
+				description: lyrics,
+				footer: `Artist: ${data.artistName || searchArtist || "Unknown"} | Powered by LRCLIB`,
+				color: client.color.main
+			});
 		} catch (error) {
-			return await ctx.editReply({
-				embeds: [
-					client.embed()
-						.setColor(client.color.red)
-						.setDescription(`❌ Failed to fetch lyrics for **${searchTitle}**`)
-				],
+			return await ctx.editMessageV2({
+				title: `${client.emoji.cross} Search Error`,
+				description: `Failed to fetch lyrics for **${searchTitle}**`,
+				isAlert: true,
+				color: client.color.red
 			});
 		}
 	}
 }
+

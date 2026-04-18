@@ -58,7 +58,7 @@ export class QuoteGenerator {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText('“', 550, 50);
+        ctx.fillText('', 550, 50);
 
         // 4. Draw Quote Content
         const textX = 640;
@@ -94,7 +94,7 @@ export class QuoteGenerator {
         // Author Name
         ctx.font = `bold 38px serif`;
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(`— ${authorName}`, textX, attributionY);
+        ctx.fillText(` ${authorName}`, textX, attributionY);
 
         // Author Handle
         ctx.font = `22px sans-serif`;

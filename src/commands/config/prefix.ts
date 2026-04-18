@@ -1,4 +1,4 @@
-﻿import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -34,7 +34,7 @@ export default class Prefix extends Command {
 
 		if (newPrefix.length > 5) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Prefix Error')
+                .setTitle(' Prefix Error')
                 .setDescription('Prefix cannot be longer than 5 characters.')
                 .setColor(client.color.red);
 			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
@@ -47,7 +47,7 @@ export default class Prefix extends Command {
 		});
 
         const successEmbed = new EmbedBuilder()
-            .setTitle('âœ… Prefix Updated')
+            .setTitle(`${client.emoji.success} Prefix Updated`)
             .setDescription(`Server prefix has been successfully updated to: \`${newPrefix}\``)
             .setColor(client.color.main)
             .setTimestamp();

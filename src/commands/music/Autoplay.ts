@@ -51,8 +51,9 @@ export default class Autoplay extends Command {
 			embeds: [
 				this.client.embed()
 					.setColor(this.client.config.color.main)
-					.setDescription(ctx.locale(autoplay ? I18N.commands.autoplay.off : I18N.commands.autoplay.on)),
+					.setDescription(ctx.locale(autoplay ? I18N.autoplay.messages.disabled : I18N.autoplay.messages.enabled)),
 			],
 		});
 	}
 }
+

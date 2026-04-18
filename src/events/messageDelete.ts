@@ -17,7 +17,7 @@ export default class MessageDelete extends Event {
 
         // Log to Data Core Manifest
         await AuditLogger.log(this.client, message.guild, {
-            type: AuditLogType.MODERATION,
+            type: AuditLogType.MESSAGES,
             event: 'Message Deleted',
             status: AuditLogStatus.INFO,
             executorId: message.author?.id,
@@ -37,7 +37,7 @@ export default class MessageDelete extends Event {
         const logChannel = message.guild.channels.cache.get(guildData.logChannelId);
         if (logChannel && logChannel.isTextBased()) {
             const embed = new EmbedBuilder()
-                .setTitle('🗑️ Message Deleted')
+                .setTitle(`${this.client.emoji.remove_user} Message Deleted`)
                 .setColor(this.client.color.red)
                 .setAuthor({ name: message.author?.tag || 'Unknown User', iconURL: message.author?.displayAvatarURL() })
                 .addFields(

@@ -39,8 +39,8 @@ export default class Leaderboard extends Command {
 
 		switch(type) {
 			case 'invite':
-				title = '\uD83D\uDCE9 Invite Leaderboard';
-				icon = '\uD83D\uDCE9';
+				title = 'Invite Leaderboard';
+				icon = client.emoji.user;
 				const topInvites = await client.prisma.member.findMany({
 					where: { guildId: ctx.guild.id, invites: { gt: 0 } },
 					orderBy: { invites: 'desc' },
@@ -52,8 +52,8 @@ export default class Leaderboard extends Command {
 				break;
 
 			case 'messages':
-				title = '\uD83D\uDCDD Message Leaderboard';
-				icon = '\uD83D\uDCDD';
+				title = 'Message Leaderboard';
+				icon = client.emoji.edit;
 				const topMessages = await client.prisma.member.findMany({
 					where: { guildId: ctx.guild.id, messages: { gt: 0 } },
 					orderBy: { messages: 'desc' },
@@ -66,8 +66,8 @@ export default class Leaderboard extends Command {
 
 			case 'level':
 			default:
-				title = '\uD83C\uDFC6 Global Rank Leaderboard';
-				icon = '\uD83C\uDFC6';
+				title = 'Global Rank Leaderboard';
+				icon = client.emoji.rank;
 				const topLevels = await client.prisma.member.findMany({
 					where: { guildId: ctx.guild.id, level: { gt: 0 } },
 					orderBy: [{ level: 'desc' }, { xp: 'desc' }],

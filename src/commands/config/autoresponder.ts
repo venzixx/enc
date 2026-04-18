@@ -69,7 +69,7 @@ export default class Autoresponder extends Command {
             }
 
             const embed = new EmbedBuilder()
-                .setTitle('✅ Responder Updated')
+                .setTitle(`${client.emoji.success} Responder Updated`)
                 .setDescription(`Auto-response for \`${trigger}\` has been set up successfully.`)
                 .setColor(client.color.main)
                 .setTimestamp();
@@ -86,13 +86,13 @@ export default class Autoresponder extends Command {
 
             if (deleted.count === 0) {
                 return await ctx.reply({ 
-                    content: `❌ No auto-response found for \`${trigger}\`.`, 
+                    content: `${client.emoji.cross} No auto-response found for \`${trigger}\`.`, 
                     flags: [64] 
                 });
             }
 
             const embed = new EmbedBuilder()
-                .setTitle('✅ Responder Removed')
+                .setTitle(`${client.emoji.success} Responder Removed`)
                 .setDescription(`Successfully deleted the auto-response for \`${trigger}\`.`)
                 .setColor(client.color.main)
                 .setTimestamp();
@@ -107,14 +107,14 @@ export default class Autoresponder extends Command {
 
             if (responders.length === 0) {
                 return await ctx.reply({ 
-                    content: 'ℹ️ No auto-responses are currently configured for this server.', 
+                    content: `${client.emoji.info} No auto-responses are currently configured for this server.`, 
                     flags: [64] 
                 });
             }
 
-            const list = responders.map(r => `• \`${r.trigger}\` → ${r.response}`).join('\n');
+            const list = responders.map(r => ` \`${r.trigger}\`  ${r.response}`).join('\n');
             const embed = new EmbedBuilder()
-                .setTitle('🤖 Auto-Responses')
+                .setTitle(' Auto-Responses')
                 .setDescription(`Current triggers and their replies:\n\n${list.slice(0, 4000)}`)
                 .setColor(client.color.main)
                 .setTimestamp();

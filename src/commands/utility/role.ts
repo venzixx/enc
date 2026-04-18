@@ -42,7 +42,7 @@ export default class RoleCommand extends Command {
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
 		await ctx.deferReply();
 		const sub = ctx.options.getSubcommand();
 		
@@ -52,25 +52,25 @@ export default class RoleCommand extends Command {
 
 		if (!target || !role) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('❌ Not Found')
+                .setTitle(`${client.emoji.cross} Not Found`)
                 .setDescription('Could not find that member or role.')
-                .setColor(_client.color.red);
+                .setColor(client.color.red);
 			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}
 
 		if (role.position >= (ctx.member as GuildMember).roles.highest.position && ctx.guild.ownerId !== ctx.author.id) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('❌ Permission Denied')
+                .setTitle(`${client.emoji.cross} Permission Denied`)
                 .setDescription('You cannot manage a role higher than or equal to your own.')
-                .setColor(_client.color.red);
+                .setColor(client.color.red);
 			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}
 
 		if (role.position >= (ctx.guild.members.me as GuildMember).roles.highest.position) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('❌ Hierarchy Error')
+                .setTitle(`${client.emoji.cross} Hierarchy Error`)
                 .setDescription('I cannot manage this role. Check my role position and ensure it is below mine.')
-                .setColor(_client.color.red);
+                .setColor(client.color.red);
 			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}
 
@@ -78,39 +78,39 @@ export default class RoleCommand extends Command {
 			if (sub === 'add') {
 				if (target.roles.cache.has(role.id)) {
                     const errorEmbed = new EmbedBuilder()
-                        .setTitle('❌ Already Has Role')
+                        .setTitle(`${client.emoji.cross} Already Has Role`)
                         .setDescription(`**${target.user.tag}** already has the ${role} role.`)
-                        .setColor(_client.color.red);
+                        .setColor(client.color.red);
 					return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 				}
 				await target.roles.add(role);
                 const successEmbed = new EmbedBuilder()
-                    .setTitle('✅ Role Added')
+                    .setTitle(`${client.emoji.success} Role Added`)
                     .setDescription(`Successfully added the ${role} role to **${target.user.tag}**.`)
-                    .setColor(_client.color.main)
+                    .setColor(client.color.main)
                     .setTimestamp();
 				await ctx.reply({ embeds: [successEmbed] });
 			} else {
 				if (!target.roles.cache.has(role.id)) {
                     const errorEmbed = new EmbedBuilder()
-                        .setTitle('❌ Missing Role')
+                        .setTitle(`${client.emoji.cross} Missing Role`)
                         .setDescription(`**${target.user.tag}** does not have the ${role} role.`)
-                        .setColor(_client.color.red);
+                        .setColor(client.color.red);
 					return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 				}
 				await target.roles.remove(role);
                 const successEmbed = new EmbedBuilder()
-                    .setTitle('✅ Role Removed')
+                    .setTitle(`${client.emoji.success} Role Removed`)
                     .setDescription(`Successfully removed the ${role} role from **${target.user.tag}**.`)
-                    .setColor(_client.color.main)
+                    .setColor(client.color.main)
                     .setTimestamp();
 				await ctx.reply({ embeds: [successEmbed] });
 			}
 		} catch (e: any) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('❌ Execution Error')
+                .setTitle(`${client.emoji.cross} Execution Error`)
                 .setDescription(`An error occurred: ${e.message}`)
-                .setColor(_client.color.red);
+                .setColor(client.color.red);
 			await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}
 	}

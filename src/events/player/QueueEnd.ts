@@ -18,7 +18,7 @@ export default class QueueEnd extends Event {
 		if (!guild) return;
 		const locale = await this.client.db.getLanguage(player.guildId);
 
-		// 🔹 Autoplay: search for a related track and keep playing
+		//  Autoplay: search for a related track and keep playing
 		const autoplay = player.get<boolean>("autoplay");
 		if (autoplay && track) {
 			try {
@@ -37,7 +37,7 @@ export default class QueueEnd extends Event {
 					
 					await player.queue.add(pick);
 					if (!player.playing) await player.play({ paused: false });
-					return; // Don't run cleanup — music continues
+					return; // Don't run cleanup  music continues
 				}
 			} catch (error) {
 				// Autoplay failed silently, fall through to normal queue end

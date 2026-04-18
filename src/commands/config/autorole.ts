@@ -49,7 +49,7 @@ export default class Autorole extends Command {
             });
 
             const embed = new EmbedBuilder()
-                .setTitle('✅ Autorole Enabled')
+                .setTitle(`${client.emoji.success} Autorole Enabled`)
                 .setDescription(`New members will now automatically receive the **${role.name}** role.`)
                 .setColor(client.color.main)
                 .setTimestamp();
@@ -62,7 +62,7 @@ export default class Autorole extends Command {
             });
 
             const embed = new EmbedBuilder()
-                .setTitle('✅ Autorole Disabled')
+                .setTitle(`${client.emoji.success} Autorole Disabled`)
                 .setDescription('The autorole feature has been disabled. New members will no longer receive a default role.')
                 .setColor(client.color.main)
                 .setTimestamp();

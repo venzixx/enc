@@ -49,28 +49,28 @@ export default class Kick extends Command {
 		const reason = ctx.options.getString('reason') || args.slice(1).join(' ') || 'No reason provided';
 
 		if (!target) {
-			return await ctx.reply({ content: '❌ Could not find that member.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} Could not find that member.`, flags: [64] });
 		}
 
 		if (target.id === ctx.author.id) {
-			return await ctx.reply({ content: '❌ You cannot kick yourself.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} You cannot kick yourself.`, flags: [64] });
 		}
 
 		if (ctx.author.id !== ctx.guild.ownerId && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
-			return await ctx.reply({ content: '❌ You cannot kick someone with a higher or equal role.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} You cannot kick someone with a higher or equal role.`, flags: [64] });
 		}
 
 		if (!target.kickable) {
-			return await ctx.reply({ content: '❌ I cannot kick this user. Check my role position.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} I cannot kick this user. Check my role position.`, flags: [64] });
 		}
 
 		try {
 			await target.kick(`Kicked by ${ctx.author.tag}: ${reason}`);
 			
 			const embed = new EmbedBuilder()
-				.setTitle('👢 Member Kicked')
+				.setTitle(' Member Kicked')
 				.setDescription(`**${target.user.tag}** has been kicked from the server.`)
-				.addFields({ name: '💬 Reason', value: reason })
+				.addFields({ name: `${client.emoji.mic} Reason`, value: reason })
 				.setColor(client.color.main)
 				.setTimestamp();
 
@@ -78,7 +78,7 @@ export default class Kick extends Command {
 
             await logModerationAction(client, ctx.guild, 'KICK', ctx.author, target.user, reason);
 		} catch (error: any) {
-			await ctx.reply({ content: `❌ Failed to kick: ${error.message}`, flags: [64] });
+			await ctx.reply({ content: `${client.emoji.cross} Failed to kick: ${error.message}`, flags: [64] });
 		}
 	}
 }

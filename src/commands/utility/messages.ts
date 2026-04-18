@@ -54,7 +54,7 @@ export default class Messages extends Command {
 
 			if (topMembers.length === 0) {
 				const embed = new EmbedBuilder()
-                    .setTitle('❌ No Data')
+                    .setTitle(`${client.emoji.cross} No Data`)
 					.setDescription('No message data found for this server.')
 					.setColor(client.color.main);
 				return await ctx.reply({ embeds: [embed] });
@@ -62,11 +62,11 @@ export default class Messages extends Command {
 
 			const leaderboard = await Promise.all(topMembers.map(async (m, i) => {
 				const user = await client.users.fetch(m.userId).catch(() => null);
-				return `**${i + 1}.** ${user ? user.tag : 'Unknown'} — \`${m.messages}\` messages`;
+				return `**${i + 1}.** ${user ? user.tag : 'Unknown'}  \`${m.messages}\` messages`;
 			}));
 
 			const embed = new EmbedBuilder()
-				.setTitle(`🏆 Message Leaderboard: ${ctx.guild.name}`)
+				.setTitle(` Message Leaderboard: ${ctx.guild.name}`)
 				.setDescription(leaderboard.join('\n'))
 				.setColor(client.color.main)
 				.setTimestamp();
@@ -83,14 +83,14 @@ export default class Messages extends Command {
 
 			if (!data) {
 				const embed = new EmbedBuilder()
-                    .setTitle('❌ No History')
+                    .setTitle(`${client.emoji.cross} No History`)
 					.setDescription(`**${target.tag}** has no message history in this server.`)
 					.setColor(client.color.main);
 				return await ctx.reply({ embeds: [embed] });
 			}
 
 			const embed = new EmbedBuilder()
-                .setTitle('💬 Message Statistics')
+                .setTitle(`${client.emoji.mic} Message Statistics`)
 				.setAuthor({ name: target.tag, iconURL: target.displayAvatarURL() })
 				.addFields(
 					{ name: 'Total Messages', value: `\`${data.messages}\``, inline: true }

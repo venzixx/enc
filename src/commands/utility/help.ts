@@ -32,8 +32,8 @@ export default class Help extends Command {
 			const command = client.commands.get(commandName) || client.commands.find(c => c.aliases.includes(commandName));
 			if (!command) {
 				return await ctx.replyV2({ 
-                    title: '\uD83D\uDCD6 Help Error', 
-                    description: `\u274C Command \`${commandName}\` not found.`,
+                    title: 'Help Error', 
+                    description: `${client.emoji.cross} Command \`${commandName}\` not found.`,
                     isAlert: true,
                     color: 0xFF0000,
                     ephemeral: true
@@ -41,13 +41,13 @@ export default class Help extends Command {
 			}
 
 			return await ctx.replyV2({
-                title: `\uD83D\uDCD6 Command: ${command.name}`,
+                title: `Command: ${command.name}`,
                 description: command.description.content,
                 fields: [
-					{ name: '\uD83D\uDCC2 Module', value: `\`${command.category}\``, inline: true },
-					{ name: '\u23F3 Cooldown', value: `\`${command.cooldown}s\``, inline: true },
-					{ name: '\uD83D\uDEE0\uFE0F Usage', value: `\`/${command.name} ${command.description.usage}\``, inline: false },
-					{ name: '\uD83D\uDCA1 Examples', value: command.description.examples.map(e => `\`/${e}\``).join('\n'), inline: false }
+					{ name: `${client.emoji.edit} Module`, value: `\`${command.category}\``, inline: true },
+					{ name: `${client.emoji.clock} Cooldown`, value: `\`${command.cooldown}s\``, inline: true },
+					{ name: `${client.emoji.edit} Usage`, value: `\`/${command.name} ${command.description.usage}\``, inline: false },
+					{ name: `${client.emoji.info} Examples`, value: command.description.examples.map(e => `\`/${e}\``).join('\n'), inline: false }
                 ],
                 color: client.color.main,
                 image: 'https://i.imgur.com/uC0aLz1.png'
@@ -65,13 +65,13 @@ export default class Help extends Command {
 		
 		const menu = new StringSelectMenuBuilder()
 			.setCustomId('help_category')
-			.setPlaceholder('\uD83D\uDCC2 Select a Module...')
+			.setPlaceholder('Select a Module...')
 			.addOptions(
 				categories.map(cat => ({
 					label: cat.charAt(0).toUpperCase() + cat.slice(1),
 					value: cat,
 					description: `Explore all ${cat} commands`,
-                    emoji: Help.getCategoryEmoji(cat)
+                    emoji: Help.getCategoryEmoji(cat, client)
 				}))
 			);
 
@@ -85,7 +85,7 @@ export default class Help extends Command {
         ];
 
 		return {
-            title: '\uD83D\uDEE0\uFE0F **Enc Command Hub**',
+            title: `**Enc Command Hub**`,
             description: [
                 `\u00BB **Status Report**`,
                 `Currently operating with **${totalCategories}** specialized modules and **${totalCommands}** commands.`,
@@ -107,25 +107,25 @@ export default class Help extends Command {
         } as any;
     }
 
-    public static getCategoryEmoji(category: string): string {
+    public static getCategoryEmoji(category: string, client: ExtendedClient): string {
         switch(category.toLowerCase()) {
-            case 'general': return '\uD83C\uDF10';
-            case 'info': return '\u2139\uFE0F';
-            case 'moderation': return '\uD83D\uDEE1\uFE0F';
-            case 'music': return '\uD83C\uDFB5';
-            case 'fun': return '\uD83C\uDFAE';
-            case 'tools': return '\uD83D\uDEE0\uFE0F';
-            case 'systems': return '\u2699\uFE0F';
-            case 'voice': return '\uD83D\uDD0A';
-            case 'config': return '\u2699\uFE0F';
-            case 'management': return '\uD83D\uDC54';
-            case 'utility': return '\uD83D\uDD27';
-            case 'social': return '\uD83D\uDCAC';
-            case 'owner': return '\uD83D\uDC51';
-            case 'tickets': return '\uD83C\uDFAB';
-            case 'leveling': return '\uD83D\uDCC8';
-            case 'giveaway': return '\uD83C\uDF89';
-            default: return '\uD83D\uDCC1';
+            case 'general': return client.emoji.info;
+            case 'info': return client.emoji.info;
+            case 'moderation': return client.emoji.shield;
+            case 'music': return client.emoji.music;
+            case 'fun': return client.emoji.random;
+            case 'tools': return client.emoji.edit;
+            case 'systems': return client.emoji.edit;
+            case 'voice': return client.emoji.mic;
+            case 'config': return client.emoji.edit;
+            case 'management': return client.emoji.user;
+            case 'utility': return client.emoji.edit;
+            case 'social': return client.emoji.user;
+            case 'owner': return client.emoji.rank;
+            case 'tickets': return client.emoji.edit;
+            case 'leveling': return client.emoji.rank;
+            case 'giveaway': return client.emoji.random;
+            default: return client.emoji.info;
         }
     }
 }

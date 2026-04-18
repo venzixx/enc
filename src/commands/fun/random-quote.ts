@@ -17,24 +17,24 @@ export default class RandomQuote extends Command {
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
 		try {
 			const response = await fetch('https://api.quotable.io/random');
 			const data: any = await response.json();
 
 			const embed = new EmbedBuilder()
-				.setTitle('📜 Quote')
+				.setTitle(' Quote')
 				.setDescription(`"${data.content}"`)
-				.setFields({ name: '— Author', value: data.author })
-				.setColor(_client.color.main)
+				.setFields({ name: ' Author', value: data.author })
+				.setColor(client.color.main)
 				.setTimestamp();
 
 			await ctx.reply({ embeds: [embed] });
 		} catch (e) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('❌ Quote Error')
+                .setTitle(`${client.emoji.cross} Quote Error`)
                 .setDescription('Could not fetch a quote at the moment. Try again later!')
-                .setColor(_client.color.red);
+                .setColor(client.color.red);
 			await ctx.reply({ embeds: [errorEmbed], flags: [64] });
 		}
 	}

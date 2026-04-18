@@ -57,7 +57,7 @@ export default class Customrole extends Command {
 		if (sub === 'create') {
 			if (existing) {
                 const errorEmbed = new EmbedBuilder()
-                    .setTitle('âŒ Already exists')
+                    .setTitle(' Already exists')
                     .setDescription('You already have a custom role.')
                     .setColor(client.color.red);
                 return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
@@ -79,7 +79,7 @@ export default class Customrole extends Command {
 				});
 
                 const successEmbed = new EmbedBuilder()
-                    .setTitle('âœ… Role Created')
+                    .setTitle(`${client.emoji.success} Role Created`)
                     .setDescription(`Created and added your custom role: ${role}`)
                     .setColor(client.color.main)
                     .setTimestamp();
@@ -87,7 +87,7 @@ export default class Customrole extends Command {
 				return await ctx.reply({ embeds: [successEmbed] });
 			} catch (e: any) {
                 const errorEmbed = new EmbedBuilder()
-                    .setTitle('âŒ Error')
+                    .setTitle(' Error')
                     .setDescription(`An error occurred: ${e.message}`)
                     .setColor(client.color.red);
 				await ctx.reply({ embeds: [errorEmbed], flags: [64] });
@@ -96,7 +96,7 @@ export default class Customrole extends Command {
 
 		if (!existing) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ No Role Found')
+                .setTitle(' No Role Found')
                 .setDescription('You do not have a custom role.')
                 .setColor(client.color.red);
             return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
@@ -107,7 +107,7 @@ export default class Customrole extends Command {
 		if (sub === 'color') {
 			if (!role) {
                 const errorEmbed = new EmbedBuilder()
-                    .setTitle('âŒ Role Lost')
+                    .setTitle(' Role Lost')
                     .setDescription('Your role was manually deleted from the server.')
                     .setColor(client.color.red);
                 return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
@@ -115,7 +115,7 @@ export default class Customrole extends Command {
 			const color = ctx.options.getString('color');
 			await role.setColor(color as any);
             const successEmbed = new EmbedBuilder()
-                .setTitle('âœ… Color Updated')
+                .setTitle(`${client.emoji.success} Color Updated`)
                 .setDescription(`Updated your role color to \`${color}\`.`)
                 .setColor(client.color.main)
                 .setTimestamp();
@@ -128,7 +128,7 @@ export default class Customrole extends Command {
 				where: { guildId_userId: { guildId: ctx.guild.id, userId } }
 			});
             const successEmbed = new EmbedBuilder()
-                .setTitle('âœ… Role Deleted')
+                .setTitle(`${client.emoji.success} Role Deleted`)
                 .setDescription('Successfully deleted your custom role.')
                 .setColor(client.color.main)
                 .setTimestamp();

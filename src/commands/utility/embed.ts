@@ -1,4 +1,4 @@
-﻿import { 
+import { 
     PermissionFlagsBits, 
     EmbedBuilder, 
     ActionRowBuilder, 
@@ -78,23 +78,23 @@ export default class Embed extends Command {
 
 		const getRows = () => {
 			const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-				new ButtonBuilder().setCustomId('eb_basics').setLabel('ðŸ“ Text').setStyle(ButtonStyle.Primary),
-				new ButtonBuilder().setCustomId('eb_color').setLabel('ðŸŽ¨ Color').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('eb_media').setLabel('ðŸ–¼ï¸ Media').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('eb_fields').setLabel('ðŸ“‹ Fields').setStyle(ButtonStyle.Secondary)
+				new ButtonBuilder().setCustomId('eb_basics').setLabel(' Text').setStyle(ButtonStyle.Primary),
+				new ButtonBuilder().setCustomId('eb_color').setLabel(' Color').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('eb_media').setLabel(' Media').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('eb_fields').setLabel(' Fields').setStyle(ButtonStyle.Secondary)
 			);
             const row2 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
                 new StringSelectMenuBuilder()
                     .setCustomId('eb_style')
-                    .setPlaceholder('ðŸ’Ž Select Style (Legacy vs V2)')
+                    .setPlaceholder(' Select Style (Legacy vs V2)')
                     .addOptions([
-                        { label: 'Standard Embed (Legacy)', value: 'legacy', description: 'Traditional Discord embed box', emoji: 'ðŸ“œ', default: embedData.style === 'legacy' },
-                        { label: 'Components V2 (Modern)', value: 'v2', description: 'Premium integrated modular layout', emoji: 'ðŸ’Ž', default: embedData.style === 'v2' }
+                        { label: 'Standard Embed (Legacy)', value: 'legacy', description: 'Traditional Discord embed box', emoji: '', default: embedData.style === 'legacy' },
+                        { label: 'Components V2 (Modern)', value: 'v2', description: 'Premium integrated modular layout', emoji: '', default: embedData.style === 'v2' }
                     ])
             );
 			const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-				new ButtonBuilder().setCustomId('eb_send').setLabel('âœ… Send').setStyle(ButtonStyle.Success),
-				new ButtonBuilder().setCustomId('eb_cancel').setLabel('âŒ Cancel').setStyle(ButtonStyle.Danger)
+				new ButtonBuilder().setCustomId('eb_send').setLabel(`${client.emoji.success} Send`).setStyle(ButtonStyle.Success),
+				new ButtonBuilder().setCustomId('eb_cancel').setLabel(' Cancel').setStyle(ButtonStyle.Danger)
 			);
 			return [row1, row2, row3];
 		};
@@ -102,7 +102,7 @@ export default class Embed extends Command {
         const getBuilderOptions = () => {
             const preview = getPreview();
             return {
-                content: '### ðŸ› ï¸ Message Builder\nCustomize your layout using the controls below.',
+                content: '###  Message Builder\nCustomize your layout using the controls below.',
                 ...preview,
                 components: getRows(),
                 flags: [MessageFlags.Ephemeral, ...(preview as any).flags || []]
@@ -111,7 +111,7 @@ export default class Embed extends Command {
 
 		const response = await ctx.reply(getBuilderOptions() as any);
 
-		const collector = response.createMessageComponentCollector({
+		const collector = (response as any).createMessageComponentCollector({
 			time: 300000 // 5 minutes
 		});
 
@@ -172,7 +172,7 @@ export default class Embed extends Command {
 						embedData.color = val as any;
 						await (submitted as any).update(getBuilderOptions() as any);
 					} else {
-						await submitted.reply({ content: 'âŒ Invalid Hex Color. Use format #RRGGBB', flags: [MessageFlags.Ephemeral] as any });
+						await submitted.reply({ content: ' Invalid Hex Color. Use format #RRGGBB', flags: [MessageFlags.Ephemeral] as any });
 					}
 				}
 			}
@@ -238,12 +238,12 @@ export default class Embed extends Command {
 
 			if (i.isButton() && i.customId === 'eb_send') {
 				await ctx.channel.send(getPreview() as any);
-				await i.update({ content: 'âœ… Message Sent!', components: [], embeds: [] });
+				await i.update({ content: `${client.emoji.success} Message Sent!`, components: [], embeds: [] });
 				collector.stop();
 			}
 
 			if (i.isButton() && i.customId === 'eb_cancel') {
-				await i.update({ content: 'âŒ Cancelled.', components: [], embeds: [], flags: [MessageFlags.Ephemeral] as any });
+				await i.update({ content: ' Cancelled.', components: [], embeds: [], flags: [MessageFlags.Ephemeral] as any });
 				collector.stop();
 			}
 		});

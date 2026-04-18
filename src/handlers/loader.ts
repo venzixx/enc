@@ -105,9 +105,13 @@ export async function loadCommands(client: ExtendedClient) {
     }
 }
 
+const loadedPaths = new Set<string>();
+
 export async function loadEvents(client: ExtendedClient) {
+    const trace = new Error().stack?.split('\n')[2]?.trim();
+    logger.info(`[LOAD_EVENTS] Manifold ignited. Trigger: ${trace}`);
+
     const eventFiles = await glob('src/events/**/*.ts');
-    const loadedPaths = new Set<string>();
 
     for (const file of eventFiles) {
         const filePath = path.resolve(file);
@@ -129,6 +133,12 @@ export async function loadEvents(client: ExtendedClient) {
                 client.lavalink.on(event.name as any, run);
             } else if (event.type === LavamusicEventType.Node) {
                 client.lavalink.nodeManager.on(event.name as any, run);
+            } else if (event.type === LavamusicEventType.Client) {
+                if (event.one) {
+                    client.once(event.name as any, run);
+                } else {
+                    client.on(event.name as any, run);
+                }
             } else {
                 if (event.one) {
                     client.once(event.name as any, run);

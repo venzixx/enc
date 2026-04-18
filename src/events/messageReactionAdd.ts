@@ -51,7 +51,9 @@ export default class MessageReactionAdd extends Event {
                 if (role) {
                     if (member.roles.cache.has(role.id)) continue;
                     
-                    await member.roles.add(role).catch(e => {
+                    await member.roles.add(role).then(() => {
+                        member.send(`You got the **${role.name}** role!`).catch(() => {});
+                    }).catch(e => {
                         console.error(`[ReactionRole] Failed to add role ${role.name} to ${user.tag}:`, e.message);
                     });
                 } else {

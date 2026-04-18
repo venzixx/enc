@@ -84,7 +84,7 @@ async function setupStart(
 					case "error":
 						await message.channel
 							.send(V2Helper.createLayout({
-                                description: `❌ ${t(I18N.player.setupStart.error_searching, { lng: locale })}`,
+                                description: `${client.emoji.cross} ${t(I18N.player.setupStart.error_searching, { lng: locale })}`,
                                 isAlert: true,
                                 color: client.config.color.red as ColorResolvable
                             }) as any)
@@ -95,7 +95,7 @@ async function setupStart(
 						await player.queue.add(res.tracks[0]);
 						await message.channel
 							.send(V2Helper.createLayout({
-                                description: `✅ ${t(I18N.player.setupStart.added_to_queue, {
+                                description: `${client.emoji.success} ${t(I18N.player.setupStart.added_to_queue, {
                                     lng: locale,
                                     title: res.tracks[0].info.title,
                                     uri: res.tracks[0].info.uri,
@@ -112,7 +112,7 @@ async function setupStart(
 						await player.queue.add(res.tracks);
 						await message.channel
 							.send(V2Helper.createLayout({
-                                description: `✅ ${t(I18N.player.setupStart.added_playlist_to_queue, {
+                                description: `${client.emoji.success} ${t(I18N.player.setupStart.added_playlist_to_queue, {
                                     lng: locale,
                                     length: res.tracks.length,
                                 })}`,

@@ -1,4 +1,4 @@
-﻿import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -35,7 +35,7 @@ export default class Mcstatus extends Command {
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
 		const ip = ctx.options.getString('ip');
 		const type = ctx.options.getString('type') || 'java';
 
@@ -48,17 +48,17 @@ export default class Mcstatus extends Command {
 
 			if (!data.online) {
                 const offlineEmbed = new EmbedBuilder()
-                    .setTitle('âŒ Server Offline')
+                    .setTitle(' Server Offline')
                     .setDescription(`The server \`${ip}\` is currently **offline** or unreachable.`)
-                    .setColor(_client.color.red);
+                    .setColor(client.color.red);
 				return ctx.editMessage({ embeds: [offlineEmbed] });
 			}
 
 			const embed = new EmbedBuilder()
-				.setTitle(`ðŸŽ® Minecraft Server Status: ${ip}`)
-				.setColor(_client.color.main)
+				.setTitle(` Minecraft Server Status: ${ip}`)
+				.setColor(client.color.main)
 				.addFields(
-					{ name: 'Status', value: 'ðŸŸ¢ Online', inline: true },
+					{ name: 'Status', value: ' Online', inline: true },
 					{ name: 'Version', value: data.version || 'Unknown', inline: true },
 					{ name: 'Players', value: `${data.players.online}/${data.players.max}`, inline: true },
 					{ name: 'MOTD', value: `\`\`\`${data.motd?.clean?.join('\n') || 'No MOTD'}\`\`\``, inline: false }
@@ -69,9 +69,9 @@ export default class Mcstatus extends Command {
 			await ctx.editMessage({ embeds: [embed] });
 		} catch (e) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle('âŒ Fetch Error')
+                .setTitle(' Fetch Error')
                 .setDescription('Failed to fetch server status. Please try again later.')
-                .setColor(_client.color.red);
+                .setColor(client.color.red);
 			await ctx.editMessage({ embeds: [errorEmbed] });
 		}
 	}

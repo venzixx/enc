@@ -9,6 +9,7 @@ export enum AuditLogType {
     CHANNELS = 'CHANNELS',
     VOICE = 'VOICE',
     WEBHOOKS = 'WEBHOOKS',
+    MESSAGES = 'MESSAGES',
 }
 
 export enum AuditLogStatus {
@@ -35,7 +36,28 @@ export class AuditLogger {
         }
     ) {
         try {
-            // 1. Save to Database Manifest
+            // 1. Sovereign State Check: Verify if logging is enabled for this category
+            const guildSettings = await client.prisma.guild.findUnique({
+                where: { id: guild.id }
+            });
+
+            if (!guildSettings) return;
+
+            let isEnabled = true;
+            switch (data.type) {
+                case AuditLogType.MESSAGES: isEnabled = guildSettings.logMessagesEnabled; break;
+                case AuditLogType.CHANNELS: isEnabled = guildSettings.logChannelsEnabled; break;
+                case AuditLogType.ROLES: isEnabled = guildSettings.logRolesEnabled; break;
+                case AuditLogType.MEMBERS: isEnabled = guildSettings.logMembersEnabled; break;
+                case AuditLogType.MODERATION: isEnabled = guildSettings.logModerationEnabled; break;
+                case AuditLogType.SECURITY: isEnabled = guildSettings.logSecurityEnabled; break;
+                case AuditLogType.VOICE: isEnabled = guildSettings.logVoiceEnabled; break;
+                case AuditLogType.WEBHOOKS: isEnabled = true; break; // Webhooks currently always logged if enabled
+            }
+
+            if (!isEnabled) return;
+
+            // 2. Save to Database Manifest
             await client.prisma.auditLog.create({
                 data: {
                     guildId: guild.id,
@@ -50,14 +72,9 @@ export class AuditLogger {
                 },
             });
 
-            // 2. High-Fidelity Discord Manifestation (Optional)
-            const guildData = await client.prisma.guild.findUnique({
-                where: { id: guild.id },
-                select: { logChannelId: true }
-            });
-
-            if (guildData?.logChannelId) {
-                const logChannel = guild.channels.cache.get(guildData.logChannelId) as TextChannel;
+            // 3. High-Fidelity Discord Manifestation (Optional)
+            if (guildSettings.logChannelId) {
+                const logChannel = guild.channels.cache.get(guildSettings.logChannelId) as TextChannel;
                 if (logChannel && logChannel.isTextBased()) {
                     const embed = new EmbedBuilder()
                         .setTitle(`Event Log // ${data.event}`)

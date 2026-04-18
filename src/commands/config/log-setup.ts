@@ -34,7 +34,7 @@ export default class LogSetup extends Command {
 
 		if (!channel || !channel.isTextBased()) {
 			return await ctx.replyV2({ 
-                title: '❌ Setup Error', 
+                title: `${client.emoji.cross} Setup Error`, 
                 description: 'Please select a text-based channel.', 
                 isAlert: true,
                 color: client.color.red,
@@ -49,7 +49,7 @@ export default class LogSetup extends Command {
 		});
 
 		await ctx.replyV2({ 
-            title: '✅ Setup Complete', 
+            title: `${client.emoji.success} Setup Complete`, 
             description: `Server logs will now be sent in ${channel}.`,
             isAlert: true,
             color: client.color.main

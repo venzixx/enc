@@ -18,7 +18,7 @@ export default class ConfessCreate extends Component {
 	public async run(interaction: ButtonInteraction): Promise<any> {
 		const modal = new ModalBuilder()
 			.setCustomId('confession_modal')
-			.setTitle('🤫 Anonymous Confession');
+			.setTitle(' Anonymous Confession');
 
 		const confessionInput = new TextInputBuilder()
 			.setCustomId('confession_text')

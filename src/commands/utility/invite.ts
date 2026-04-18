@@ -34,16 +34,16 @@ export default class InviteCommand extends Command {
 		const inviteCount = data?.invites || 0;
 
 		return await ctx.replyV2({
-            title: '\uD83D\uDCE9 **Invite Statistics**',
+            title: `**Invite Statistics**`,
             description: `Performance metrics for **${user.username}** within **${ctx.guild.name}**.`,
             fields: [
                 {
-                    name: '\uD83D\uDCC8 **TOTAL INVITES**',
+                    name: `${client.emoji.edit} **TOTAL INVITES**`,
                     value: `> \`${inviteCount}\` successful joins`,
                     inline: true
                 },
                 {
-                    name: '\uD83C\uDFC5 **RANK**',
+                    name: `${client.emoji.rank} **RANK**`,
                     value: `> #${await this.getInviteRank(client, ctx.guild.id, inviteCount)} top inviter`,
                     inline: true
                 }

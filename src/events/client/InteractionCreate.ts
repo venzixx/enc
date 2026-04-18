@@ -280,7 +280,7 @@ export default class InteractionCreate extends Event {
 						});
 					}
 				} catch {
-					// Interaction already expired or was acknowledged — ignore
+					// Interaction already expired or was acknowledged  ignore
 				}
 			}
 

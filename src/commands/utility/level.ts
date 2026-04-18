@@ -43,7 +43,7 @@ export default class Level extends Command {
                 member = ctx.member!;
             } else {
                 // Failed to resolve a specific search term
-                return await ctx.reply({ content: '❌ Could not find that member.', flags: [64] });
+                return await ctx.reply({ content: `${client.emoji.cross} Could not find that member.`, flags: [64] });
             }
         }
 
@@ -55,8 +55,8 @@ export default class Level extends Command {
 		if (!data) {
 			return await ctx.reply({ 
                 content: user.id === ctx.author.id 
-                    ? '📊 You have no rank record yet. Start chatting to gain XP!'
-                    : `❌ **${user.username}** has no rank record yet.`,
+                    ? ' You have no rank record yet. Start chatting to gain XP!'
+                    : `${client.emoji.cross} **${user.username}** has no rank record yet.`,
                 flags: [64]
             });
 		}
@@ -90,7 +90,7 @@ export default class Level extends Command {
         } catch (error) {
             console.error('Level Command Error:', error);
             await ctx.reply({
-                content: `📊 **${user.username}** — **Level ${data.level}** | **XP: ${data.xp}/${nextLevelXP}** | **Rank #${rank}**`,
+                content: ` **${user.username}**  **Level ${data.level}** | **XP: ${data.xp}/${nextLevelXP}** | **Rank #${rank}**`,
             });
         }
 	}

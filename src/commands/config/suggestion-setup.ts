@@ -40,7 +40,7 @@ export default class SuggestionSetup extends Command {
         });
 
         const embed = new EmbedBuilder()
-            .setTitle('✅ Suggestion System Set Up')
+            .setTitle(`${client.emoji.success} Suggestion System Set Up`)
             .setDescription(`Suggestions will now be posted in ${channel}.\nUsers can use \`/suggest\` to submit their ideas!`)
             .setColor(client.color.main)
             .setTimestamp();

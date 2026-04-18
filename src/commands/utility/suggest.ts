@@ -39,7 +39,7 @@ export default class Suggest extends Command {
 
         if (!guildData?.suggestionChannelId) {
             return await ctx.reply({ 
-                content: '❌ The suggestion system has not been set up in this server. An administrator needs to run `/suggestion-setup`.', 
+                content: `${client.emoji.cross} The suggestion system has not been set up in this server. An administrator needs to run \`/suggestion-setup\`.`, 
                 flags: [64] 
             });
         }

@@ -17,12 +17,13 @@ export default class HelpMenu extends Component {
         const buttons = [
             new ButtonBuilder()
                 .setCustomId('help_back')
-                .setLabel('\u2B05\uFE0F Back to Hub')
+                .setEmoji(this.client.emoji.page.back)
+                .setLabel('Back to Hub')
                 .setStyle(ButtonStyle.Secondary)
         ];
 
 		const layout = V2Helper.createLayout({
-			title: `\uD83D\uDCC2 **Module: ${category.charAt(0).toUpperCase() + category.slice(1)}**`,
+			title: `${this.client.emoji.edit} **Module: ${category.charAt(0).toUpperCase() + category.slice(1)}**`,
 			description: [
                 `\u00BB **Commands in this module**`,
                 ...commands.map(c => `**\`/${c.name}\`** \u2022 ${c.description.content}`)

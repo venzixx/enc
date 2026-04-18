@@ -39,6 +39,7 @@ export default class Context {
 	public guild: any; 
 	public member: GuildMember | null;
 	public memberVoiceChannel: Channel | null;
+	public response: Message | null = null;
 	public deferred = false;
 	public replied = false;
 	public lng = "en-US";
@@ -108,7 +109,9 @@ export default class Context {
             }
 			return await this.interaction.reply(options as InteractionReplyOptions);
 		}
-		return await this.channel?.send(options as MessageCreateOptions);
+		const response = await this.channel?.send(options as MessageCreateOptions);
+        if (response) this.response = response;
+        return response;
 	}
 
     public async sendDeferMessage(options: string | MessageCreateOptions | InteractionReplyOptions) {
@@ -119,10 +122,17 @@ export default class Context {
 		if (this.interaction) {
 			return await this.interaction.editReply(options as InteractionEditReplyOptions);
 		}
-		if (this.message) {
-			return await this.message.edit(options as any);
+		if (this.response) {
+			return await this.response.edit(options as any);
 		}
+        // Fallback for logic where editMessage might be called before sendMessage
+        if (this.message) {
+            const response = await this.channel?.send(options as MessageCreateOptions);
+            if (response) this.response = response;
+            return response;
+        }
 	}
+
 
 	public async deleteMessage() {
 		if (this.interaction) {
@@ -160,6 +170,14 @@ export default class Context {
 
     public async replyV2(options: V2Options) {
         return this.sendV2(options);
+    }
+
+    /**
+     * Edits a Discord Components V2 message.
+     */
+    public async editMessageV2(options: V2Options) {
+        const layout = V2Helper.createLayout(options);
+        return this.editMessage(layout as any);
     }
 
 	public async followUp(options: string | InteractionReplyOptions) {

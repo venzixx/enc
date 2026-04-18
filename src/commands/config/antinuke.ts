@@ -117,7 +117,7 @@ export default class AntiNuke extends Command {
 
         if (!isOwner && !isExtraOwner) {
             return await ctx.reply({ 
-                content: '❌ Only the **Server Owner** or an **Extra Owner** can manage Anti-Nuke settings.', 
+                content: `${client.emoji.cross} Only the **Server Owner** or an **Extra Owner** can manage Anti-Nuke settings.`, 
                 ephemeral: true 
             });
         }
@@ -137,7 +137,7 @@ export default class AntiNuke extends Command {
             });
 
             const name = category === 'antiNukeEnabled' ? 'Global Anti-Nuke' : category.replace('antiNuke', '') + ' Protection';
-            return await ctx.reply({ content: `🛡️ **${name}** has been **${state ? 'Enabled' : 'Disabled'}**.` });
+            return await ctx.reply({ content: `${client.emoji.shield} **${name}** has been **${state ? 'Enabled' : 'Disabled'}**.` });
         }
 
         if (subcommand === 'trust') {
@@ -158,14 +158,14 @@ export default class AntiNuke extends Command {
                         create: { guildId: ctx.guild.id, roleId: target.id }
                     });
                 }
-                return await ctx.reply({ content: `✅ Added **${target.displayName || target.name}** to the security whitelist.` });
+                return await ctx.reply({ content: `${client.emoji.success} Added **${target.displayName || target.name}** to the security whitelist.` });
             } else {
                 if ('username' in target) {
                     await client.prisma.whitelistedUser.deleteMany({ where: { guildId: ctx.guild.id, userId: target.id } });
                 } else {
                     await client.prisma.whitelistedRole.deleteMany({ where: { guildId: ctx.guild.id, roleId: target.id } });
                 }
-                return await ctx.reply({ content: `🗑️ Removed **${target.displayName || target.name}** from the security whitelist.` });
+                return await ctx.reply({ content: `${client.emoji.remove_user} Removed **${target.displayName || target.name}** from the security whitelist.` });
             }
         }
 
@@ -179,10 +179,10 @@ export default class AntiNuke extends Command {
                     update: {},
                     create: { guildId: ctx.guild.id, userId: user.id }
                 });
-                return await ctx.reply({ content: `👑 Added **${user.tag}** as an **Extra Owner**.` });
+                return await ctx.reply({ content: `${client.emoji.rank} Added **${user.tag}** as an **Extra Owner**.` });
             } else {
                 await client.prisma.extraOwner.deleteMany({ where: { guildId: ctx.guild.id, userId: user.id } });
-                return await ctx.reply({ content: `🗑️ Removed **${user.tag}** from the Extra Owners.` });
+                return await ctx.reply({ content: `${client.emoji.remove_user} Removed **${user.tag}** from the Extra Owners.` });
             }
         }
     }
@@ -198,20 +198,20 @@ export default class AntiNuke extends Command {
         });
 
         const embed = new EmbedBuilder()
-            .setTitle('🛡️ Anti-Nuke Dashboard')
+            .setTitle(`${client.emoji.shield} Anti-Nuke Dashboard`)
             .setColor(client.color.main)
             .setThumbnail(ctx.guild.iconURL())
             .addFields(
-                { name: '📡 System Status', value: `Global: ${guildData?.antiNukeEnabled ? '✅' : '❌'}`, inline: true },
-                { name: '🛡️ Categories', value: [
-                    `${guildData?.antiNukeBan ? '✅' : '❌'} Ban`,
-                    `${guildData?.antiNukeKick ? '✅' : '❌'} Kick`,
-                    `${guildData?.antiNukeChannel ? '✅' : '❌'} Channel`,
-                    `${guildData?.antiNukeRole ? '✅' : '❌'} Role`,
-                    `${guildData?.antiNukeBot ? '✅' : '❌'} Bot`,
-                    `${guildData?.antiNukeWebhook ? '✅' : '❌'} Webhook`,
+                { name: ' System Status', value: `Global: ${guildData?.antiNukeEnabled ? client.emoji.success : client.emoji.cross}`, inline: true },
+                { name: `${client.emoji.shield} Categories`, value: [
+                    `${guildData?.antiNukeBan ? client.emoji.success : client.emoji.cross} Ban`,
+                    `${guildData?.antiNukeKick ? client.emoji.success : client.emoji.cross} Kick`,
+                    `${guildData?.antiNukeChannel ? client.emoji.success : client.emoji.cross} Channel`,
+                    `${guildData?.antiNukeRole ? client.emoji.success : client.emoji.cross} Role`,
+                    `${guildData?.antiNukeBot ? client.emoji.success : client.emoji.cross} Bot`,
+                    `${guildData?.antiNukeWebhook ? client.emoji.success : client.emoji.cross} Webhook`,
                 ].join('\n'), inline: true },
-                { name: '👑 Extra Owners', value: guildData?.extraOwners.length ? guildData.extraOwners.map(o => `<@${o.userId}>`).join(', ') : 'None', inline: false }
+                { name: `${client.emoji.rank} Extra Owners`, value: guildData?.extraOwners.length ? guildData.extraOwners.map(o => `<@${o.userId}>`).join(', ') : 'None', inline: false }
             );
 
         // Security Audit Logic
@@ -226,10 +226,10 @@ export default class AntiNuke extends Command {
         );
 
         let threatList = threats.size > 0 
-           ? threats.map((m: any) => `• <@${m.id}> (\`${m.id}\`)`).slice(0, 10).join('\n') + (threats.size > 10 ? `\n*+ ${threats.size - 10} more*` : '')
-           : '✅ No at-risk users found.';
+           ? threats.map((m: any) => ` <@${m.id}> (\`${m.id}\`)`).slice(0, 10).join('\n') + (threats.size > 10 ? `\n*+ ${threats.size - 10} more*` : '')
+           : `${client.emoji.success} No at-risk users found.`;
 
-        embed.addFields({ name: '🚨 Security Audit (Un-whitelisted Privileged Users)', value: threatList });
+        embed.addFields({ name: `${client.emoji.exclamation} Security Audit (Un-whitelisted Privileged Users)`, value: threatList });
 
         return await ctx.reply({ embeds: [embed] });
     }

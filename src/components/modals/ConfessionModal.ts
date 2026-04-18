@@ -25,12 +25,12 @@ export default class ConfessionModal extends Component {
 		});
 
 		if (!guildData?.confessionChannel) {
-			return await interaction.reply({ content: '❌ Confessions are not set up in this server.', ephemeral: true });
+			return await interaction.reply({ content: `${this.client.emoji.cross} Confessions are not set up in this server.`, ephemeral: true });
 		}
 
 		const channel = interaction.guild!.channels.cache.get(guildData.confessionChannel) as TextChannel;
 		if (!channel) {
-			return await interaction.reply({ content: '❌ The confession channel no longer exists.', ephemeral: true });
+			return await interaction.reply({ content: `${this.client.emoji.cross} The confession channel no longer exists.`, ephemeral: true });
 		}
 
 		try {
@@ -68,19 +68,19 @@ export default class ConfessionModal extends Component {
 			}
 
 			if (!success) {
-				return await interaction.reply({ content: '❌ Failed to send confession after multiple attempts due to high traffic. Please try again!', ephemeral: true });
+				return await interaction.reply({ content: `${this.client.emoji.cross} Failed to send confession after multiple attempts due to high traffic. Please try again!`, ephemeral: true });
 			}
 
 			// Build the anonymous V2 layout
 			const layout = V2Helper.createLayout({
-				title: `🤫 Anonymous Confession #${confessionNumber}`,
+				title: ` Anonymous Confession #${confessionNumber}`,
 				description: confession,
 				color: this.client.color.main,
 				footer: 'Click the button below to send your own confession!',
 				buttons: [
 					new ButtonBuilder()
 						.setCustomId('confess_create')
-						.setLabel('📝 Write a Confession')
+						.setLabel(`${this.client.emoji.edit} Write a Confession`)
 						.setStyle(ButtonStyle.Secondary)
 				]
 			});
@@ -89,7 +89,7 @@ export default class ConfessionModal extends Component {
 			
 			await interaction.reply({ 
                 ...V2Helper.createLayout({
-                    title: '✅ Confession Sent',
+                    title: `${this.client.emoji.success} Confession Sent`,
                     description: `Your confession **#${confessionNumber}** has been sent anonymously!`,
                     isAlert: true,
                     color: this.client.color.main,
@@ -98,7 +98,7 @@ export default class ConfessionModal extends Component {
             });
 		} catch (error) {
 			console.error('Confession error:', error);
-			await interaction.reply({ content: '❌ I failed to send your confession.', ephemeral: true });
+			await interaction.reply({ content: `${this.client.emoji.cross} I failed to send your confession.`, ephemeral: true });
 		}
 	}
 }

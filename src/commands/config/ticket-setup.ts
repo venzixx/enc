@@ -1,4 +1,4 @@
-﻿import { PermissionFlagsBits, ChannelType, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { PermissionFlagsBits, ChannelType, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { V2Helper } from '../../utils/V2Helper';
@@ -68,7 +68,7 @@ export default class TicketSetup extends Command {
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
 		const panelId = ctx.options.getString('panel_id');
 		const name = ctx.options.getString('name');
 		const channel = ctx.options.getChannel('channel') as any;
@@ -78,19 +78,19 @@ export default class TicketSetup extends Command {
 		const welcome = ctx.options.getString('welcome') || 'Hello {user}, welcome to your support ticket. Our staff will be with you shortly.';
 
         if (!panelId || !name || !channel || !category || !role) {
-            return await ctx.reply({ content: 'âŒ Missing required arguments.', ephemeral: true });
+            return await ctx.reply({ content: ' Missing required arguments.', ephemeral: true });
         }
 
 		const panelV2 = await (channel as any).send(V2Helper.createLayout({
-            title: `ðŸŽ« ${name}`,
+            title: ` ${name}`,
             description: description,
-            footer: `Powered by ${_client.user?.username}`,
-            color: _client.color.main,
+            footer: `Powered by ${client.user?.username}`,
+            color: client.color.main,
             buttons: [
                 new ButtonBuilder()
                     .setCustomId(`ticket_open_${panelId}`)
                     .setLabel('Open Ticket')
-                    .setEmoji('ðŸ“©')
+                    .setEmoji('')
                     .setStyle(ButtonStyle.Secondary)
             ]
         }));
@@ -98,7 +98,7 @@ export default class TicketSetup extends Command {
         const msg = panelV2;
 
         // Save to Database
-        await (_client.prisma as any).ticketConfig.upsert({
+        await (client.prisma as any).ticketConfig.upsert({
             where: {
                 guildId_panelId: {
                     guildId: ctx.guild?.id!,
@@ -128,10 +128,10 @@ export default class TicketSetup extends Command {
         });
 
 		await ctx.replyV2({ 
-            title: 'âœ… Setup Complete', 
+            title: `${client.emoji.success} Setup Complete`, 
             description: `Ticket panel **${name}** (ID: \`${panelId}\`) has been set up in ${channel}.`,
             isAlert: true,
-            color: _client.color.main
+            color: client.color.main
         });
 	}
 }

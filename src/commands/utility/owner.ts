@@ -1,4 +1,4 @@
-﻿import { PermissionFlagsBits, EmbedBuilder } from 'discord.js';
+import { PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -28,45 +28,45 @@ export default class OwnerTransfer extends Command {
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
         if (!ctx.guild) return;
         const member = ctx.member as any;
         const voiceChannel = member.voice.channel;
 
         if (!voiceChannel) {
-            return await ctx.reply({ content: 'âŒ You must be in your temporary voice channel to transfer ownership.', ephemeral: true });
+            return await ctx.reply({ content: ' You must be in your temporary voice channel to transfer ownership.', ephemeral: true });
         }
 
-        const tempVoice = await (_client.prisma as any).tempVoice.findUnique({
+        const tempVoice = await (client.prisma as any).tempVoice.findUnique({
             where: { channelId: voiceChannel.id }
         });
 
         if (!tempVoice) {
-            return await ctx.reply({ content: 'âŒ This is not a temporary voice channel.', ephemeral: true });
+            return await ctx.reply({ content: ' This is not a temporary voice channel.', ephemeral: true });
         }
 
         if (tempVoice.ownerId !== ctx.author.id && !ctx.member?.permissions.has(PermissionFlagsBits.Administrator)) {
-            return await ctx.reply({ content: 'âŒ Only the current owner or an Admin can transfer ownership.', ephemeral: true });
+            return await ctx.reply({ content: ' Only the current owner or an Admin can transfer ownership.', ephemeral: true });
         }
 
         const targetUser = ctx.options.getUser('user');
-        if (!targetUser) return await ctx.reply({ content: 'âŒ User not found.', ephemeral: true });
+        if (!targetUser) return await ctx.reply({ content: ' User not found.', ephemeral: true });
 
         if (targetUser.bot) {
-            return await ctx.reply({ content: 'âŒ You cannot transfer ownership to a bot.', ephemeral: true });
+            return await ctx.reply({ content: ' You cannot transfer ownership to a bot.', ephemeral: true });
         }
 
         if (targetUser.id === ctx.author.id) {
-            return await ctx.reply({ content: 'âŒ You are already the owner!', ephemeral: true });
+            return await ctx.reply({ content: ' You are already the owner!', ephemeral: true });
         }
 
         // Check if target is in the VC
         if (!voiceChannel.members.has(targetUser.id)) {
-            return await ctx.reply({ content: 'âŒ The target user must be inside the voice channel to receive ownership.', ephemeral: true });
+            return await ctx.reply({ content: ' The target user must be inside the voice channel to receive ownership.', ephemeral: true });
         }
 
         // Update DB
-        await (_client.prisma as any).tempVoice.update({
+        await (client.prisma as any).tempVoice.update({
             where: { channelId: voiceChannel.id },
             data: { ownerId: targetUser.id }
         });
@@ -81,6 +81,6 @@ export default class OwnerTransfer extends Command {
             MoveMembers: true
         });
 
-        await ctx.reply({ content: `âœ… Ownership of the channel has been transferred to ${targetUser}.` });
+        await ctx.reply({ content: `${client.emoji.success} Ownership of the channel has been transferred to ${targetUser}.` });
 	}
 }

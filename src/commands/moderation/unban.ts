@@ -48,21 +48,21 @@ export default class Unban extends Command {
 		const reason = ctx.options.getString('reason') || args.slice(1).join(' ') || 'No reason provided';
 
 		if (!user) {
-			return await ctx.reply({ content: '❌ Please provide a valid user ID or mention.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} Please provide a valid user ID or mention.`, flags: [64] });
 		}
 
 		try {
 			const ban = await ctx.guild.bans.fetch(user.id).catch(() => null);
 			if (!ban) {
-				return await ctx.reply({ content: '❌ This user is not banned from this server.', flags: [64] });
+				return await ctx.reply({ content: `${client.emoji.cross} This user is not banned from this server.`, flags: [64] });
 			}
 
 			await ctx.guild.bans.remove(user.id, `Unbanned by ${ctx.author.tag}: ${reason}`);
 			
 			const embed = new EmbedBuilder()
-				.setTitle('🔊 Member Unbanned')
+				.setTitle(`${client.emoji.volmore} Member Unbanned`)
 				.setDescription(`**${user.tag}** (\`${user.id}\`) has been unbanned.`)
-				.addFields({ name: '💬 Reason', value: reason })
+				.addFields({ name: `${client.emoji.mic} Reason`, value: reason })
 				.setColor(client.color.main)
 				.setTimestamp();
 
@@ -70,7 +70,7 @@ export default class Unban extends Command {
 
             await logModerationAction(client, ctx.guild, 'UNBAN', ctx.author, user, reason);
 		} catch (error: any) {
-			await ctx.reply({ content: `❌ Failed to unban: ${error.message}`, flags: [64] });
+			await ctx.reply({ content: `${client.emoji.cross} Failed to unban: ${error.message}`, flags: [64] });
 		}
 	}
 }

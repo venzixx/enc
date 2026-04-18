@@ -46,7 +46,7 @@ export default class VanitySetup extends Command {
 		});
 
         const successEmbed = new EmbedBuilder()
-            .setTitle('âœ… Setup Complete')
+            .setTitle(`${client.emoji.success} Setup Complete`)
             .setDescription(`Vanity tracking has been successfully configured!\n\n**Slug:** \`${slug}\`\n**Role:** ${role}`)
             .setFooter({ text: 'Users with this slug in their status will receive the role automatically.' })
             .setColor(client.color.main)

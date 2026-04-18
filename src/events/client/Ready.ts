@@ -4,6 +4,8 @@ import { Event } from "../../structures";
 import logger from "../../structures/Logger";
 import { LavamusicEventType } from "../../types/events";
 import { ExtendedClient } from "../../client";
+import { startGiveawayScheduler } from "../../tasks/giveawayScheduler";
+
 
 export default class Ready extends Event {
 	constructor(client: ExtendedClient, file: string) {
@@ -15,6 +17,7 @@ export default class Ready extends Event {
 
 	public async run(): Promise<void> {
 		logger.success(`${this.client.user?.tag} is ready!`);
+		await startGiveawayScheduler(this.client);
 
 		this.client.user?.setPresence({
 			activities: [
@@ -24,10 +27,11 @@ export default class Ready extends Event {
 				},
 			],
 			status: (env.BOT_STATUS as any) || "online",
+
 		});
 
 		await this.client.lavalink.init({ ...this.client.user!, shards: "auto" });
-		
+
 		// Initialize invite cache
 		for (const guild of this.client.guilds.cache.values()) {
 			try {

@@ -32,7 +32,7 @@ export default class VoiceControl extends Component {
             if (!tempVoice || tempVoice.ownerId !== interaction.user.id) {
                 return await interaction.editReply({ 
                     ...V2Helper.createLayout({
-                        title: '❌ Error',
+                        title: `${client.emoji.cross} Error`,
                         description: 'You are no longer the owner of this voice channel.',
                         isAlert: true,
                         color: this.client.color.red,
@@ -49,7 +49,7 @@ export default class VoiceControl extends Component {
 
             return await interaction.editReply({ 
                 ...V2Helper.createLayout({
-                    title: '✅ User Added',
+                    title: `${client.emoji.success} User Added`,
                     description: `Successfully granted access to <@${targetId}>!`,
                     isAlert: true,
                     color: this.client.color.main,
@@ -78,7 +78,7 @@ export default class VoiceControl extends Component {
             if (!voiceChannel) {
                 return await interaction.followUp({ 
                     ...V2Helper.createLayout({
-                        title: '❌ Voice Error',
+                        title: `${client.emoji.cross} Voice Error`,
                         description: 'You must be in a voice channel to claim it!',
                         isAlert: true,
                         color: this.client.color.red,
@@ -94,7 +94,7 @@ export default class VoiceControl extends Component {
             if (!currentTempVoice) {
                 return await interaction.followUp({ 
                     ...V2Helper.createLayout({
-                        title: '❌ Voice Error',
+                        title: `${client.emoji.cross} Voice Error`,
                         description: 'This is not a temporary voice channel.',
                         isAlert: true,
                         color: this.client.color.red,
@@ -108,7 +108,7 @@ export default class VoiceControl extends Component {
             if (ownerInChannel) {
                 return await interaction.followUp({ 
                     ...V2Helper.createLayout({
-                        title: '❌ Claim Denied',
+                        title: `${client.emoji.cross} Claim Denied`,
                         description: 'The current owner is still in the channel!',
                         isAlert: true,
                         color: this.client.color.red,
@@ -124,7 +124,7 @@ export default class VoiceControl extends Component {
 
             return await interaction.followUp({ 
                 ...V2Helper.createLayout({
-                    title: '✅ Claimed!',
+                    title: `${client.emoji.success} Claimed!`,
                     description: 'You are now the owner of this voice channel!',
                     isAlert: true,
                     color: this.client.color.main,
@@ -137,7 +137,7 @@ export default class VoiceControl extends Component {
         if (!voiceChannel || !tempVoice || (tempVoice.ownerId !== interaction.user.id && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator))) {
             return await interaction.followUp({ 
                 ...V2Helper.createLayout({
-                    title: '❌ Permission Denied',
+                    title: `${client.emoji.cross} Permission Denied`,
                     description: 'You must be the owner of the temporary voice channel you are currently in to use these controls!',
                     isAlert: true,
                     color: this.client.color.red,
@@ -159,7 +159,7 @@ export default class VoiceControl extends Component {
                 });
                 await interaction.followUp({ 
                     ...V2Helper.createLayout({
-                        title: `✅ Channel ${isHidden ? 'Hidden' : 'Visible'}`,
+                        title: `${client.emoji.success} Channel ${isHidden ? 'Hidden' : 'Visible'}`,
                         description: `The channel is now **${isHidden ? 'hidden from' : 'visible to'}** @everyone.`,
                         isAlert: true,
                         color: this.client.color.main,
@@ -180,7 +180,7 @@ export default class VoiceControl extends Component {
                 });
                 await interaction.followUp({ 
                     ...V2Helper.createLayout({
-                        title: `✅ Channel ${isLocked ? 'Locked' : 'Unlocked'}`,
+                        title: `${client.emoji.success} Channel ${isLocked ? 'Locked' : 'Unlocked'}`,
                         description: `The channel is now **${isLocked ? 'locked' : 'unlocked'}**.`,
                         isAlert: true,
                         color: this.client.color.main,
@@ -210,7 +210,7 @@ export default class VoiceControl extends Component {
                 // Return a user select menu for adding users
                 await interaction.reply({
                     ...V2Helper.createLayout({
-                        title: '👤 Add User to Voice',
+                        title: `${client.emoji.user} Add User to Voice`,
                         description: 'Select a user below to grant them access to your voice channel.',
                         ephemeral: true,
                         color: this.client.color.main,
@@ -228,7 +228,7 @@ export default class VoiceControl extends Component {
                 await (voiceChannel as any).setUserLimit(newLimit);
                 await interaction.followUp({ 
                     ...V2Helper.createLayout({
-                        title: '✅ Limit Updated',
+                        title: `${client.emoji.success} Limit Updated`,
                         description: `User limit increased to **${newLimit === 0 ? 'Unlimited' : newLimit}**.`,
                         isAlert: true,
                         color: this.client.color.main,
@@ -242,7 +242,7 @@ export default class VoiceControl extends Component {
                 await (voiceChannel as any).setUserLimit(newLimit);
                 await interaction.followUp({ 
                     ...V2Helper.createLayout({
-                        title: '✅ Limit Updated',
+                        title: `${client.emoji.success} Limit Updated`,
                         description: `User limit decreased to **${newLimit === 0 ? 'Unlimited' : newLimit}**.`,
                         isAlert: true,
                         color: this.client.color.main,
@@ -254,11 +254,11 @@ export default class VoiceControl extends Component {
             case 'info': {
                 await interaction.followUp({ 
                     ...V2Helper.createLayout({
-                        title: '🎙️ VC Information',
+                        title: `${client.emoji.mic} VC Information`,
                         fields: [
                             { name: 'Owner', value: `<@${tempVoice.ownerId}>`, inline: true },
                             { name: 'Channel', value: `${voiceChannel.name}`, inline: true },
-                            { name: 'Status', value: `${tempVoice.isLocked ? '🔒 Locked' : '🔓 Unlocked'} | ${tempVoice.isHidden ? '👁️ Hidden' : '👁️ Visible'}`, inline: true },
+                            { name: 'Status', value: `${tempVoice.isLocked ? ' Locked' : ' Unlocked'} | ${tempVoice.isHidden ? ' Hidden' : ' Visible'}`, inline: true },
                             { name: 'Limit', value: `${voiceChannel.userLimit === 0 ? 'Unlimited' : voiceChannel.userLimit}`, inline: true }
                         ],
                         color: this.client.color.main,
@@ -270,7 +270,7 @@ export default class VoiceControl extends Component {
             case 'delete': {
                 await interaction.followUp({ 
                     ...V2Helper.createLayout({
-                        title: '🗑️ Deleting Channel',
+                        title: `${client.emoji.remove_user} Deleting Channel`,
                         description: 'Your temporary voice channel is being deleted...',
                         isAlert: true,
                         color: this.client.color.red,

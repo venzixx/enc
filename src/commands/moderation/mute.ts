@@ -57,33 +57,33 @@ export default class Mute extends Command {
 		const reason = ctx.options.getString('reason') || args.slice(2).join(' ') || 'No reason provided';
 
 		if (!target) {
-			return await ctx.reply({ content: '❌ Could not find that member.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} Could not find that member.`, flags: [64] });
 		}
 
 		if (target.id === ctx.author.id) {
-			return await ctx.reply({ content: '❌ You cannot mute yourself.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} You cannot mute yourself.`, flags: [64] });
 		}
 
 		if (ctx.author.id !== ctx.guild.ownerId && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
-			return await ctx.reply({ content: '❌ You cannot mute someone with a higher or equal role.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} You cannot mute someone with a higher or equal role.`, flags: [64] });
 		}
 
 		if (!target.manageable) {
-			return await ctx.reply({ content: '❌ I cannot mute this user. Check my role position.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} I cannot mute this user. Check my role position.`, flags: [64] });
 		}
 
 		const time = durationStr ? ms(durationStr) : null;
 		if (!time || (time as any) < 10000 || (time as any) > 2419200000) {
-			return await ctx.reply({ content: '❌ Invalid duration. Must be between 10s and 28 days.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} Invalid duration. Must be between 10s and 28 days.`, flags: [64] });
 		}
 
 		try {
 			await target.timeout(time as any, `Muted by ${ctx.author.tag}: ${reason}`);
 			
 			const embed = new EmbedBuilder()
-				.setTitle('🔇 Member Muted')
+				.setTitle(' Member Muted')
 				.setDescription(`**${target.user.tag}** has been timed out for **${durationStr}**.`)
-				.addFields({ name: '💬 Reason', value: reason })
+				.addFields({ name: `${client.emoji.mic} Reason`, value: reason })
 				.setColor(client.color.main)
 				.setTimestamp();
 
@@ -91,7 +91,7 @@ export default class Mute extends Command {
 
             await logModerationAction(client, ctx.guild, 'MUTE', ctx.author, target.user, reason, durationStr);
 		} catch (error: any) {
-			await ctx.reply({ content: `❌ Failed to mute: ${error.message}`, flags: [64] });
+			await ctx.reply({ content: `${client.emoji.cross} Failed to mute: ${error.message}`, flags: [64] });
 		}
 	}
 }

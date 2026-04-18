@@ -1,4 +1,4 @@
-﻿import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -35,7 +35,7 @@ export default class Encode extends Command {
 		});
 	}
 
-	public async run(_client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
 		const text = ctx.options.getString('text');
 		const format = ctx.options.getString('format');
 
@@ -48,13 +48,13 @@ export default class Encode extends Command {
 		}
 
         const embed = new EmbedBuilder()
-            .setTitle('âœ¨ Text Encoded')
+            .setTitle(`${client.emoji.random} Text Encoded`)
             .setDescription(`Successfully encoded your text using **${format.toUpperCase()}**.`)
             .addFields(
                 { name: 'Original Text', value: `\`\`\`${text}\`\`\`` },
                 { name: 'Encoded Result', value: `\`\`\`${result}\`\`\`` }
             )
-            .setColor(_client.color.main)
+            .setColor(client.color.main)
             .setTimestamp();
 
 		await ctx.reply({ embeds: [embed] });

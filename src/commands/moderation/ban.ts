@@ -49,28 +49,28 @@ export default class Ban extends Command {
 		const reason = ctx.options.getString('reason') || args.slice(1).join(' ') || 'No reason provided';
 
 		if (!target) {
-			return await ctx.reply({ content: '❌ Could not find that member.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} Could not find that member.`, flags: [64] });
 		}
 
 		if (target.id === ctx.author.id) {
-			return await ctx.reply({ content: '❌ You cannot ban yourself.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} You cannot ban yourself.`, flags: [64] });
 		}
 
 		if (ctx.author.id !== ctx.guild.ownerId && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
-			return await ctx.reply({ content: '❌ You cannot ban someone with a higher or equal role.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} You cannot ban someone with a higher or equal role.`, flags: [64] });
 		}
 
 		if (!target.bannable) {
-			return await ctx.reply({ content: '❌ I cannot ban this user. Check my role position.', flags: [64] });
+			return await ctx.reply({ content: `${client.emoji.cross} I cannot ban this user. Check my role position.`, flags: [64] });
 		}
 
 		try {
 			await target.ban({ reason: `Banned by ${ctx.author.tag}: ${reason}` });
 			
 			const embed = new EmbedBuilder()
-				.setTitle('🔨 Member Banned')
+				.setTitle(`${client.emoji.hammer} Member Banned`)
 				.setDescription(`**${target.user.tag}** has been banned from the server.`)
-				.addFields({ name: '💬 Reason', value: reason })
+				.addFields({ name: `${client.emoji.mic} Reason`, value: reason })
 				.setColor(client.color.main)
 				.setTimestamp();
 
@@ -78,7 +78,7 @@ export default class Ban extends Command {
 
             await logModerationAction(client, ctx.guild, 'BAN', ctx.author, target.user, reason);
 		} catch (error: any) {
-			await ctx.reply({ content: `❌ Failed to ban: ${error.message}`, flags: [64] });
+			await ctx.reply({ content: `${client.emoji.cross} Failed to ban: ${error.message}`, flags: [64] });
 		}
 	}
 }

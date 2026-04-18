@@ -69,7 +69,7 @@ export default class Ignore extends Command {
 
 			if (exists) {
                 const errorEmbed = new EmbedBuilder()
-                    .setTitle('âŒ Already Ignored')
+                    .setTitle(' Already Ignored')
                     .setDescription(`${channel} is already in the ignore list.`)
                     .setColor(client.color.red);
 				return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
@@ -80,7 +80,7 @@ export default class Ignore extends Command {
 			});
 
             const successEmbed = new EmbedBuilder()
-                .setTitle('âœ… Channel Ignored')
+                .setTitle(`${client.emoji.success} Channel Ignored`)
                 .setDescription(`Successfully added ${channel} to the ignore list. Bot will no longer respond there.`)
                 .setColor(client.color.main)
                 .setTimestamp();
@@ -95,7 +95,7 @@ export default class Ignore extends Command {
 			});
 
             const successEmbed = new EmbedBuilder()
-                .setTitle('âœ… Channel Unignored')
+                .setTitle(`${client.emoji.success} Channel Unignored`)
                 .setDescription(`Successfully removed ${channel} from the ignore list.`)
                 .setColor(client.color.main)
                 .setTimestamp();
@@ -110,7 +110,7 @@ export default class Ignore extends Command {
 
 			if (ignored.length === 0) {
                 const infoEmbed = new EmbedBuilder()
-                    .setTitle('ðŸš« Ignored Channels')
+                    .setTitle(' Ignored Channels')
                     .setDescription('No channels are currently being ignored.')
                     .setColor(client.color.main);
 				return await ctx.reply({ embeds: [infoEmbed], flags: [64] });
@@ -118,7 +118,7 @@ export default class Ignore extends Command {
 
 			const channelsList = ignored.map(i => `<#${i.channelId}>`).join(', ');
 			const embed = new EmbedBuilder()
-				.setTitle('ðŸš« Ignored Channels')
+				.setTitle(' Ignored Channels')
 				.setDescription(`The bot will ignore commands and XP gain in the following channels:\n\n${channelsList}`)
 				.setColor(client.color.main)
                 .setTimestamp();

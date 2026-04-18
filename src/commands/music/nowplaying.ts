@@ -1,4 +1,4 @@
-import { EmbedBuilder, type ColorResolvable } from "discord.js";
+import { type ColorResolvable } from "discord.js";
 import { I18N } from "../../structures/I18n";
 import { Command, Context } from "../../structures";
 import {
@@ -11,6 +11,8 @@ import {
 } from "../../utils/Permissions";
 import { ExtendedClient } from "../../client";
 import type { Requester } from "../../types";
+import { V2Helper } from "../../utils/V2Helper";
+
 
 export default class Nowplaying extends Command {
 	constructor(client: ExtendedClient) {
@@ -49,23 +51,15 @@ export default class Nowplaying extends Command {
 		const track = player.queue.current;
 		const locale = await this.client.db.getLanguage(ctx.guild.id);
 
-		const embed = new EmbedBuilder()
-			.setAuthor({
-				name: ctx.locale(I18N.player.trackStart.now_playing),
-				iconURL: client.config.icons[track.info.sourceName] || client.user?.displayAvatarURL(),
-			})
-			.setDescription(
-				`**[${track.info.title}](${track.info.uri})**\n` +
-					`-# ${ctx.locale(I18N.player.trackStart.author)}: ${track.info.author}\n` +
-					`-# ${ctx.locale(I18N.player.trackStart.duration)}: ${track.info.isStream ? "LIVE" : this.client.utils.formatTime(track.info.duration)}\n` +
-					`-# ${ctx.locale(I18N.player.trackStart.requested_by, { user: (track.requester as Requester).username })}`,
-			)
-			.setColor(this.client.config.color.main as ColorResolvable);
-
-		if (track.info.artworkUrl) {
-			embed.setThumbnail(track.info.artworkUrl);
-		}
-
-		return await ctx.sendMessage({ embeds: [embed] });
+		return await ctx.sendV2({
+            title: ctx.locale(I18N.player.trackStart.now_playing),
+            description: `**[${track.info.title}](${track.info.uri})**\n` +
+                         `-# ${ctx.locale(I18N.player.trackStart.author)}: ${track.info.author}\n` +
+                         `-# ${ctx.locale(I18N.player.trackStart.duration)}: ${track.info.isStream ? "LIVE" : this.client.utils.formatTime(track.info.duration)}\n` +
+                         `-# ${ctx.locale(I18N.player.trackStart.requested_by, { user: (track.requester as Requester).username })}`,
+            color: this.client.config.color.main as ColorResolvable,
+            thumbnail: track.info.artworkUrl || undefined
+        });
 	}
 }
+

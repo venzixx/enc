@@ -72,7 +72,7 @@ export default class GuildMemberAdd extends Event {
                     const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome.png' });
                     
                     const embed = new EmbedBuilder()
-                        .setTitle('👋 Welcome!')
+                        .setTitle(' Welcome!')
                         .setDescription(`Welcome to the server, ${member}! You were invited by **${usedInvite?.inviter?.tag || 'Unknown'}** using code \`${usedInvite?.code || 'Direct Join'}\`.`)
                         .setImage('attachment://welcome.png')
                         .setColor(this.client.color.main)

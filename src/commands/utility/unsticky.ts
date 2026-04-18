@@ -28,7 +28,7 @@ export default class Unsticky extends Command {
 
         if (!exists) {
             return await ctx.reply({ 
-                content: 'ℹ️ There is no sticky message configured for this channel.', 
+                content: `${client.emoji.info} There is no sticky message configured for this channel.`, 
                 ephemeral: true 
             });
         }
@@ -44,7 +44,7 @@ export default class Unsticky extends Command {
         });
 
         const embed = new EmbedBuilder()
-            .setTitle('✅ Sticky Removed')
+            .setTitle(`${client.emoji.success} Sticky Removed`)
             .setDescription('The sticky message has been successfully removed from this channel.')
             .setColor(client.color.main)
             .setTimestamp();

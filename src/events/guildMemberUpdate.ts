@@ -12,8 +12,8 @@ export default {
             const channel = guild.systemChannel;
             if (channel) {
                 const embed = new EmbedBuilder()
-                    .setTitle('🚀 New Server Boost!')
-                    .setDescription(`Wow! ${newMember.user} just boosted the server! Thank you so much for the support! 💖`)
+                    .setTitle(' New Server Boost!')
+                    .setDescription(`Wow! ${newMember.user} just boosted the server! Thank you so much for the support! `)
                     .setThumbnail(newMember.user.displayAvatarURL())
                     .setColor(0xFF73FA) // Pinkish boost color
                     .setFooter({ text: `Total Boosts: ${guild.premiumSubscriptionCount || 0}` })

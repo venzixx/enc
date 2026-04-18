@@ -1,4 +1,4 @@
-﻿import { ChannelType, OverwriteType, PermissionFlagsBits } from "discord.js";
+import { ChannelType, OverwriteType, PermissionFlagsBits } from "discord.js";
 import { I18N } from "../../structures/I18n";
 import { Command, Context } from "../../structures";
 import { getButtons } from "../../utils/Buttons";

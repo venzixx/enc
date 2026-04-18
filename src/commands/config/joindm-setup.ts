@@ -42,7 +42,7 @@ export default class JoindmSetup extends Command {
         const preview = message?.replace(/{user}/g, ctx.author.toString()).replace(/{server}/g, ctx.guild.name) || 'No message provided';
 
         const successEmbed = new EmbedBuilder()
-            .setTitle('âœ… Setup Complete')
+            .setTitle(`${client.emoji.success} Setup Complete`)
             .setDescription(`Join DM message has been successfully configured!\n\n**Preview:**\n${preview}`)
             .setColor(client.color.main)
             .setTimestamp();

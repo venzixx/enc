@@ -68,22 +68,22 @@ const embedHandler = {
 
         // 3. Construct the Control Panel (Using Secondary for "black/transparent" look)
         const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder().setCustomId('embed-edit-core').setLabel('Core Details').setStyle(ButtonStyle.Secondary).setEmoji('📝'),
-            new ButtonBuilder().setCustomId('embed-edit-author').setLabel('Author').setStyle(ButtonStyle.Secondary).setEmoji('👤'),
-            new ButtonBuilder().setCustomId('embed-edit-footer').setLabel('Footer').setStyle(ButtonStyle.Secondary).setEmoji('👣'),
-            new ButtonBuilder().setCustomId('embed-edit-images').setLabel('Images').setStyle(ButtonStyle.Secondary).setEmoji('🖼️'),
-            new ButtonBuilder().setCustomId('embed-add-field').setLabel('Add Field').setStyle(ButtonStyle.Secondary).setEmoji('➕')
+            new ButtonBuilder().setCustomId('embed-edit-core').setLabel('Core Details').setStyle(ButtonStyle.Secondary).setEmoji(client.emoji.edit),
+            new ButtonBuilder().setCustomId('embed-edit-author').setLabel('Author').setStyle(ButtonStyle.Secondary).setEmoji(client.emoji.user),
+            new ButtonBuilder().setCustomId('embed-edit-footer').setLabel('Footer').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('embed-edit-images').setLabel('Images').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('embed-add-field').setLabel('Add Field').setStyle(ButtonStyle.Secondary)
         );
 
         const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder().setCustomId('embed-add-link-btn').setLabel('Add Link Button').setStyle(ButtonStyle.Secondary).setEmoji('🔗'),
-            new ButtonBuilder().setCustomId('embed-add-role-btn').setLabel('Add Role Button').setStyle(ButtonStyle.Secondary).setEmoji('🎭'),
-            new ButtonBuilder().setCustomId('embed-clear').setLabel('Clear All').setStyle(ButtonStyle.Danger).setEmoji('🧹'),
-            new ButtonBuilder().setCustomId('embed-post').setLabel('Post Message').setStyle(ButtonStyle.Primary).setEmoji('🚀')
+            new ButtonBuilder().setCustomId('embed-add-link-btn').setLabel('Add Link Button').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('embed-add-role-btn').setLabel('Add Role Button').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('embed-clear').setLabel('Clear All').setStyle(ButtonStyle.Danger).setEmoji(client.emoji.remove_user),
+            new ButtonBuilder().setCustomId('embed-post').setLabel('Post Message').setStyle(ButtonStyle.Primary)
         );
 
         return {
-            content: `**🎨 Embed Builder Dashboard**\nUse the buttons below to build your message. The preview is shown above.`,
+            content: `** Embed Builder Dashboard**\nUse the buttons below to build your message. The preview is shown above.`,
             embeds: [preview],
             components: [...previewRows, row1, row2] as any,
         };
@@ -110,7 +110,7 @@ const embedHandler = {
 
         // Ensure user owns this dashboard (if using message interaction check)
         if (interaction.message.interaction && interaction.message.interaction.user.id !== userId) {
-            return interaction.reply({ content: '❌ You did not start this command.', flags: [MessageFlags.Ephemeral] });
+            return interaction.reply({ content: `${client.emoji.cross} You did not start this command.`, flags: [MessageFlags.Ephemeral] });
         }
 
         let draft = client.embedDrafts.get(userId) || this.createEmptyDraft();
@@ -167,7 +167,7 @@ const embedHandler = {
             }
 
             if (customId === 'embed-add-link-btn') {
-                if (draft.components.length >= 5) return interaction.reply({ content: '❌ Maximum 5 buttons allowed per message.', flags: [MessageFlags.Ephemeral] });
+                if (draft.components.length >= 5) return interaction.reply({ content: `${client.emoji.cross} Maximum 5 buttons allowed per message.`, flags: [MessageFlags.Ephemeral] });
                 const modal = new ModalBuilder().setCustomId('embed-modal-link-btn').setTitle('Add Link Button');
                 modal.addComponents(
                     new ActionRowBuilder<TextInputBuilder>().addComponents(new TextInputBuilder().setCustomId('label').setLabel('Button Label').setStyle(TextInputStyle.Short).setRequired(true)),
@@ -178,7 +178,7 @@ const embedHandler = {
             }
 
             if (customId === 'embed-add-role-btn') {
-                if (draft.components.length >= 5) return interaction.reply({ content: '❌ Maximum 5 buttons allowed per message.', flags: [MessageFlags.Ephemeral] });
+                if (draft.components.length >= 5) return interaction.reply({ content: `${client.emoji.cross} Maximum 5 buttons allowed per message.`, flags: [MessageFlags.Ephemeral] });
                 
                 const roleMenu = new RoleSelectMenuBuilder()
                     .setCustomId('embed-select-role')
@@ -227,7 +227,7 @@ const embedHandler = {
 
                 await interaction.channel.send({ embeds: [display], components: realRows });
                 client.embedDrafts.delete(userId);
-                return interaction.update({ content: '✅ Message posted successfully!', embeds: [], components: [] });
+                return interaction.update({ content: `${client.emoji.success} Message posted successfully!`, embeds: [], components: [] });
             }
         }
 
@@ -294,7 +294,7 @@ const embedHandler = {
 
             client.embedDrafts.set(userId, draft);
             if (customId === 'embed-modal-role-btn' && !interaction.message) {
-               await interaction.reply({ content: '✅ Role button added!', flags: [MessageFlags.Ephemeral] });
+               await interaction.reply({ content: `${client.emoji.success} Role button added!`, flags: [MessageFlags.Ephemeral] });
             } else {
                return interaction.update(await this.getDashboard(userId, client));
             }

@@ -92,7 +92,7 @@ export default class AICommand extends Command {
 			});
 
 			return await ctx.replyV2({
-                title: '✅ AI Personality Updated',
+                title: `${client.emoji.success} AI Personality Updated`,
                 description: `I will now act like a **${preset}** character in this server.`,
                 isAlert: true,
                 color: client.color.main
@@ -109,7 +109,7 @@ export default class AICommand extends Command {
 			});
 
 			return await ctx.replyV2({
-                title: '✅ Search Settings Updated',
+                title: `${client.emoji.success} Search Settings Updated`,
                 description: `AI web search is now **${enabled ? 'enabled' : 'disabled'}**.`,
                 isAlert: true,
                 color: client.color.main

@@ -45,7 +45,7 @@ export const utilityHandler = {
                 const created = await guild.stickers.create({
                     file: stickerUrl,
                     name: stickerName,
-                    tags: '⭐'
+                    tags: ''
                 });
                 return { success: true, name: created.name, type: 'STICKER' };
             }
