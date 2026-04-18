@@ -58,5 +58,9 @@ export default class MessageReactionRemove extends Event {
         } catch (e) {
             console.error('[ReactionRole] Unexpected error during role removal:', e);
         }
+
+        // Starboard Hook
+        const { StarboardManager } = await import('../utils/StarboardManager');
+        await StarboardManager.handle(reaction, this.client).catch(() => {});
     }
 }

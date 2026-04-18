@@ -59,9 +59,10 @@ export default class Help extends Command {
 	}
 
     public static getHomeLayout(client: ExtendedClient) {
-		const totalCategories = [...new Set(client.commands.map(c => c.category))].length;
-		const totalCommands = client.commands.size;
-		const categories = [...new Set(client.commands.map(c => c.category))].sort();
+		const visibleCommands = client.commands.filter(c => !c.hidden);
+		const totalCategories = [...new Set(visibleCommands.map(c => c.category))].length;
+		const totalCommands = visibleCommands.size;
+		const categories = [...new Set(visibleCommands.map(c => c.category))].sort();
 		
 		const menu = new StringSelectMenuBuilder()
 			.setCustomId('help_category')

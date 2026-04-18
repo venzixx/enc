@@ -63,6 +63,10 @@ export default class MessageReactionAdd extends Event {
         } catch (e) {
             console.error('[ReactionRole] Unexpected error during role assignment:', e);
         }
+
+        // Starboard Hook
+        const { StarboardManager } = await import('../utils/StarboardManager');
+        await StarboardManager.handle(reaction, this.client).catch(() => {});
     }
 }
 

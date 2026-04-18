@@ -41,6 +41,7 @@ interface CommandOptions {
 	type?: ApplicationCommandType;
 	options?: APIApplicationCommandOption[];
 	category?: string;
+	hidden?: boolean;
 }
 
 export default class Command {
@@ -59,6 +60,7 @@ export default class Command {
 	public type: ApplicationCommandType;
 	public options: APIApplicationCommandOption[];
 	public category: string;
+	public hidden: boolean;
 
 	constructor(client: ExtendedClient, options: CommandOptions) {
 		this.client = client;
@@ -93,6 +95,7 @@ export default class Command {
 		this.type = options.type ?? ApplicationCommandType.ChatInput;
 		this.options = options.options ?? [];
 		this.category = options.category ?? "general";
+		this.hidden = options.hidden ?? false;
 	}
 
 	public async run(_client: ExtendedClient, _message: any, _args: string[]): Promise<any> {

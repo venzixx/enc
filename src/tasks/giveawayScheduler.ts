@@ -58,9 +58,15 @@ export async function startGiveawayScheduler(client: ExtendedClient): Promise<vo
                         continue;
                     }
 
-                    // Pick winners (shuffle + slice)
-                    const shuffled = [...entries].sort(() => Math.random() - 0.5);
-                    const winners = shuffled.slice(0, Math.min(giveaway.winnersCount, entries.length));
+                    // Pick winners using weight algorithm (Bonus Entries)
+                    const pool: typeof entries[0][] = [];
+                    for (const entry of entries) {
+                        const w = Math.max(1, (entry as any).weight || 1);
+                        for (let i = 0; i < w; i++) pool.push(entry);
+                    }
+                    
+                    const shuffled = pool.sort(() => Math.random() - 0.5);
+                    const winners = Array.from(new Set(shuffled)).slice(0, Math.min(giveaway.winnersCount, entries.length));
                     const winnerMentions = winners.map(w => `<@${w.userId}>`).join(', ');
 
                     // Edit the original giveaway message

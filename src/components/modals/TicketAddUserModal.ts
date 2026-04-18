@@ -31,7 +31,7 @@ export default class TicketAddUserModal extends Component {
 
             await interaction.reply({ embeds: [embed] });
         } catch (error) {
-            await interaction.reply({ content: `${client.emoji.cross} Invalid User ID or user not found in this server.`, ephemeral: true });
+            await interaction.reply({ content: `${this.client.emoji.cross} Invalid User ID or user not found in this server.`, ephemeral: true });
         }
 	}
 }

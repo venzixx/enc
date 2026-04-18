@@ -3,7 +3,6 @@ import { ExtendedClient } from './client';
 import { loadCommands, loadEvents, loadComponents } from './handlers/loader';
 import * as dotenv from 'dotenv';
 
-
 dotenv.config();
 
 const client = new ExtendedClient({

@@ -38,8 +38,8 @@ export class ExtendedClient extends Client {
         this.registerLavalinkEvents();
     }
 
-    public embed(): EmbedBuilder {
-        return new EmbedBuilder();
+    public embed(data?: any, ctx?: any): EmbedBuilder {
+        return new EmbedBuilder(data);
     }
 
     public async start(): Promise<void> {

@@ -15,6 +15,10 @@ export default class MessageDelete extends Event {
     public async run(message: Message): Promise<void> {
         if (!message.guild || message.author?.bot) return;
 
+        // Snipe Tracker
+        const { Sniper } = await import('../utils/Sniper');
+        Sniper.add(message.channelId, message);
+
         // Log to Data Core Manifest
         await AuditLogger.log(this.client, message.guild, {
             type: AuditLogType.MESSAGES,

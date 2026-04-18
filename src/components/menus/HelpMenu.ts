@@ -12,7 +12,7 @@ export default class HelpMenu extends Component {
 
 	public async run(interaction: StringSelectMenuInteraction): Promise<any> {
 		const category = interaction.values[0];
-		const commands = this.client.commands.filter(c => c.category === category);
+		const commands = this.client.commands.filter(c => c.category === category && !c.hidden);
 
         const buttons = [
             new ButtonBuilder()

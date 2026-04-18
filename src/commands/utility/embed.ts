@@ -115,7 +115,7 @@ export default class Embed extends Command {
 			time: 300000 // 5 minutes
 		});
 
-		collector.on('collect', async (i) => {
+		collector.on('collect', async (i: any) => {
 			if (i.user.id !== ctx.author.id) return i.reply({ content: 'Only the command user can use these buttons.', flags: [MessageFlags.Ephemeral] as any });
 
             if (i.isStringSelectMenu() && i.customId === 'eb_style') {

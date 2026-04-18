@@ -24,13 +24,20 @@ export default class WelcomeSetup extends Command {
 					description: 'The channel to send welcome messages in',
 					type: 7, // CHANNEL
 					required: true
-				}
+				},
+                {
+                    name: 'message',
+                    description: 'Custom welcome message (use {user}, {server}, {inviter}, {mentionID})',
+                    type: 3, // STRING
+                    required: false
+                }
 			]
 		});
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
 		const channel = ctx.options.getChannel('channel');
+        const message = ctx.options.getString('message');
 
 		if (!channel.isTextBased()) {
             const errorEmbed = new EmbedBuilder()
@@ -42,13 +49,13 @@ export default class WelcomeSetup extends Command {
 
 		await client.prisma.guild.upsert({
 			where: { id: ctx.guild.id },
-			update: { welcomeChannelId: channel.id },
-			create: { id: ctx.guild.id, welcomeChannelId: channel.id }
+			update: { welcomeChannelId: channel.id, ...(message && { welcomeMessage: message }) },
+			create: { id: ctx.guild.id, welcomeChannelId: channel.id, ...(message && { welcomeMessage: message }) }
 		});
 
         const successEmbed = new EmbedBuilder()
             .setTitle(`${client.emoji.success} Setup Complete`)
-            .setDescription(`Welcome messages will now be sent in ${channel}.`)
+            .setDescription(`Welcome messages will now be sent in ${channel}.${message ? `\n\nCustom Message:\n\`\`\`${message}\`\`\`` : ''}`)
             .setColor(client.color.main)
             .setTimestamp();
 

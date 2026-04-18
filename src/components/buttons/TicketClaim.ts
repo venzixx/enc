@@ -20,12 +20,12 @@ export default class TicketClaim extends Component {
         });
 
         if (!ticket) {
-            return await interaction.reply({ content: `${client.emoji.cross} Ticket data not found in database.`, ephemeral: true });
+            return await interaction.reply({ content: `${this.client.emoji.cross} Ticket data not found in database.`, ephemeral: true });
         }
 
         // Check if already claimed
         if (ticket.claimantId) {
-            return await interaction.reply({ content: `${client.emoji.cross} This ticket is already claimed by <@${ticket.claimantId}>.`, ephemeral: true });
+            return await interaction.reply({ content: `${this.client.emoji.cross} This ticket is already claimed by <@${ticket.claimantId}>.`, ephemeral: true });
         }
 
         // Check staff role
@@ -40,7 +40,7 @@ export default class TicketClaim extends Component {
         const isStaff = member.roles.cache.has(config?.supportRoleId) || member.permissions.has(PermissionFlagsBits.Administrator);
 
         if (!isStaff) {
-            return await interaction.reply({ content: `${client.emoji.cross} Only staff can claim tickets.`, ephemeral: true });
+            return await interaction.reply({ content: `${this.client.emoji.cross} Only staff can claim tickets.`, ephemeral: true });
         }
 
         // Update DB
@@ -68,6 +68,6 @@ export default class TicketClaim extends Component {
 
         await interaction.update({ embeds: [embed], components: [row] });
 
-		await interaction.followUp({ content: `${client.emoji.success} Ticket claimed by ${interaction.user}!`, ephemeral: false });
+		await interaction.followUp({ content: `${this.client.emoji.success} Ticket claimed by ${interaction.user}!`, ephemeral: false });
 	}
 }

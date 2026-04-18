@@ -60,6 +60,23 @@ export default class GuildMemberAdd extends Event {
                 }
             }
 
+            // --- Greeter ---
+            if (guildData?.greeterChannelId) {
+                const greeterChannel = guild.channels.cache.get(guildData.greeterChannelId) as any;
+                if (greeterChannel && greeterChannel.isTextBased()) {
+                    let greetMsg = guildData.greeterMessage || "Welcome {user}!";
+                    greetMsg = greetMsg.replace(/{user}/g, member.toString()).replace(/{server}/g, guild.name).replace(/{mentionID}/g, `<@${member.id}>`);
+                    
+                    greeterChannel.send(greetMsg).then((sentMsg: any) => {
+                        if (guildData.greeterTime && guildData.greeterTime > 0) {
+                            setTimeout(() => {
+                                sentMsg.delete().catch(() => {});
+                            }, guildData.greeterTime * 1000);
+                        }
+                    }).catch(() => {});
+                }
+            }
+
             // --- Welcome Image ---
             if (guildData?.welcomeChannelId) {
                 const welcomeChannel = guild.channels.cache.get(guildData.welcomeChannelId) as any;
@@ -71,9 +88,16 @@ export default class GuildMemberAdd extends Event {
                     
                     const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome.png' });
                     
+                    let welcomeDesc = guildData.welcomeMessage || `Welcome to the server, {user}! You were invited by **{inviter}** using code \`${usedInvite?.code || 'Direct Join'}\`.`;
+                    welcomeDesc = welcomeDesc
+                        .replace(/{user}/g, member.toString())
+                        .replace(/{server}/g, guild.name)
+                        .replace(/{inviter}/g, usedInvite?.inviter?.tag || 'Unknown')
+                        .replace(/{mentionID}/g, `<@${member.id}>`);
+
                     const embed = new EmbedBuilder()
                         .setTitle(' Welcome!')
-                        .setDescription(`Welcome to the server, ${member}! You were invited by **${usedInvite?.inviter?.tag || 'Unknown'}** using code \`${usedInvite?.code || 'Direct Join'}\`.`)
+                        .setDescription(welcomeDesc)
                         .setImage('attachment://welcome.png')
                         .setColor(this.client.color.main)
                         .setTimestamp();

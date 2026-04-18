@@ -1,40 +1,42 @@
-import { type ButtonInteraction, ChannelType, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
+import { type StringSelectMenuInteraction, ChannelType, PermissionFlagsBits, ButtonBuilder, ButtonStyle } from "discord.js";
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
 import { V2Helper } from "../../utils/V2Helper";
 
-export default class TicketOpen extends Component {
+export default class TicketMulti extends Component {
 	constructor(client: ExtendedClient) {
 		super(client, {
-			name: "ticket_open", // Matches ticket_open_${panelId}
+			name: "ticket_multi", // Matches ticket_multi_${panelId}
 		});
 	}
 
-	public async run(interaction: ButtonInteraction): Promise<any> {
+	public async run(interaction: StringSelectMenuInteraction): Promise<any> {
 		if (!interaction.guild) return;
 		const parts = interaction.customId.split('_');
 		const panelId = parts[2];
+        const optionId = interaction.values[0];
 
-        // Fetch config from DB
+        // Fetch panel config
         const config = await (this.client.prisma as any).ticketConfig.findUnique({
-            where: {
-                guildId_panelId: {
-                    guildId: interaction.guild.id,
-                    panelId: panelId
-                }
-            }
+            where: { guildId_panelId: { guildId: interaction.guild.id, panelId: panelId } },
+            include: { options: true }
         });
 
-        if (!config) {
+        if (!config || !config.isMulti) {
             return await interaction.reply({ content: `${this.client.emoji.cross} This ticket panel is no longer configured.`, ephemeral: true });
         }
 
-		const channelName = `${config.panelId}-${interaction.user.username}`;
+        const optionInfo = config.options.find((o: any) => o.optionId === optionId);
+        if (!optionInfo) {
+            return await interaction.reply({ content: `${this.client.emoji.cross} This ticket category is no longer valid.`, ephemeral: true });
+        }
+
+		const channelName = `${optionId}-${interaction.user.username}`;
 		
 		const ticketChannel = await interaction.guild.channels.create({
 			name: channelName,
 			type: ChannelType.GuildText,
-			parent: config.categoryId,
+			parent: optionInfo.categoryId,
 			permissionOverwrites: [
 				{
 					id: interaction.guild.id,
@@ -45,7 +47,7 @@ export default class TicketOpen extends Component {
 					allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles],
 				},
 				{
-					id: config.supportRoleId,
+					id: optionInfo.supportRoleId,
 					allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles],
 				}
 			]
@@ -63,10 +65,10 @@ export default class TicketOpen extends Component {
 
 		const ticketLayout = V2Helper.createLayout({
 			title: ' Ticket Dashboard',
-			description: config.welcomeMessage.replace('{user}', interaction.user.toString()),
+			description: config.welcomeMessage ? config.welcomeMessage.replace('{user}', interaction.user.toString()) : `Hello ${interaction.user.toString()}, welcome to your support ticket. Our staff will be with you shortly.`,
             fields: [
                 { name: 'Creator', value: interaction.user.toString(), inline: true },
-                { name: 'Panel', value: config.name, inline: true },
+                { name: 'Category', value: optionInfo.label, inline: true },
                 { name: 'Claimed By', value: 'Unclaimed', inline: true }
             ],
 			color: this.client.color.main,
@@ -74,28 +76,24 @@ export default class TicketOpen extends Component {
                 new ButtonBuilder()
                     .setCustomId(`ticket_claim_${ticket.id}`)
                     .setLabel('Claim')
-                    .setEmoji('')
                     .setStyle(ButtonStyle.Primary),
                 new ButtonBuilder()
                     .setCustomId(`ticket_close`)
                     .setLabel('Close')
-                    .setEmoji('')
                     .setStyle(ButtonStyle.Danger),
                 new ButtonBuilder()
                     .setCustomId(`ticket_rename`)
                     .setLabel('Rename')
-                    .setEmoji(this.client.emoji.edit)
                     .setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder()
                     .setCustomId(`ticket_add`)
                     .setLabel('Add User')
-                    .setEmoji('')
                     .setStyle(ButtonStyle.Secondary)
             ]
-		});
+        });
 
 		await ticketChannel.send({ 
-            content: `${interaction.user} | <@&${config.supportRoleId}>`, 
+            content: `${interaction.user} | <@&${optionInfo.supportRoleId}>`, 
             ...(ticketLayout as any)
         });
 

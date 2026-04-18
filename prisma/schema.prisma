@@ -17,7 +17,11 @@ model Guild {
   logChannelId          String?
   autoroleId            String?
   welcomeChannelId      String?
+  welcomeMessage        String?
   joinDmMessage         String?
+  giveawayDefaultRoleId  String?
+  giveawayDefaultInvites Int?      @default(0)
+  giveawayBypassRoleId   String?
   verificationChannelId String?
   verificationRoleId    String?
   verificationType      String            @default("BUTTON")
@@ -53,6 +57,14 @@ model Guild {
   aiPersonality         String?           @default("CASUAL")
   aiCustomPrompt        String?
   aiSearchEnabled       Boolean           @default(true)
+  greeterChannelId      String?
+  greeterMessage        String?
+  greeterTime           Int?
+  starboardChannelId    String?
+  starboardCount        Int?
+  snipeEnabled          Boolean           @default(true)
+  backroomRoleId        String?
+  backroomChannelId     String?
   auditLogs             AuditLog[]        @relation("GuildToAuditLog")
   autoResponses         AutoResponse[]
   djRoles               DjRole[]
@@ -160,6 +172,8 @@ model Giveaway {
   prize           String
   winnersCount    Int
   endTime         DateTime
+  reqRoleId       String?
+  reqInvites      Int             @default(0)
   reqMessageCount Int             @default(0)
   reqLevel        Int             @default(0)
   isActive        Boolean         @default(true)
@@ -337,4 +351,62 @@ model AuditLog {
   guild       Guild    @relation("GuildToAuditLog", fields: [guildId], references: [id])
 
   @@index([guildId, executorId, type])
+}
+
+model UserConfig {
+  id           Int      @id @default(autoincrement())
+  userId       String   @unique
+  snipeOptOut  Boolean  @default(false)
+}
+
+model GiveawayBlacklist {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  userId     String
+  
+  @@unique([guildId, userId])
+}
+
+model GiveawayBonusEntry {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  targetId   String 
+  type       String 
+  entries    Int      @default(1)
+
+  @@unique([guildId, targetId])
+}
+
+model TicketPanelOption {
+  id             Int     @id @default(autoincrement())
+  guildId        String
+  panelId        String
+  label          String
+  description    String?
+  emoji          String?
+  categoryId     String
+  supportRoleId  String
+  welcomeMessage String? @default("Hello {user}, welcome to your support ticket.")
+  
+  @@index([guildId, panelId])
+}
+
+model BackroomHistory {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  userId     String
+  roleIds    String   
+  timestamp  DateTime @default(now())
+
+  @@unique([guildId, userId])
+}
+
+model StarboardMessage {
+  id                 Int      @id @default(autoincrement())
+  guildId            String
+  originalMessageId  String   @unique
+  starboardMessageId String
+  starCount          Int      @default(0)
+
+  @@index([guildId, originalMessageId])
 }

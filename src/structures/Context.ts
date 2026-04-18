@@ -180,6 +180,10 @@ export default class Context {
         return this.editMessage(layout as any);
     }
 
+    public async editReplyV2(options: V2Options) {
+        return this.editMessageV2(options);
+    }
+
 	public async followUp(options: string | InteractionReplyOptions) {
 		if (this.interaction) {
 			return await this.interaction.followUp(options);
