@@ -67,8 +67,64 @@ export class ExtendedClient extends Client {
 
         // Basic error handling for players
         // @ts-ignore
-        this.lavalink.on('trackException', (player: any, track: any, exception: any) => {
-            logger.error(`[Lavalink] Track exception in guild ${player.guildId}:`, exception.message);
+        this.lavalink.on('trackException', async (player: any, track: any, exception: any) => {
+            const errorMsg = exception?.message || exception || "Unknown Error";
+            logger.error(`[Lavalink] Track exception in guild ${player.guildId}: ${track?.info?.title || 'Unknown Track'} ->`, errorMsg);
+
+            // Failover to SoundCloud if YouTube is blocked/restricted
+            if (track?.info?.sourceName === "youtube" && (errorMsg.includes("403") || errorMsg.includes("Forbidden") || errorMsg.includes("unplayable"))) {
+                const channel = this.channels.cache.get(player.textChannelId) as any;
+                if (channel) channel.send(`${this.emoji.exclamation} YouTube is restricting access to this track. Searching for a SoundCloud alternative...`).catch(() => {});
+                
+                try {
+                    const res = await this.lavalink.search({ query: track.info.title, source: "scsearch" }, track.requester);
+                    if (res && res.tracks.length > 0) {
+                        player.queue.add(res.tracks[0], 0); // Insert at start
+                        return player.skip();
+                    }
+                } catch (err) {
+                    logger.error(`[Lavalink] Failover search failed:`, err);
+                }
+            }
+        });
+
+        // @ts-ignore
+        this.lavalink.on('trackStuck', async (player: any, track: any, payload: any) => {
+            logger.warn(`[Lavalink] Track STUCK in guild ${player.guildId}: ${track?.info?.title || 'Unknown Track'} (Threshold: ${payload?.thresholdMs}ms).`);
+            
+            // Failover to SoundCloud if it seems throttled
+            if (track?.info?.sourceName === "youtube") {
+                const channel = this.channels.cache.get(player.textChannelId) as any;
+                if (channel) channel.send(`${this.emoji.exclamation} Track playback stalled. Attempting to switch to an alternative source...`).catch(() => {});
+                
+                try {
+                    const res = await this.lavalink.search({ query: track.info.title, source: "scsearch" }, track.requester);
+                    if (res && res.tracks.length > 0) {
+                        player.queue.add(res.tracks[0], 0);
+                        return player.skip();
+                    }
+                } catch (err) {
+                    logger.error(`[Lavalink] Failover search failed:`, err);
+                }
+            }
+            player.skip();
+        });
+
+        // @ts-ignore
+        this.lavalink.on('playerDestroy', (player: any) => {
+            logger.info(`[Lavalink] Player DESTROYED in guild ${player.guildId}. Trace: ${new Error().stack}`);
+        });
+
+        // @ts-ignore
+        this.lavalink.on('playerDisconnect', (player: any) => {
+            logger.info(`[Lavalink] Player DISCONNECTED in guild ${player.guildId}.`);
+        });
+
+        // @ts-ignore
+        this.lavalink.nodeManager.on('raw', (node: any, payload: any) => {
+            if (payload?.op === 'event') {
+                logger.info(`[Lavalink-RAW] EVENT: ${payload.type} for guild ${payload.guildId} | Reason/Error: ${payload.reason || payload.exception?.message || 'N/A'}`);
+            }
         });
     }
 }

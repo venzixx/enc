@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Identity Forge | PHANTOM ARCHIVE</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary-fixed-dim": "#d6d4d3",
+                      "background": "#0e0e0e",
+                      "surface-variant": "#252626",
+                      "secondary-fixed": "#e4e2e1",
+                      "primary-dim": "#b8b9b9",
+                      "on-background": "#e7e5e4",
+                      "inverse-surface": "#fcf9f8",
+                      "inverse-primary": "#5e5f60",
+                      "secondary-dim": "#9f9d9d",
+                      "secondary": "#9f9d9d",
+                      "on-tertiary-fixed-variant": "#656666",
+                      "on-error-container": "#ff9993",
+                      "surface-container-highest": "#252626",
+                      "surface-container-high": "#1f2020",
+                      "error-dim": "#bb5551",
+                      "tertiary-container": "#ebebeb",
+                      "on-error": "#490106",
+                      "surface-container-lowest": "#000000",
+                      "secondary-container": "#3c3b3b",
+                      "tertiary-fixed": "#f4f3f3",
+                      "primary-container": "#454747",
+                      "surface-tint": "#c6c6c7",
+                      "surface": "#0e0e0e",
+                      "outline": "#767575",
+                      "on-tertiary-fixed": "#484a4a",
+                      "error": "#ee7d77",
+                      "surface-bright": "#2c2c2c",
+                      "primary-fixed": "#e2e2e2",
+                      "on-secondary-fixed": "#3f3f3f",
+                      "on-secondary": "#202020",
+                      "on-primary-fixed-variant": "#5a5c5c",
+                      "error-container": "#7f2927",
+                      "on-secondary-container": "#c1bfbe",
+                      "surface-container-low": "#131313",
+                      "primary-fixed-dim": "#d4d4d4",
+                      "on-secondary-fixed-variant": "#5c5b5b",
+                      "tertiary-dim": "#ebebeb",
+                      "on-primary": "#3f4041",
+                      "on-tertiary-container": "#555757",
+                      "on-primary-fixed": "#3e4040",
+                      "primary": "#c6c6c7",
+                      "tertiary": "#f9f9f9",
+                      "surface-dim": "#0e0e0e",
+                      "on-surface-variant": "#acabaa",
+                      "on-tertiary": "#5e5f5f",
+                      "tertiary-fixed-dim": "#e5e5e5",
+                      "on-surface": "#e7e5e4",
+                      "outline-variant": "#484848",
+                      "inverse-on-surface": "#565555",
+                      "on-primary-container": "#d0d0d0",
+                      "surface-container": "#191a1a"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "fontFamily": {
+                      "headline": ["Space Grotesk"],
+                      "body": ["Inter"],
+                      "label": ["Inter"]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        body {
+            background-color: #0e0e0e;
+            color: #e7e5e4;
+            font-family: 'Inter', sans-serif;
+        }
+        .liquid-gradient {
+            background: linear-gradient(135deg, #c6c6c7 0%, #454747 100%);
+        }
+        .glass-panel {
+            background: rgba(31, 32, 32, 0.7);
+            backdrop-filter: blur(24px);
+            position: relative;
+        }
+        .glass-panel::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface selection:bg-primary selection:text-on-primary min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-[#0e0e0e]/80 backdrop-blur-2xl shadow-[0_20px_40px_rgba(0,0,0,0.4)] flex justify-between items-center px-8 h-20 w-full">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-zinc-300" data-icon="token">token</span>
+<h1 class="text-xl font-black text-zinc-100 tracking-tighter font-['Space_Grotesk'] uppercase">PHANTOM ARCHIVE</h1>
+</div>
+<nav class="hidden md:flex gap-8">
+<a class="text-zinc-500 font-['Space_Grotesk'] tracking-tight uppercase hover:text-zinc-100 transition-colors duration-300" href="#">Archive</a>
+<a class="text-zinc-100 border-b border-zinc-100 font-['Space_Grotesk'] tracking-tight uppercase hover:text-zinc-100 transition-colors duration-300" href="#">Identity Forge</a>
+<a class="text-zinc-500 font-['Space_Grotesk'] tracking-tight uppercase hover:text-zinc-100 transition-colors duration-300" href="#">Terminal</a>
+</nav>
+<div class="w-10 h-10 rounded-full overflow-hidden border border-outline-variant/20">
+<img class="w-full h-full object-cover" data-alt="minimalist close-up portrait of a user profile avatar with soft cinematic lighting on a dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwqlPgwHXO1rWq4YW8sklJf2D5hajLNm3TX2faNmJwpxeqs9bYFcQQ9UqJ14zy2s1UDrPDZfDp71qLraT4t6Mz2S_GXFx1-nJPR38YBy3Iffb8RJhATRZjbPsp-tEQzo7mrAmlb8W2xwRRzVoD6ssE_Xm0IUa4IpnNYwEN6k0qdOysVQL3yUmeYSxs8sLiml9nDpfVWyxJE2-ToYcTEbcQnxlcc4N2HUT18j3a3Y9TAUtGDy5JbRYmZ3VorNd7Pu1dTS76UJidClit"/>
+</div>
+</header>
+<!-- Sidebar (NavigationDrawer) -->
+<aside class="fixed left-0 top-0 h-full w-72 bg-[#0e0e0e] flex flex-col py-10 px-6 gap-4 hidden lg:flex mt-20">
+<p class="font-['Space_Grotesk'] font-medium text-sm tracking-widest text-zinc-600 mb-4 px-4 uppercase">CORE NAV</p>
+<nav class="flex flex-col gap-2">
+<a class="flex items-center gap-4 px-4 py-3 bg-gradient-to-br from-[#c6c6c7] to-[#454747] text-[#0e0e0e] rounded-sm transition-transform duration-500 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="fingerprint">fingerprint</span>
+<span class="font-['Space_Grotesk'] font-medium text-sm tracking-widest">Identity Forge</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-zinc-600 hover:text-zinc-300 hover:bg-[#131313] transition-all rounded-sm" href="#">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span class="font-['Space_Grotesk'] font-medium text-sm tracking-widest">Command Matrix</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-zinc-600 hover:text-zinc-300 hover:bg-[#131313] transition-all rounded-sm" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="font-['Space_Grotesk'] font-medium text-sm tracking-widest">Neural Link</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-zinc-600 hover:text-zinc-300 hover:bg-[#131313] transition-all rounded-sm" href="#">
+<span class="material-symbols-outlined" data-icon="history_edu">history_edu</span>
+<span class="font-['Space_Grotesk'] font-medium text-sm tracking-widest">Protocol Logs</span>
+</a>
+</nav>
+</aside>
+<!-- Main Canvas -->
+<main class="lg:ml-72 pt-32 px-8 max-w-7xl mx-auto">
+<div class="flex flex-col gap-12 lg:flex-row items-start">
+<!-- Content Left: Identity Forge Form -->
+<div class="w-full lg:w-3/5 space-y-12">
+<section>
+<h2 class="text-5xl font-['Space_Grotesk'] font-bold tracking-tight text-on-surface mb-2">NEURAL SYNTHESIS</h2>
+<p class="text-on-surface-variant font-body leading-relaxed max-w-md">Configure the core parameters of your phantom entity. Changes propagate across the matrix in real-time.</p>
+</section>
+<div class="space-y-10">
+<!-- Nickname Input -->
+<div class="group relative">
+<label class="block text-xs font-['Space_Grotesk'] uppercase tracking-widest text-zinc-500 mb-2 transition-colors group-focus-within:text-primary">Neural Nickname</label>
+<input class="w-full bg-transparent border-0 border-b border-outline-variant/20 py-4 font-['Space_Grotesk'] text-xl focus:ring-0 focus:border-primary transition-all text-on-surface placeholder:text-zinc-800" placeholder="PHANTOM_ARCHIVE_01" type="text"/>
+</div>
+<!-- Bio Textarea -->
+<div class="group relative">
+<label class="block text-xs font-['Space_Grotesk'] uppercase tracking-widest text-zinc-500 mb-2 transition-colors group-focus-within:text-primary">Intelligence Bio</label>
+<textarea class="w-full bg-transparent border-0 border-b border-outline-variant/20 py-4 font-body text-base focus:ring-0 focus:border-primary transition-all text-on-surface placeholder:text-zinc-800 resize-none" placeholder="Define the entity's mission protocols and behavioral constraints..." rows="3"></textarea>
+</div>
+<!-- Upload Zones -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Avatar Upload -->
+<div class="flex flex-col gap-4">
+<label class="text-xs font-['Space_Grotesk'] uppercase tracking-widest text-zinc-500">Visual Avatar</label>
+<div class="h-48 rounded-xl bg-surface-container-low flex flex-col items-center justify-center border-2 border-dashed border-outline-variant/10 hover:border-primary/40 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-4xl text-zinc-600 group-hover:text-primary transition-colors mb-2" data-icon="cloud_upload">cloud_upload</span>
+<span class="text-xs font-['Space_Grotesk'] text-zinc-500 uppercase tracking-tighter">Drag Asset Here</span>
+</div>
+</div>
+<!-- Banner Upload -->
+<div class="flex flex-col gap-4">
+<label class="text-xs font-['Space_Grotesk'] uppercase tracking-widest text-zinc-500">Splash Banner</label>
+<div class="h-48 rounded-xl bg-surface-container-low flex flex-col items-center justify-center border-2 border-dashed border-outline-variant/10 hover:border-primary/40 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-4xl text-zinc-600 group-hover:text-primary transition-colors mb-2" data-icon="add_photo_alternate">add_photo_alternate</span>
+<span class="text-xs font-['Space_Grotesk'] text-zinc-500 uppercase tracking-tighter">Choose Texture</span>
+</div>
+</div>
+</div>
+<button class="liquid-gradient w-full py-5 rounded-sm font-['Space_Grotesk'] font-bold text-background uppercase tracking-widest text-sm hover:scale-[1.01] active:scale-95 transition-all duration-300">
+                        Initiate Deployment
+                    </button>
+</div>
+</div>
+<!-- Content Right: Mockup (Asymmetric Layout) -->
+<div class="w-full lg:w-2/5 lg:sticky lg:top-32">
+<div class="relative pt-12">
+<!-- The Phantom Profile Mockup Card -->
+<div class="glass-panel rounded-xl overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.6)] w-full max-w-sm mx-auto border border-outline-variant/5">
+<!-- Banner -->
+<div class="h-32 relative">
+<img class="w-full h-full object-cover grayscale opacity-60" data-alt="abstract dark 3D flowing shapes with chrome highlights and deep obsidian reflections" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdgCpqbAMvbRFRjzfHVsGJp2cRWRX1uYzGwvSNOZbJZPu4t_RnBH3Mpxp-sd8-sfpt23q8z9GB61p4Zspl4t8DYoKp7FU9uy55SOuA3s408tdxx2CsUAg3rjOLedB5GSw-dg2HFwVp2hE8eCYof2FNLFONiTyZMWfbLbftd8BivLF-l3_GpmyIklMHY1mPJy6eeADmNlKgqnfQrhtC55jWbMeFB77dEGwt9uZrBEKOa347ByfVc08LL65dysmDi8oaHvTANUqD8ZFp"/>
+<div class="absolute bottom-[-40px] left-6">
+<div class="w-24 h-24 rounded-full border-4 border-[#131313] bg-background overflow-hidden relative group">
+<img class="w-full h-full object-cover" data-alt="futuristic digital identity avatar featuring a metallic mask with glowing light strips" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDQv-83Zk_oGWpSJuH2_3turml4EzQ6P4Z-hoktr1koa5SIZGNYPu9gKNySLe4doKfACmN7nMysDgtPEfALDS38NFp6v3lrs1-xFsCxud2zkeuuOjAb-TPUo3P51gcl6Jbbtmp1XqO7mrSUUGwUTTObF3GLzFRRL-5xg26uYN0jaA_PAoTFhnsy9FkxNMycW4TdZ6PbicESZd-uJUIE8IJ7gfY18UgigfUsxttXsczMsp9Igor_2jJHpup5ikQct1RLlkWKWQtEIA8"/>
+<div class="absolute bottom-1 right-1 w-6 h-6 bg-emerald-500 rounded-full border-2 border-background"></div>
+</div>
+</div>
+</div>
+<!-- Profile Content -->
+<div class="pt-14 pb-8 px-6 space-y-6">
+<div>
+<h3 class="text-2xl font-['Space_Grotesk'] font-bold text-zinc-100">PHANTOM ARCHIVE</h3>
+<p class="text-zinc-500 text-sm font-medium">@phantom_identity_01</p>
+</div>
+<div class="h-[1px] bg-outline-variant/10"></div>
+<div class="space-y-4">
+<div class="space-y-1">
+<p class="text-[10px] font-['Space_Grotesk'] uppercase tracking-[0.2em] text-zinc-400">Mission Parameters</p>
+<p class="text-sm text-zinc-300 leading-relaxed">System Architect &amp; Data Custodian. Monitoring neural links for unauthorized protocol deviations.</p>
+</div>
+<div class="space-y-1">
+<p class="text-[10px] font-['Space_Grotesk'] uppercase tracking-[0.2em] text-zinc-400">Core Affiliation</p>
+<div class="flex items-center gap-2 mt-1">
+<div class="bg-zinc-800 p-1.5 rounded-md">
+<span class="material-symbols-outlined text-[16px] text-zinc-400" data-icon="deployed_code">deployed_code</span>
+</div>
+<span class="text-xs text-zinc-300 font-medium">Neural Forge Mainframe</span>
+</div>
+</div>
+</div>
+<div class="pt-4 flex gap-2">
+<button class="flex-1 bg-zinc-100 py-2.5 rounded-sm text-background text-xs font-bold uppercase tracking-wider">Sync Link</button>
+<button class="flex-1 bg-zinc-800/50 py-2.5 rounded-sm text-zinc-100 text-xs font-bold uppercase tracking-wider backdrop-blur-md">Signal</button>
+</div>
+</div>
+</div>
+<!-- Decorative elements for 3D depth -->
+<div class="absolute -z-10 top-0 -right-12 w-64 h-64 bg-primary/5 rounded-full blur-[100px]"></div>
+<div class="absolute -z-10 bottom-0 -left-12 w-48 h-48 bg-primary-container/10 rounded-full blur-[80px]"></div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 md:hidden bg-[#131313]/90 backdrop-blur-xl shadow-[0_-10px_30px_rgba(0,0,0,0.5)] flex justify-around items-center h-20 px-6 pb-safe">
+<div class="bg-[#1f2020] h-[1px] mb-2 absolute top-0 w-full"></div>
+<a class="flex flex-col items-center justify-center text-zinc-600 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-zinc-100 text-[#0e0e0e] rounded-full w-12 h-12 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="auto_fix_high" style="font-variation-settings: 'FILL' 1;">auto_fix_high</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-600 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="insights">insights</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-600 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</a>
+</nav>
+</body></html>

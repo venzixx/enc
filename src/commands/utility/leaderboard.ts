@@ -5,6 +5,7 @@ export default class Leaderboard extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'leaderboard',
+			aliases: ['lb', 'top'],
 			description: {
 				content: 'View the server leaderboard for various categories.',
 				usage: 'leaderboard [category]',
@@ -12,7 +13,8 @@ export default class Leaderboard extends Command {
 			},
 			category: 'general',
 			cooldown: 5,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			options: [
 				{
 					name: 'category',

@@ -14,6 +14,9 @@ import { I18N, t } from "../../structures/I18n";
 import { Context, Event } from "../../structures";
 import logger from "../../structures/Logger";
 import { LavamusicEventType } from "../../types/events";
+import { PermitManager, PermitPermission } from "../../utils/PermitManager";
+import { AutoModHandler } from "../../utils/AutoModHandler";
+import { HeatManager } from "../../utils/HeatManager";
 import { ExtendedClient } from "../../client";
 import { getAIResponse } from "../../handlers/aiHandler";
 
@@ -28,6 +31,11 @@ export default class MessageCreate extends Event {
 	public async run(message: Message): Promise<any> {
 		if (message.author.bot) return;
 		if (!(message.guild && message.guildId)) return;
+
+		// 0. AUTO-MOD CHECK 
+		// Check for spam, links, blacklisted words, etc.
+		const handledByAutoMod = await AutoModHandler.process(this.client, message);
+		if (handledByAutoMod) return;
 
 		//  AFK SYSTEM 
 		// 1) If the message author is AFK  remove their AFK and show missed mentions
@@ -294,8 +302,17 @@ export default class MessageCreate extends Event {
 			ctx.lng = locale || "en-US";
 			(ctx as any).args = args;
 
+            logger.info(`[Command] ${command.name} triggered by ${message.author.tag} (${message.author.id}) in ${message.guildId}. Content: "${message.content}"`);
+
 			// ... (Rest of command validation and run)
 			return await this.handleCommand(command, ctx, args, locale, message);
+		} else if (cmd) {
+			// Unknown command response
+			const embed = new EmbedBuilder()
+				.setColor(this.client.color.red)
+				.setDescription(`${this.client.emoji.cross} Unknown command. Use \`${prefix}help\` for assistance.`)
+				.setTimestamp();
+			return await message.reply({ embeds: [embed] }).catch(() => {});
 		}
 
 		//  PATH B: AI RESPONSE 
@@ -305,16 +322,26 @@ export default class MessageCreate extends Event {
 		const isMentionOnly = message.content.match(mentionPrefixRegex) && !cmd;
 
 		if (isMentionOnly || isReplyToBot) {
-			if ('sendTyping' in message.channel) await message.channel.sendTyping();
-			
-			// Clean the content (remove bot mention)
-			const cleanContent = message.content.replace(new RegExp(`<@!?${this.client.user?.id}>`, 'g'), '').trim();
-
 			try {
                 // Fetch Guild AI Settings
                 const guildData = await this.client.prisma.guild.findUnique({
                     where: { id: message.guildId! }
                 });
+
+                // Check if AI is enabled
+                if (guildData && !guildData.aiEnabled) {
+                    if (isMentionOnly) {
+                        return await message.reply({
+                            content: t(I18N.events.message.prefix_mention, { lng: locale, prefix: prefix }),
+                        });
+                    }
+                    return;
+                }
+
+                if ('sendTyping' in message.channel) await message.channel.sendTyping();
+			
+                // Clean the content (remove bot mention)
+                const cleanContent = message.content.replace(new RegExp(`<@!?${this.client.user?.id}>`, 'g'), '').trim();
 
                 const aiResponse = await getAIResponse(
                     `User says: "${cleanContent || "(Just a ping/reply)"}".`,
@@ -392,7 +419,16 @@ export default class MessageCreate extends Event {
 					? command.permissions.user
 					: [command.permissions.user];
 
-				if (!(isDev || (message.member as GuildMember).permissions.has(userRequiredPermissions as any))) {
+				// CHECK PERMITS FIRST (Overrides Discord Permissions)
+				// We map Discord permissions to our PermitPermission enum if applicable, or check specifically
+				const hasDiscordPerm = (message.member as GuildMember).permissions.has(userRequiredPermissions as any);
+				
+				// Permit check: We check if they have a permit that allows this specific command's type
+				// For simplicity, we check if they have the BAN/KICK permit for moderation commands
+                const cmdName = command.name.toUpperCase() as any;
+				const hasPermit = await PermitManager.hasPermission(this.client, message.guild!, message.author.id, cmdName);
+
+				if (!(isDev || hasDiscordPerm || hasPermit)) {
 					return await message.reply({
 						content: t(I18N.events.message.no_user_permission, { lng: locale }),
 					});

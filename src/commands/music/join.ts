@@ -36,7 +36,8 @@ export default class Join extends Command {
 				client: [SendMessages, ReadMessageHistory, ViewChannel, EmbedLinks, Connect, Speak],
 				user: [],
 			},
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			options: [],
 		});
 	}

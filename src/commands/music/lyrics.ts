@@ -34,7 +34,8 @@ export default class Lyrics extends Command {
 				client: [SendMessages, ReadMessageHistory, ViewChannel, EmbedLinks, Connect, Speak],
 				user: [],
 			},
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			options: [
 				{
 					name: "song",

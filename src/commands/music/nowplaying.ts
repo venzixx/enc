@@ -39,14 +39,23 @@ export default class Nowplaying extends Command {
 				client: [SendMessages, ReadMessageHistory, ViewChannel, EmbedLinks, Connect, Speak],
 				user: [],
 			},
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			options: [],
 		});
 	}
 
 	public async run(client: ExtendedClient, ctx: Context): Promise<any> {
 		const player = client.lavalink.getPlayer(ctx.guild.id);
-		if (!player || !player.queue.current) return;
+		if (!player || !player.queue.current) {
+            return await ctx.sendV2({
+                title: `${client.emoji.music} Player Idle`,
+                description: "There is nothing currently playing in this server.",
+                isAlert: true,
+                color: client.color.main,
+                ephemeral: true
+            });
+        }
 
 		const track = player.queue.current;
 		const locale = await this.client.db.getLanguage(ctx.guild.id);

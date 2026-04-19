@@ -13,7 +13,8 @@ export default class LevelSetup extends Command {
 			},
 			category: 'utility',
 			cooldown: 3,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			permissions: {
 				user: [PermissionFlagsBits.Administrator],
 				client: [PermissionFlagsBits.Administrator]

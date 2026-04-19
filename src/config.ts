@@ -4,6 +4,7 @@ export default {
 		green: 0x22c55e, // Modern sleek green
 		blue: 0x3b82f6, // Modern sleek blue
 		yellow: 0xeab308, // Modern sleek yellow
+		orange: 0xf97316, // Modern sleek orange
 		main: 0xFFFFFF,
 	},
 	// High-Fidelity Custom Emoji Manifest

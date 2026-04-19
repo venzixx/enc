@@ -13,7 +13,8 @@ export default class EmojiDelete extends Command {
 			},
 			category: 'tools',
 			cooldown: 3,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			permissions: {
 				user: [PermissionFlagsBits.ManageEmojisAndStickers],
 				client: [PermissionFlagsBits.ManageEmojisAndStickers]

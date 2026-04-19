@@ -20,7 +20,7 @@ export default class Stop extends Command {
 				usage: "stop",
 			},
 			category: "music",
-			aliases: ["st", "leave", "clear"],
+			aliases: ["leave", "dc", "disconnect"],
 			cooldown: 3,
 			args: false,
 			vote: false,
@@ -35,7 +35,8 @@ export default class Stop extends Command {
 				client: [SendMessages, ReadMessageHistory, ViewChannel, EmbedLinks, Connect, Speak],
 				user: [],
 			},
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			options: [],
 		});
 	}

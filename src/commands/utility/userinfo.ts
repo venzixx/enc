@@ -12,6 +12,7 @@ export default class UserInfo extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'userinfo',
+			aliases: ['whois', 'ui'],
 			description: {
 				content: 'Get information about a user.',
 				usage: 'userinfo [user]',
@@ -19,7 +20,8 @@ export default class UserInfo extends Command {
 			},
 			category: 'tools',
 			cooldown: 3,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			options: [
 				{
 					name: 'user',

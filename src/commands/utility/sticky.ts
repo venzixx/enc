@@ -93,6 +93,15 @@ export default class Sticky extends Command {
 			return await ctx.reply({ embeds: [embed] });
 
 		} else if (sub === 'remove') {
+			const exists = await client.prisma.stickyMessage.findUnique({
+				where: { guildId_channelId: { guildId: ctx.guild.id, channelId: ctx.channel.id } }
+			});
+
+			if (exists && exists.lastMsgId) {
+				const lastMsg = await ctx.channel.messages.fetch(exists.lastMsgId).catch(() => null);
+				if (lastMsg) await lastMsg.delete().catch(() => {});
+			}
+
 			await client.prisma.stickyMessage.delete({
 				where: { guildId_channelId: { guildId: ctx.guild.id, channelId: ctx.channel.id } }
 			}).catch(() => null);

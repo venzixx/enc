@@ -9,6 +9,7 @@ export default class ServerInfo extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'serverinfo',
+			aliases: ['si', 'guildinfo'],
 			description: {
 				content: 'Get information about the server.',
 				usage: 'serverinfo',
@@ -16,7 +17,8 @@ export default class ServerInfo extends Command {
 			},
 			category: 'tools',
 			cooldown: 3,
-			slashCommand: true
+			slashCommand: false,
+			hidden: true
 		});
 	}
 

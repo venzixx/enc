@@ -28,7 +28,7 @@ export default class Ignore extends Command {
 							name: 'channel', 
 							description: 'The channel to ignore', 
 							type: 7, 
-							required: true,
+							required: false,
 							channel_types: [ChannelType.GuildText]
 						}
 					]
@@ -42,7 +42,7 @@ export default class Ignore extends Command {
 							name: 'channel', 
 							description: 'The channel to unignore', 
 							type: 7, 
-							required: true,
+							required: false,
 							channel_types: [ChannelType.GuildText]
 						}
 					]
@@ -61,7 +61,7 @@ export default class Ignore extends Command {
 		const sub = ctx.options.getSubcommand();
 
 		if (sub === 'add') {
-			const channel = ctx.options.getChannel('channel');
+			const channel = ctx.options.getChannel('channel') || ctx.channel;
 			
 			const exists = await client.prisma.ignoredChannel.findFirst({
 				where: { guildId: ctx.guild.id, channelId: channel.id }
@@ -89,7 +89,7 @@ export default class Ignore extends Command {
 		}
 
 		if (sub === 'remove') {
-			const channel = ctx.options.getChannel('channel');
+			const channel = ctx.options.getChannel('channel') || ctx.channel;
 			await client.prisma.ignoredChannel.deleteMany({
 				where: { guildId: ctx.guild.id, channelId: channel.id }
 			});

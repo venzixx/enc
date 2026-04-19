@@ -26,6 +26,7 @@ export default class Timer extends Command {
     }
 
     public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+        await ctx.deferReply(true);
         const durationStr = ctx.options.getString('duration')!;
         const duration = ms(durationStr) as any;
 

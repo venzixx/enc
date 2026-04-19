@@ -35,7 +35,8 @@ export default class ClearQueue extends Command {
 				client: [SendMessages, ReadMessageHistory, ViewChannel, EmbedLinks, Connect, Speak],
 				user: [],
 			},
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			options: [],
 		});
 	}

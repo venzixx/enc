@@ -2,6 +2,7 @@ import { Events, Webhook, AuditLogEvent } from "discord.js";
 import { Event } from "../../structures";
 import { LavamusicEventType } from "../../types/events";
 import { ExtendedClient } from "../../client";
+import { AuditLogger, AuditLogType, AuditLogStatus } from "../../utils/AuditLogger";
 
 export default class AntiNukeWebhookGuard extends Event {
     constructor(client: ExtendedClient, file: string) {
@@ -48,6 +49,19 @@ export default class AntiNukeWebhookGuard extends Event {
         for (const webhook of webhooks.values()) {
             if (webhook.owner?.id === log.executorId) {
                 await webhook.delete('Enc Anti-Nuke: Unauthorized Webhook Injection');
+                
+                // Log the security stoppage in Data Core
+                await AuditLogger.log(this.client, guild, {
+                    type: AuditLogType.SECURITY,
+                    event: 'Security Stoppage (Webhook Shield)',
+                    status: AuditLogStatus.CRITICAL,
+                    executorId: this.client.user?.id,
+                    executorTag: this.client.user?.tag,
+                    targetId: log.executorId,
+                    targetName: log.executor?.tag || 'Unauthorized Executor',
+                    details: `Unauthorized webhook creation detected in <#${channel.id}>. Webhook has been neutralized.`,
+                    color: this.client.color.red
+                });
             }
         }
     }

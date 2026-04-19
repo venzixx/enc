@@ -1,9 +1,10 @@
-import { ColorResolvable, EmbedBuilder, Guild, TextChannel } from 'discord.js';
+import { ColorResolvable, EmbedBuilder, Guild, TextChannel, AttachmentBuilder } from 'discord.js';
 import { ExtendedClient } from '../client';
 
 export enum AuditLogType {
     SECURITY = 'SECURITY',
     MODERATION = 'MODERATION',
+    AUTOMOD = 'AUTOMOD',
     MEMBERS = 'MEMBERS',
     ROLES = 'ROLES',
     CHANNELS = 'CHANNELS',
@@ -33,6 +34,8 @@ export class AuditLogger {
             targetName?: string;
             details?: string;
             color?: ColorResolvable;
+            transcript?: string;
+            files?: any[];
         }
     ) {
         try {
@@ -50,6 +53,7 @@ export class AuditLogger {
                 case AuditLogType.ROLES: isEnabled = guildSettings.logRolesEnabled; break;
                 case AuditLogType.MEMBERS: isEnabled = guildSettings.logMembersEnabled; break;
                 case AuditLogType.MODERATION: isEnabled = guildSettings.logModerationEnabled; break;
+                case AuditLogType.AUTOMOD: isEnabled = guildSettings.logModerationEnabled; break;
                 case AuditLogType.SECURITY: isEnabled = guildSettings.logSecurityEnabled; break;
                 case AuditLogType.VOICE: isEnabled = guildSettings.logVoiceEnabled; break;
                 case AuditLogType.WEBHOOKS: isEnabled = true; break; // Webhooks currently always logged if enabled
@@ -69,6 +73,7 @@ export class AuditLogger {
                     targetId: data.targetId,
                     targetName: data.targetName,
                     details: data.details,
+                    transcript: data.transcript,
                 },
             });
 
@@ -98,7 +103,7 @@ export class AuditLogger {
                         embed.addFields({ name: 'Details', value: `\`\`\`${sanitizedDetails}\`\`\``, inline: false });
                     }
 
-                    await logChannel.send({ embeds: [embed] }).catch(() => null);
+                    await logChannel.send({ embeds: [embed], files: data.files }).catch(() => null);
                 }
             }
         } catch (error) {

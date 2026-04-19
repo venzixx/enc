@@ -17,7 +17,7 @@ export default class Ping extends Command {
 				usage: "ping",
 			},
 			category: "general",
-			aliases: ["pong"],
+			aliases: ["p", "pong"],
 			cooldown: 3,
 			args: false,
 			vote: false,
@@ -37,7 +37,8 @@ export default class Ping extends Command {
 				],
 				user: [],
 			},
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			options: [],
 		});
 	}

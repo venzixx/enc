@@ -13,7 +13,8 @@ export default class Decode extends Command {
 			},
 			category: 'tools',
 			cooldown: 3,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			options: [
 				{
 					name: 'text',

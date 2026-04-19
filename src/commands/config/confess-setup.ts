@@ -12,6 +12,7 @@ export default class ConfessSetup extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'confess-setup',
+			aliases: ['confess'],
 			description: {
 				content: 'Set the channel where anonymous confessions will be posted.',
 				usage: 'confess-setup <channel>',
@@ -19,7 +20,8 @@ export default class ConfessSetup extends Command {
 			},
 			category: 'social',
 			cooldown: 3,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			permissions: {
 				user: [PermissionFlagsBits.Administrator],
 				client: [PermissionFlagsBits.Administrator]

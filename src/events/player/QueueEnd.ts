@@ -4,6 +4,7 @@ import { Event } from "../../structures";
 import { LavamusicEventType } from "../../types/events";
 import { updateSetup } from "../../utils/SetupSystem";
 import { ExtendedClient } from "../../client";
+import logger from "../../structures/Logger";
 
 export default class QueueEnd extends Event {
 	constructor(client: ExtendedClient, file: string) {
@@ -40,7 +41,8 @@ export default class QueueEnd extends Event {
 					return; // Don't run cleanup  music continues
 				}
 			} catch (error) {
-				// Autoplay failed silently, fall through to normal queue end
+				// Autoplay failed, log and fall through to normal queue end
+                logger.error(`[Lavalink] Autoplay failed in guild ${guild.id}:`, error);
 			}
 		}
 

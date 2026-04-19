@@ -5,6 +5,7 @@ export default class MemberCount extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'membercount',
+            aliases: ['mc'],
             description: {
                 content: 'Shows the number of members, users, and bots.',
                 usage: 'membercount',
@@ -12,7 +13,8 @@ export default class MemberCount extends Command {
             },
             category: 'utility',
             cooldown: 5,
-            slashCommand: true
+            slashCommand: false,
+            hidden: true
         });
     }
 

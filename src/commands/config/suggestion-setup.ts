@@ -6,6 +6,7 @@ export default class SuggestionSetup extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'suggestion-setup',
+            aliases: ['suggestion'],
             description: {
                 content: 'Set the channel where suggestions will be posted.',
                 usage: 'suggestion-setup <channel>',
@@ -13,7 +14,8 @@ export default class SuggestionSetup extends Command {
             },
             category: 'config',
             cooldown: 3,
-            slashCommand: true,
+            slashCommand: false,
+            hidden: true,
             permissions: {
                 user: [PermissionFlagsBits.Administrator],
                 client: [PermissionFlagsBits.Administrator]

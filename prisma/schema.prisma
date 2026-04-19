@@ -57,6 +57,7 @@ model Guild {
   aiPersonality         String?           @default("CASUAL")
   aiCustomPrompt        String?
   aiSearchEnabled       Boolean           @default(true)
+  aiEnabled             Boolean           @default(true)
   greeterChannelId      String?
   greeterMessage        String?
   greeterTime           Int?
@@ -65,6 +66,18 @@ model Guild {
   snipeEnabled          Boolean           @default(true)
   backroomRoleId        String?
   backroomChannelId     String?
+  lockdownEnabled       Boolean           @default(false)
+  lockdownMode          String            @default("PUBLIC")
+  lockdownChannels      String?
+  autoModEnabled        Boolean           @default(false)
+  botNickname           String?
+  botBio                String?
+  botAvatar             String? 
+  botBanner             String?
+  lastBrandingUpdate    DateTime?
+  leaveChannelId        String?
+  leaveMessage          String?
+  levelMessage          String?
   auditLogs             AuditLog[]        @relation("GuildToAuditLog")
   autoResponses         AutoResponse[]
   djRoles               DjRole[]
@@ -77,7 +90,50 @@ model Guild {
   suggestions           Suggestion[]
   whitelistedRoles      WhitelistedRole[]
   whitelistedUsers      WhitelistedUser[]
+  permits               Permit[]
+  autoModFilters        AutoModFilter[]
+  autoModWhitelists     AutoModWhitelist[]
+  antiNukeConfig        AntiNukeConfig?
+  giveawayBlacklists    GiveawayBlacklist[]
+  giveawayBonusEntries  GiveawayBonusEntry[]
+  starboardMessages     StarboardMessage[]
+  levelRoles            LevelRole[]
 }
+
+model UserConfig {
+  userId      String  @id
+  snipeOptOut Boolean @default(false)
+}
+
+model GiveawayBlacklist {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  userId  String
+  guild   Guild  @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, userId])
+}
+
+model GiveawayBonusEntry {
+  id       Int    @id @default(autoincrement())
+  guildId  String
+  targetId String
+  type     String // ROLE, USER
+  entries  Int    @default(1)
+  guild    Guild  @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, targetId])
+}
+
+model StarboardMessage {
+  id                 Int    @id @default(autoincrement())
+  guildId            String
+  originalMessageId  String @unique
+  starboardMessageId String @unique
+  starCount          Int    @default(0)
+  guild              Guild  @relation(fields: [guildId], references: [id])
+}
+
 
 model ExtraOwner {
   id      Int    @id @default(autoincrement())
@@ -347,66 +403,65 @@ model AuditLog {
   targetId    String?
   targetName  String?
   details     String?
+  transcript  String?
   createdAt   DateTime @default(now())
   guild       Guild    @relation("GuildToAuditLog", fields: [guildId], references: [id])
 
   @@index([guildId, executorId, type])
 }
 
-model UserConfig {
-  id           Int      @id @default(autoincrement())
-  userId       String   @unique
-  snipeOptOut  Boolean  @default(false)
-}
-
-model GiveawayBlacklist {
-  id         Int      @id @default(autoincrement())
-  guildId    String
-  userId     String
-  
-  @@unique([guildId, userId])
-}
-
-model GiveawayBonusEntry {
-  id         Int      @id @default(autoincrement())
-  guildId    String
-  targetId   String 
-  type       String 
-  entries    Int      @default(1)
+model Permit {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  targetId    String
+  type        String   @default("USER") // USER, ROLE
+  permissions String   @default("[]")   // JSON string of permissions
+  immunity    Boolean  @default(false)
+  guild       Guild    @relation(fields: [guildId], references: [id])
 
   @@unique([guildId, targetId])
 }
 
-model TicketPanelOption {
-  id             Int     @id @default(autoincrement())
-  guildId        String
-  panelId        String
-  label          String
-  description    String?
-  emoji          String?
-  categoryId     String
-  supportRoleId  String
-  welcomeMessage String? @default("Hello {user}, welcome to your support ticket.")
-  
-  @@index([guildId, panelId])
+model AutoModFilter {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  type        String   // SPAM, MENTIONS, INVITES, LINKS, WORDS, MALICIOUS
+  enabled     Boolean  @default(false)
+  threshold   Int?
+  action      String   @default("DELETE")
+  data        String?
+  guild       Guild    @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, type])
 }
 
-model BackroomHistory {
-  id         Int      @id @default(autoincrement())
-  guildId    String
-  userId     String
-  roleIds    String   
-  timestamp  DateTime @default(now())
-
-  @@unique([guildId, userId])
+model AutoModWhitelist {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  targetId  String
+  type      String   // USER, ROLE, CHANNEL, CATEGORY
+  guild     Guild    @relation(fields: [guildId], references: [id])
 }
 
-model StarboardMessage {
-  id                 Int      @id @default(autoincrement())
-  guildId            String
-  originalMessageId  String   @unique
-  starboardMessageId String
-  starCount          Int      @default(0)
+model AntiNukeConfig {
+  id              Int     @id @default(autoincrement())
+  guildId         String  @unique
+  banHeat         Int     @default(20)
+  kickHeat        Int     @default(15)
+  channelHeat     Int     @default(10)
+  roleHeat        Int     @default(10)
+  webhookHeat     Int     @default(25)
+  decayRate       Int     @default(5)
+  punishment      String  @default("STRIP_ROLES")
+  guild           Guild   @relation(fields: [guildId], references: [id])
+}
 
-  @@index([guildId, originalMessageId])
+model LevelRole {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  level   Int
+  roleId  String
+  guild   Guild  @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, level])
 }

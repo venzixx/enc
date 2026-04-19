@@ -6,6 +6,7 @@ export default class WelcomeSetup extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'welcome-setup',
+			aliases: ['welcome'],
 			description: {
 				content: 'Set the channel where welcome messages with images will be sent.',
 				usage: 'welcome-setup <channel>',
@@ -13,7 +14,8 @@ export default class WelcomeSetup extends Command {
 			},
 			category: 'systems',
 			cooldown: 3,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			permissions: {
 				user: [PermissionFlagsBits.Administrator],
 				client: [PermissionFlagsBits.Administrator]

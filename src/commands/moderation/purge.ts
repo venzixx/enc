@@ -1,4 +1,4 @@
-import { PermissionFlagsBits, TextChannel, Message, Collection } from 'discord.js';
+import { PermissionFlagsBits, TextChannel, Message, Collection, AttachmentBuilder } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { AuditLogger, AuditLogType, AuditLogStatus } from '../../utils/AuditLogger';
@@ -159,8 +159,14 @@ export default class Purge extends Command {
             });
         }
 
-        // Log and Reply
-        const deletedContent = deleted.map(m => `[${m?.author?.tag || 'Unknown'}]: ${m?.content || ''}`).join('\n').slice(0, 1500);
+        // Generate Transcript
+        const transcript = deleted.map(m => {
+            if (!m) return '[Unknown Message]';
+            const time = new Date(m.createdTimestamp).toISOString().replace(/T/, ' ').replace(/\..+/, '');
+            return `[${time}] [${m.author?.tag || 'Unknown'}] (${m.author?.id || 'Unknown'}): ${m.content || (m.attachments.size > 0 ? '[Attachment]' : '[No Content]')}`;
+        }).reverse().join('\n');
+
+        const attachment = new AttachmentBuilder(Buffer.from(transcript), { name: `purge-${channel.id}-${Date.now()}.txt` });
 
         await AuditLogger.log(client, ctx.guild, {
             type: AuditLogType.MODERATION,
@@ -170,7 +176,9 @@ export default class Purge extends Command {
             targetId: channel.id,
             targetName: channel.name,
             details: `Purged ${deleted.size} messages.\nTarget: ${targetUser ? targetUser.tag : filterInput}\nScanned: ${scannedCount} messages.`,
-            color: client.color.red
+            color: client.color.red,
+            transcript: transcript,
+            files: [attachment]
         });
 
         const replyMessage = await ctx.editReply({ 

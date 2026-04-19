@@ -37,7 +37,8 @@ export default class Setup extends Command {
 				client: [SendMessages, ReadMessageHistory, ViewChannel, EmbedLinks, ManageChannels],
 				user: [ManageGuild],
 			},
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			options: [
 				{
 					name: "create",

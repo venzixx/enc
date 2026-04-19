@@ -53,6 +53,16 @@ export default class AICommand extends Command {
 							required: true
 						}
 					]
+				},
+				{
+					name: 'enable',
+					description: 'Enable AI responses for pings/replies',
+					type: 1, // SUB_COMMAND
+				},
+				{
+					name: 'disable',
+					description: 'Disable AI responses for pings/replies',
+					type: 1, // SUB_COMMAND
 				}
 			]
 		});
@@ -111,6 +121,23 @@ export default class AICommand extends Command {
 			return await ctx.replyV2({
                 title: `${client.emoji.success} Search Settings Updated`,
                 description: `AI web search is now **${enabled ? 'enabled' : 'disabled'}**.`,
+                isAlert: true,
+                color: client.color.main
+            });
+		}
+
+		if (sub === 'enable' || sub === 'disable') {
+			const enabled = sub === 'enable';
+
+			await ctx.deferReply();
+			await client.prisma.guild.update({
+				where: { id: ctx.guild.id },
+				data: { aiEnabled: enabled }
+			});
+
+			return await ctx.replyV2({
+                title: `${client.emoji.success} AI Status Updated`,
+                description: `AI responses are now **${enabled ? 'enabled' : 'disabled'}**.`,
                 isAlert: true,
                 color: client.color.main
             });

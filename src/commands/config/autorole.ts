@@ -13,7 +13,8 @@ export default class Autorole extends Command {
             },
             category: 'config',
             cooldown: 3,
-            slashCommand: true,
+            slashCommand: false,
+            hidden: true,
             permissions: {
                 user: [PermissionFlagsBits.Administrator],
                 client: [PermissionFlagsBits.Administrator]

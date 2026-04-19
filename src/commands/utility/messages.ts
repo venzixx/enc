@@ -10,6 +10,7 @@ export default class Messages extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'messages',
+			aliases: ['msg', 'msgs'],
 			description: {
 				content: 'Check message statistics or leaderboard.',
 				usage: 'messages [leaderboard/user]',
@@ -17,7 +18,8 @@ export default class Messages extends Command {
 			},
 			category: 'tools',
 			cooldown: 5,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			options: [
 				{
 					name: 'leaderboard',

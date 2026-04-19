@@ -2,6 +2,7 @@ import { Events, GuildMember, AuditLogEvent } from "discord.js";
 import { Event } from "../../structures";
 import { LavamusicEventType } from "../../types/events";
 import { ExtendedClient } from "../../client";
+import { AuditLogger, AuditLogType, AuditLogStatus } from "../../utils/AuditLogger";
 
 export default class AntiNukeBotShield extends Event {
     constructor(client: ExtendedClient, file: string) {
@@ -47,15 +48,18 @@ export default class AntiNukeBotShield extends Event {
         try {
             await member.kick('Enc Anti-Nuke: Unauthorized Bot Addition');
             
-            // Log it
-            if (guildData.logChannelId) {
-                const logChannel = await guild.channels.fetch(guildData.logChannelId).catch(() => null) as any;
-                if (logChannel) {
-                    await logChannel.send({
-                        content: `${this.client.emoji.exclamation} **Anti-Nuke Alert**: Unauthorized bot **${member.user.tag}** was added by <@${log.executorId}> and has been auto-kicked.`
-                    });
-                }
-            }
+            // Log the security stoppage in Data Core and Discord
+            await AuditLogger.log(this.client, guild, {
+                type: AuditLogType.SECURITY,
+                event: 'Security Stoppage (Bot Shield)',
+                status: AuditLogStatus.CRITICAL,
+                executorId: this.client.user?.id,
+                executorTag: this.client.user?.tag,
+                targetId: log.executorId,
+                targetName: member.user.tag,
+                details: `Unauthorized bot addition detected. Bot **${member.user.tag}** added by <@${log.executorId}> has been neutralized.`,
+                color: this.client.color.red
+            });
         } catch (e) {
             console.error('Failed to kick rogue bot:', e);
         }

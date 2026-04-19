@@ -6,6 +6,7 @@ export default class LogSetup extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'log-setup',
+			aliases: ['logs'],
 			description: {
 				content: 'Set the channel for advanced server logging.',
 				usage: 'log-setup <channel>',
@@ -13,7 +14,8 @@ export default class LogSetup extends Command {
 			},
 			category: 'systems',
 			cooldown: 3,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			permissions: {
 				user: [PermissionFlagsBits.Administrator],
 				client: [PermissionFlagsBits.Administrator]

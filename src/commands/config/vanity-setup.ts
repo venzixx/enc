@@ -13,7 +13,8 @@ export default class VanitySetup extends Command {
 			},
 			category: 'config',
 			cooldown: 10,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			permissions: {
 				user: [PermissionFlagsBits.ManageGuild],
 				client: [PermissionFlagsBits.Administrator, PermissionFlagsBits.ManageRoles]

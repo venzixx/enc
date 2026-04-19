@@ -7,6 +7,7 @@ export default class VerifySetup extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'verify-setup',
+			aliases: ['verify'],
 			description: {
 				content: 'Set up the verification gate system with a button.',
 				usage: 'verify-setup <channel> <role>',
@@ -14,7 +15,8 @@ export default class VerifySetup extends Command {
 			},
 			category: 'systems',
 			cooldown: 3,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			permissions: {
 				user: [PermissionFlagsBits.Administrator],
 				client: [PermissionFlagsBits.Administrator]

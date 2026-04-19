@@ -47,6 +47,7 @@ export default class Play extends Command {
 				user: [],
 			},
 			slashCommand: true,
+			hidden: true,
 			options: [
 				{
 					name: "song",
@@ -61,6 +62,15 @@ export default class Play extends Command {
 
 	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
 		const query = args.join(" ");
+		if (!query || query.trim().length === 0) {
+			return await ctx.replyV2({
+				title: `${client.emoji.cross} Missing Argument`,
+				description: "Please provide a song name or URL to play!",
+				isAlert: true,
+				color: client.color.red,
+				ephemeral: true
+			});
+		}
 		await ctx.sendDeferMessage(ctx.locale(I18N.commands.play.loading));
 		let player = client.lavalink.getPlayer(ctx.guild.id);
 		const memberVoiceChannel = (ctx.member as any).voice.channel as VoiceChannel;

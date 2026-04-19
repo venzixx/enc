@@ -11,6 +11,7 @@ export default class Level extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'level',
+			aliases: ['rank', 'lvl'],
 			description: {
 				content: 'Check your current level and XP with a premium status card.',
 				usage: 'level [user]',
@@ -18,7 +19,8 @@ export default class Level extends Command {
 			},
 			category: 'tools',
 			cooldown: 5,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			options: [
 				{
 					name: 'user',

@@ -6,6 +6,7 @@ export default class BirthdaySetup extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'birthday-setup',
+			aliases: ['birthday'],
 			description: {
 				content: 'Configure the birthday announcement system.',
 				usage: 'birthday-setup <channel> [ping_role]',
@@ -13,7 +14,8 @@ export default class BirthdaySetup extends Command {
 			},
 			category: 'systems',
 			cooldown: 3,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			permissions: {
 				user: [PermissionFlagsBits.Administrator],
 				client: [PermissionFlagsBits.Administrator]

@@ -6,6 +6,7 @@ export default class CountingSetup extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'counting-setup',
+			aliases: ['counting'],
 			description: {
 				content: 'Set the channel for the counting minigame.',
 				usage: 'counting-setup <channel>',
@@ -13,7 +14,8 @@ export default class CountingSetup extends Command {
 			},
 			category: 'fun',
 			cooldown: 3,
-			slashCommand: true,
+			slashCommand: false,
+			hidden: true,
 			permissions: {
 				user: [PermissionFlagsBits.Administrator],
 				client: [PermissionFlagsBits.Administrator]

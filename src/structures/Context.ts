@@ -39,6 +39,7 @@ export default class Context {
 	public guild: any; 
 	public member: GuildMember | null;
 	public memberVoiceChannel: Channel | null;
+	public targetMessage: Message | null = null;
 	public response: Message | null = null;
 	public deferred = false;
 	public replied = false;
@@ -94,20 +95,27 @@ export default class Context {
 		this.guild = ctx.guild;
 		this.member = ctx.member as GuildMember;
 		this.memberVoiceChannel = this.member?.voice?.channel || null;
+
+		if (!(ctx instanceof Message) && ctx.isMessageContextMenuCommand()) {
+			this.targetMessage = ctx.targetMessage as Message;
+		}
 	}
 
 	public async sendMessage(options: string | MessageCreateOptions | InteractionReplyOptions) {
 		if (this.interaction) {
-			if (this.replied || this.deferred || this.interaction.replied || (this.interaction as any).deferred) {
-                this.replied = true;
+			if (this.interaction.replied || this.interaction.deferred) {
 				return await this.interaction.editReply(options as InteractionEditReplyOptions);
 			}
-			this.replied = true;
+            
             if (typeof options === 'object' && (options as any).ephemeral) {
                 const { ephemeral, ...rest } = options as any;
-                return await this.interaction.reply({ ...rest, flags: [MessageFlags.Ephemeral] });
+                const resp = await this.interaction.reply({ ...rest, flags: [MessageFlags.Ephemeral] });
+                this.replied = true;
+                return resp;
             }
-			return await this.interaction.reply(options as InteractionReplyOptions);
+			const resp = await this.interaction.reply(options as InteractionReplyOptions);
+            this.replied = true;
+            return resp;
 		}
 		const response = await this.channel?.send(options as MessageCreateOptions);
         if (response) this.response = response;
@@ -151,8 +159,9 @@ export default class Context {
 
 	public async deferReply(ephemeral = false) {
 		if (this.interaction) {
-			this.deferred = true;
-			return await this.interaction.deferReply({ flags: ephemeral ? [MessageFlags.Ephemeral] : undefined });
+			const resp = await this.interaction.deferReply({ flags: ephemeral ? [MessageFlags.Ephemeral] : undefined });
+            this.deferred = true;
+            return resp;
 		}
 		return null;
 	}

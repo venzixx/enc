@@ -20,6 +20,7 @@ import type { Requester } from "../../types";
 import { LavamusicEventType } from "../../types/events";
 import { trackStart as updateSetupTrackStart } from "../../utils/SetupSystem";
 import { ExtendedClient } from '../../client';
+import logger from "../../structures/Logger";
 import { V2Helper } from "../../utils/V2Helper";
 import { getButtons } from "../../utils/Buttons";
 
@@ -41,6 +42,8 @@ export default class TrackStart extends Event {
 		if (!channel) return;
 
 		const locale = await this.client.db.getLanguage(guild.id);
+        player.set("startTime", Date.now());
+        logger.info(`[Lavalink] Track Started: ${track.info.title} in guild ${guild.id}. Timestamp recorded.`);
 
 		if (player.voiceChannelId) {
 			await this.client.utils.setVoiceStatus(

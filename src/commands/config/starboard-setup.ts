@@ -6,6 +6,7 @@ export default class StarboardSetup extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'starboard-setup',
+            aliases: ['starboard'],
             description: {
                 content: 'Configure the starboard system.',
                 usage: 'starboard-setup <channel> <count>',
@@ -13,7 +14,8 @@ export default class StarboardSetup extends Command {
             },
             category: 'config',
             cooldown: 5,
-            slashCommand: true,
+            slashCommand: false,
+            hidden: true,
             permissions: {
                 user: [PermissionFlagsBits.ManageGuild],
                 client: [PermissionFlagsBits.ManageChannels, PermissionFlagsBits.EmbedLinks]

@@ -13,7 +13,8 @@ export default class Unsticky extends Command {
             },
             category: 'tools',
             cooldown: 3,
-            slashCommand: true,
+            slashCommand: false,
+            hidden: true,
             permissions: {
                 user: [PermissionFlagsBits.ManageMessages],
                 client: [PermissionFlagsBits.ManageMessages]
