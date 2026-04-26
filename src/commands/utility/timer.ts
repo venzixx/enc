@@ -6,66 +6,70 @@ export default class Timer extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'timer',
+            aliases: ['cd', 'countdown'],
             description: {
-                content: 'Set a DM timer.',
+                content: 'Start a synchronized channel-wide countdown timer.',
                 usage: 'timer <duration>',
-                examples: ['timer 30m']
+                examples: ['timer 10m', 'timer 1h']
             },
             category: 'utility',
-            cooldown: 3,
+            cooldown: 5,
             slashCommand: true,
             options: [
                 {
                     name: 'duration',
-                    description: 'Duration for the timer (e.g. 10m, 1h)',
+                    description: 'Timer duration (e.g., 10m, 1h)',
                     type: 3, // STRING
                     required: true
                 }
-            ]
+            ],
+            args: true
         });
     }
 
-    public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
-        await ctx.deferReply(true);
-        const durationStr = ctx.options.getString('duration')!;
-        const duration = ms(durationStr) as any;
+    public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+        const durationStr = ctx.options.getString('duration') || args[0];
+        if (!durationStr) {
+            return ctx.replyV2({ description: 'Please provide a valid duration (e.g., 5m, 1h).', isAlert: true });
+        }
 
+        const duration = ms(durationStr as any) as unknown as number;
         if (!duration || duration < 1000) {
-            return ctx.replyV2({ description: 'Invalid duration provided.', color: client.color.red, isAlert: true, ephemeral: true });
+            return ctx.replyV2({ description: 'Invalid duration provided. Minimum is 1 second.', isAlert: true });
+        }
+
+        if (duration > 86400000 * 7) { // 7 days limit
+            return ctx.replyV2({ description: 'Timer duration cannot exceed 7 days.', isAlert: true });
         }
 
         const endTime = Math.floor((Date.now() + duration) / 1000);
 
-        try {
-            await ctx.author.send({
-                embeds: [
-                    client.embed({
-                        title: '🕒 Timer Started',
-                        description: `Your timer for **${durationStr}** has started.\n\nEnds: <t:${endTime}:R>`,
-                        color: client.color.main
-                    }, ctx)
-                ]
-            });
-            
-            await ctx.replyV2({ description: `Timer set for **${durationStr}**. I will DM you when it's done!`, color: client.color.main, isAlert: true, ephemeral: true });
-        } catch (e) {
-            return ctx.replyV2({ description: 'I cannot DM you. Please open your DMs to set a timer.', color: client.color.red, isAlert: true, ephemeral: true });
-        }
+        const embed = client.embed({
+            title: `⏳ Timer Initialized`,
+            description: `A synchronized countdown has been established by ${ctx.author}.\n\n**Duration:** \`${durationStr}\`\n**Remaining:** <t:${endTime}:R>`,
+            color: client.color.main,
+            footer: 'This timer is visible to all users in this channel.'
+        }, ctx);
 
+        const msg = await ctx.reply({ embeds: [embed] });
+
+        // Wait for timer completion
         setTimeout(async () => {
             try {
-                await ctx.author.send({
-                    content: `${ctx.author}`,
-                    embeds: [
-                        client.embed({
-                            title: '⏰ Timer Finished!',
-                            description: `Your **${durationStr}** timer has ended.`,
-                            color: client.color.main
-                        }, ctx)
-                    ]
+                const finishEmbed = client.embed({
+                    title: `⏰ Timer Expired`,
+                    description: `The **${durationStr}** timer set by ${ctx.author} has concluded.`,
+                    color: client.color.yellow,
+                    footer: `Finality reached at <t:${endTime}:f>`
+                }, ctx);
+
+                // Send a new message to ping the user
+                await ctx.channel.send({
+                    content: `${client.emoji.clock} ${ctx.author}, your countdown is complete!`,
+                    embeds: [finishEmbed]
                 });
             } catch (e) {
-                // Ignore if closed
+                // Channel might be deleted or bot lost perms
             }
         }, duration);
     }

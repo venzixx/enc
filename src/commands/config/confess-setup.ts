@@ -18,10 +18,10 @@ export default class ConfessSetup extends Command {
 				usage: 'confess-setup <channel>',
 				examples: ['confess-setup #confessions']
 			},
-			category: 'social',
+			category: 'config',
 			cooldown: 3,
-			slashCommand: false,
-			hidden: true,
+			slashCommand: true,
+			hidden: false,
 			permissions: {
 				user: [PermissionFlagsBits.Administrator],
 				client: [PermissionFlagsBits.Administrator]
@@ -37,8 +37,8 @@ export default class ConfessSetup extends Command {
 		});
 	}
 
-	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
-		const channel = ctx.options.getChannel('channel') as TextChannel;
+	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+		const channel = (ctx.isInteraction ? ctx.options.getChannel('channel') : ctx.guild.channels.cache.get(args[0]?.replace(/[<#>]/g, ''))) as TextChannel;
 
 		if (!channel || !channel.isTextBased()) {
 			return await ctx.replyV2({ 
@@ -65,7 +65,8 @@ export default class ConfessSetup extends Command {
             buttons: [
                 new ButtonBuilder()
                     .setCustomId('confess_create')
-                    .setLabel(`${client.emoji.edit} Send Confession`)
+                    .setLabel('Send Confession')
+                    .setEmoji('1494693086843109527')
                     .setStyle(ButtonStyle.Primary)
             ]
         }) as any).catch(() => {});

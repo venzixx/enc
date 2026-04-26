@@ -19,6 +19,7 @@ import { AutoModHandler } from "../../utils/AutoModHandler";
 import { HeatManager } from "../../utils/HeatManager";
 import { ExtendedClient } from "../../client";
 import { getAIResponse } from "../../handlers/aiHandler";
+import { StreakManager } from "../../utils/StreakManager";
 
 export default class MessageCreate extends Event {
 	constructor(client: ExtendedClient, file: string) {
@@ -29,13 +30,17 @@ export default class MessageCreate extends Event {
 	}
 
 	public async run(message: Message): Promise<any> {
-		if (message.author.bot) return;
-		if (!(message.guild && message.guildId)) return;
+		if (!message.guild || message.author.bot) return;
+
+		console.log(`[DEBUG] Message from ${message.author.tag} in ${message.guild.name}: "${message.content}"`);
 
 		// 0. AUTO-MOD CHECK 
 		// Check for spam, links, blacklisted words, etc.
 		const handledByAutoMod = await AutoModHandler.process(this.client, message);
 		if (handledByAutoMod) return;
+
+		// UPDATE STREAKS
+		StreakManager.processMessage(this.client, message.guild.id, message.author.id).catch(err => console.error("Streak Error:", err));
 
 		//  AFK SYSTEM 
 		// 1) If the message author is AFK  remove their AFK and show missed mentions
@@ -104,77 +109,222 @@ export default class MessageCreate extends Event {
 		}
 		//  END AFK SYSTEM 
 
-		const [setup, locale, guild] = await Promise.all([
-			this.client.db.getSetup(message.guildId),
-			this.client.db.getLanguage(message.guildId),
-			this.client.db.get(message.guildId),
+		// 1) Fetch Guild Settings & Leveling Config once
+		const [setup, locale, guild]: [any, any, any] = await Promise.all([
+			this.client.db.getSetup(message.guildId as string),
+			this.client.db.getLanguage(message.guildId as string),
+			this.client.db.getLevelConfig(message.guildId as string),
 		]);
 
-
-
-		const now = Date.now();
-
 		if (setup && setup.textId === message.channelId) {
-			// Handle setup channel system
+			// Handle setup channel system (Song Requests)
 			return this.client.emit("setupSystem", message);
 		}
 
-		// --- Ignored Channels Check ---
-		const isIgnored = await this.client.prisma.ignoredChannel.findFirst({
-			where: { guildId: message.guildId, channelId: message.channelId }
+		// 2) Check for Ignored Channels (Bypass for HELP command)
+		const prefix = setup?.prefix || guild?.prefix || process.env.PREFIX || "e!";
+		console.log(`[DEBUG] Message from ${message.author.tag}: "${message.content}". Prefix: "${prefix}"`);
+		const isHelp = message.content.toLowerCase().startsWith(prefix.toLowerCase() + "help") || 
+					   message.content.startsWith(`<@!${this.client.user?.id}> help`) || 
+					   message.content.startsWith(`<@${this.client.user?.id}> help`);
+
+		const isIgnored = guild?.ignoredChannels?.some((ic: any) => ic.channelId === message.channelId);
+		if (isIgnored && !isHelp) return;
+
+		// 3) --- Autoresponder (High Priority) ---
+		const autoResponses = await (this.client.prisma as any).autoResponse.findMany({
+			where: { guildId: message.guildId }
 		});
 
-		if (isIgnored) return;
+		const cleanContent = message.content.toLowerCase().trim();
+		for (const ar of autoResponses as any[]) {
+			// A) Channel Filter: If channelId is set and doesn't match, skip
+			if (ar.channelId && ar.channelId !== message.channelId) continue;
 
-		// --- Message Tracking & Leveling ---
-		const cooldownTime = 60000; // 1 minute
-		const hasCooldown = this.client.xpCooldowns.has(`${message.guildId}-${message.author.id}`);
+			// B) Match Logic
+			let matched = false;
+			const trigger = ar.trigger.toLowerCase().trim();
+			const matchType = (ar as any).matchType || "EXACT"; // Fallback for safety during migration
 
-		const memberData = await this.client.prisma.member.upsert({
-			where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } },
-			update: { 
-				messages: { increment: 1 },
-				xp: hasCooldown ? undefined : { increment: Math.floor(Math.random() * 11) + 15 } // 15-25 XP
-			},
-			create: { 
-				guildId: message.guildId, 
-				userId: message.author.id, 
-				messages: 1, 
-				xp: Math.floor(Math.random() * 11) + 15 
+			if (matchType === "CONTAINS") {
+				matched = cleanContent.includes(trigger);
+			} else if (matchType === "MENTION") {
+				// Match if the trigger (user ID) is mentioned in the message
+				matched = message.mentions.users.has(ar.trigger) || 
+						  message.content.includes(`<@${ar.trigger}>`) || 
+						  message.content.includes(`<@!${ar.trigger}>`);
+			} else {
+				// EXACT match
+				matched = cleanContent === trigger;
 			}
-		});
 
-		if (!hasCooldown) {
-			this.client.xpCooldowns.set(`${message.guildId}-${message.author.id}`, now);
-			setTimeout(() => this.client.xpCooldowns.delete(`${message.guildId}-${message.author.id}`), cooldownTime);
-		}
-
-		// Check level up
-		const nextLevelXP = (memberData.level + 1) * (memberData.level + 1) * 100;
-		if (memberData.xp >= nextLevelXP) {
-			await this.client.prisma.member.update({
-				where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } },
-				data: { level: { increment: 1 } }
-			});
-			// Level up messages can be handled here if needed
-		}
-
-		// --- Autoresponder ---
-		const autoResponse = await this.client.prisma.autoResponse.findFirst({
-			where: { 
-				guildId: message.guildId, 
-				trigger: message.content.toLowerCase() 
+			if (matched) {
+				// C) Response Handling (GIF/Image support)
+				const isImageUrl = ar.response.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/i);
+				
+				if (isImageUrl) {
+					const embed = new EmbedBuilder()
+						.setColor(this.client.color.main)
+						.setImage(ar.response);
+					await message.reply({ embeds: [embed] }).catch((e) => console.error("[AUTORESPONDER] Failed to reply:", e));
+				} else {
+					await message.reply(ar.response).catch((e) => console.error("[AUTORESPONDER] Failed to reply:", e));
+				}
+				return; // Stop processing further if it's an auto-response
 			}
-		});
-
-		if (autoResponse) {
-			await message.reply(autoResponse.response);
-			return;
 		}
 
-		// --- Sticky Message Handling ---
-		const stickyData = await this.client.prisma.stickyMessage.findUnique({
-			where: { guildId_channelId: { guildId: message.guildId, channelId: message.channelId } }
+		// 4) --- Counting Game ---
+		if (guild.countingChannel === message.channelId) {
+			const num = parseInt(message.content);
+			const expected = (guild.countingCurrent || 0) + 1;
+
+			if (!isNaN(num)) {
+				if (num !== expected || message.author.id === guild.countingLastUser) {
+					await message.react(this.client.emoji.cross);
+					await message.reply(`${this.client.emoji.cross} Wrong number! The next number was **${expected}**. The game has been reset to **1**.`);
+					await (this.client.prisma as any).guild.update({
+						where: { id: message.guildId },
+						data: { countingCurrent: 0, countingLastUser: null }
+					});
+					return;
+				}
+
+				await message.react(this.client.emoji.success);
+				await (this.client.prisma as any).guild.update({
+					where: { id: message.guildId },
+					data: { 
+						countingCurrent: num, 
+						countingLastUser: message.author.id,
+						countingHighScore: num > (guild.countingHighScore || 0) ? num : undefined
+					}
+				});
+				return;
+			}
+			// If it's not a number, we just let it pass to XP/Commands (or you can return if you want it to be number-only)
+		}
+
+		// 5) --- Message Tracking & Leveling ---
+		if (guild.levelingEnabled && guild.xpMessageEnabled) {
+			const hasCooldown = this.client.xpCooldowns.has(`${message.guildId}-${message.author.id}`);
+			const now = Date.now();
+
+			if (!hasCooldown) {
+				// 1. Calculate Base XP
+				const minXp = guild.xpMessageMin ?? 15;
+				const maxXp = guild.xpMessageMax ?? 25;
+				let xpToGive = Math.floor(Math.random() * (maxXp - minXp + 1)) + minXp;
+
+				// 2. Apply Boosters
+				let multiplier = 1.0;
+				const cBoosters = guild.channelBoosters || guild.ChannelBooster || [];
+				const channelBooster = cBoosters.find((cb: any) => cb.channelId === message.channelId);
+				if (channelBooster) multiplier += (channelBooster.percentage / 100);
+
+				const rBoosters = guild.roleBoosters || guild.RoleBooster || [];
+				if (rBoosters.length > 0) {
+					const memberRoles = message.member?.roles.cache;
+					if (memberRoles) {
+						if (guild.stackXpBoosters) {
+							rBoosters.forEach((rb: any) => {
+								if (memberRoles.has(rb.roleId)) multiplier += (rb.percentage / 100);
+							});
+						} else {
+							const highestBoost = Math.max(...rBoosters
+								.filter((rb: any) => memberRoles.has(rb.roleId))
+								.map((rb: any) => rb.percentage), 0);
+							multiplier += (highestBoost / 100);
+						}
+					}
+				}
+
+				if (guild.effortBoosterEnabled) {
+					const wordCount = message.content.split(/\s+/).length;
+					const imageCount = message.attachments.size;
+					if (wordCount >= (guild.effortBoosterWords ?? 25) || imageCount >= (guild.effortBoosterImages ?? 3)) {
+						multiplier += ((guild.effortBoosterPercentage ?? 10) / 100);
+					}
+				}
+
+				xpToGive = Math.floor(xpToGive * multiplier);
+
+				const memberData = await (this.client.prisma as any).member.upsert({
+					where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } },
+					update: { 
+						messages: { increment: 1 },
+						xp: { increment: xpToGive }
+					},
+					create: { 
+						guildId: message.guildId, 
+						userId: message.author.id, 
+						messages: 1, 
+						xp: xpToGive 
+					}
+				});
+
+				const cooldownTime = (guild.xpMessageCooldown ?? 60) * 1000;
+				this.client.xpCooldowns.set(`${message.guildId}-${message.author.id}`, now);
+				setTimeout(() => this.client.xpCooldowns.delete(`${message.guildId}-${message.author.id}`), cooldownTime);
+
+				const calcLevelXP = (lvl: number) => Math.floor((5 * Math.pow(lvl, 2) + 50 * lvl + 100) * (guild.xpFormulaMultiplier ?? 1.0));
+				const nextLevelXP = calcLevelXP(memberData.level + 1);
+
+				if (memberData.xp >= nextLevelXP) {
+					const newLevel = memberData.level + 1;
+					await (this.client.prisma as any).member.update({
+						where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } },
+						data: { level: newLevel }
+					});
+
+					if (guild.levelRoles && guild.levelRoles.length > 0) {
+						const rolesToAdd = guild.levelRoles.filter((lr: any) => lr.level <= newLevel).map((lr: any) => lr.roleId);
+						if (rolesToAdd.length > 0) {
+							if (guild.stackRoleRewards) {
+								await message.member?.roles.add(rolesToAdd).catch(() => {});
+							} else {
+								const allLevelRoles = guild.levelRoles.map((lr: any) => lr.roleId);
+								const highestRole = guild.levelRoles
+									.filter((lr: any) => lr.level <= newLevel)
+									.sort((a: any, b: any) => b.level - a.level)[0]?.roleId;
+								if (highestRole) {
+									const rolesToRemove = allLevelRoles.filter((id: string) => id !== highestRole);
+									await message.member?.roles.remove(rolesToRemove).catch(() => {});
+									await message.member?.roles.add(highestRole).catch(() => {});
+								}
+							}
+						}
+					}
+
+					if (guild.levelUpMessageEnabled) {
+						const content = (guild.levelUpMessage ?? "GG {user.mention}, you just reached level **{user.level}**!")
+							.replace(/{user\.mention}/g, `<@${message.author.id}>`)
+							.replace(/{user\.tag}/g, message.author.tag)
+							.replace(/{user\.name}/g, message.author.username)
+							.replace(/{user\.level}/g, newLevel.toString());
+
+						const embed = new EmbedBuilder()
+							.setColor(this.client.color.main)
+							.setDescription(content)
+							.setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() });
+
+						const targetChannel = guild.levelChannelId ? 
+							(message.guild.channels.cache.get(guild.levelChannelId) as TextChannel) : 
+							(message.channel as TextChannel);
+
+						if (targetChannel) await targetChannel.send({ embeds: [embed] }).catch(() => {});
+					}
+				}
+			} else {
+				await (this.client.prisma as any).member.update({
+					where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } },
+					data: { messages: { increment: 1 } }
+				}).catch(() => {});
+			}
+		}
+
+		// 6) --- Sticky Message ---
+		const stickyData = await (this.client.prisma as any).stickyMessage.findUnique({
+			where: { guildId_channelId: { guildId: message.guildId as string, channelId: message.channelId as string } }
 		});
 
 		if (stickyData) {
@@ -182,95 +332,50 @@ export default class MessageCreate extends Event {
 				const lastMsg = await message.channel.messages.fetch(stickyData.lastMsgId).catch(() => null);
 				if (lastMsg) await lastMsg.delete().catch(() => {});
 			}
-
 			const newSticky = await (message.channel as TextChannel).send({
 				embeds: [new EmbedBuilder().setDescription(stickyData.content).setColor(0x000000).setFooter({ text: 'Sticky Message' })]
 			});
-
-			await this.client.prisma.stickyMessage.update({
-				where: { guildId_channelId: { guildId: message.guildId, channelId: message.channelId } },
+			await (this.client.prisma as any).stickyMessage.update({
+				where: { guildId_channelId: { guildId: message.guildId as string, channelId: message.channelId as string } },
 				data: { lastMsgId: newSticky.id }
 			});
 		}
 
 
 
-		// --- Counting Game Handling ---
-		const guildData = await this.client.prisma.guild.findUnique({
-			where: { id: message.guildId }
-		});
-
-		if (guildData?.countingChannel === message.channelId) {
-			const num = parseInt(message.content);
-			const expected = (guildData.countingCurrent || 0) + 1;
-
-			if (isNaN(num)) {
-				// Ignore non-number messages in counting channel (or delete them)
-				return;
-			}
-
-			if (num !== expected || message.author.id === guildData.countingLastUser) {
-				await message.react(this.client.emoji.cross);
-				await message.reply(`${this.client.emoji.cross} Wrong number! The next number was **${expected}**. The game has been reset to **1**.`);
-				await this.client.prisma.guild.update({
-					where: { id: message.guildId },
-					data: { countingCurrent: 0, countingLastUser: null }
-				});
-				return;
-			}
-
-			await message.react(this.client.emoji.success);
-			await this.client.prisma.guild.update({
-				where: { id: message.guildId },
-				data: { 
-					countingCurrent: num, 
-					countingLastUser: message.author.id,
-					countingHighScore: num > (guildData.countingHighScore || 0) ? num : undefined
-				}
-			});
-			return; // Don't process commands or XP in the counting channel? Or maybe do? I'll return for now to keep it clean.
-		}
-
-
-
-		// --- Collaborative Story Game Handling ---
-		const storyData = await this.client.prisma.story.findUnique({
-			where: { guildId_channelId: { guildId: message.guildId, channelId: message.channelId } }
+		// 7) --- Collaborative Story Game ---
+		const storyData = await (this.client.prisma as any).story.findUnique({
+			where: { guildId_channelId: { guildId: message.guildId as string, channelId: message.channelId as string } }
 		});
 
 		if (storyData && storyData.isActive) {
 			const words = message.content.trim().split(/\s+/);
 			if (words.length > 1) {
-				await message.delete().catch(() => {});
-				if (message.channel.isTextBased() && 'send' in message.channel) {
-					return await message.channel.send({ content: `${this.client.emoji.cross} ${message.author}, you can only contribute **one word** at a time!` }).then((m: Message) => setTimeout(() => m.delete().catch(() => {}), 5000));
+				// Not a story word, ignore (let it pass to commands/XP)
+			} else {
+				if (message.author.id === storyData.lastUser) {
+					await message.delete().catch(() => {});
+					if (message.channel.isTextBased() && 'send' in message.channel) {
+						await message.channel.send({ content: `${this.client.emoji.cross} ${message.author}, you cannot contribute twice in a row!` }).then((m: Message) => setTimeout(() => m.delete().catch(() => {}), 5000));
+					}
+					return;
 				}
+
+				await (this.client.prisma as any).story.update({
+					where: { guildId_channelId: { guildId: message.guildId as string, channelId: message.channelId as string } },
+					data: { 
+						content: storyData.content + ' ' + words[0],
+						lastUser: message.author.id
+					}
+				});
 				return;
 			}
-
-			if (message.author.id === storyData.lastUser) {
-				await message.delete().catch(() => {});
-				if (message.channel.isTextBased() && 'send' in message.channel) {
-					return await message.channel.send({ content: `${this.client.emoji.cross} ${message.author}, you cannot contribute twice in a row!` }).then((m: Message) => setTimeout(() => m.delete().catch(() => {}), 5000));
-				}
-				return;
-			}
-
-			await this.client.prisma.story.update({
-				where: { guildId_channelId: { guildId: message.guildId, channelId: message.channelId } },
-				data: { 
-					content: { set: storyData.content + ' ' + words[0] },
-					lastUser: message.author.id
-				}
-			});
-			return;
 		}
 
 
 
 
 		const escapeRegex = (str: string): string => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-		const prefix = guild?.prefix || process.env.PREFIX || "e!";
 		const mentionPrefixRegex = new RegExp(`^<@!?${this.client.user?.id}>\\s*`);
 		const standardPrefixRegex = new RegExp(`^${escapeRegex(prefix)}\\s*`);
 
@@ -324,7 +429,7 @@ export default class MessageCreate extends Event {
 		if (isMentionOnly || isReplyToBot) {
 			try {
                 // Fetch Guild AI Settings
-                const guildData = await this.client.prisma.guild.findUnique({
+                const guildData = await (this.client.prisma as any).guild.findUnique({
                     where: { id: message.guildId! }
                 });
 

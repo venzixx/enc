@@ -16,11 +16,13 @@ const client = new ExtendedClient({
         GatewayIntentBits.GuildInvites,
         GatewayIntentBits.GuildBans,
         GatewayIntentBits.GuildWebhooks,
+        GatewayIntentBits.DirectMessages,
     ],
     partials: [
         Partials.Message,
         Partials.Reaction,
         Partials.User,
+        Partials.Channel,
     ],
 });
 

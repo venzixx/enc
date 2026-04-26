@@ -1,0 +1,119 @@
+server: # REST and WS server
+  port: 2333
+  address: 0.0.0.0
+  http2:
+    enabled: true
+plugins:
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: false
+    allowDirectPlaylistIds: false
+    remoteCipher:
+      url: "https://cipher.kikkia.dev/"
+      userAgent: "Tuning Thunder/1.0.0"
+    oauth:
+      enabled: true
+      refreshToken: "1//03PVAxOo_H1EYCgYIARAAGAMSNwF-L9Ir4VVLMkWU6XJUhVi2xhgphcX6tfW60ZpIN7OfllHhCSxVi76SZhy8LIe9867g8VLdLoE"
+    pot:
+      token: "MniXLg0xfLS9OpcSor_OVz7fF5uPrYs90Ak2uaPVgr7QCMe2xHbYODUnpR0_ffDFVYrJPwEmuunuybk5LmK9eU6zu7YtbyW4TiYmAcJoqI1Ch8SaieoC26fU9dUymPV3zNkMY7pMc8mqFQUJvZdXEnVupt9YOOrKv1w="
+      visitorData: "CgtOb0haM3FWN0V2USj8oOHGBjIKCgJERRIEEgAgVw%3D%3D"
+    clients:
+      - TV
+      - TVHTML5_SIMPLY
+      - WEB
+      - MUSIC
+      - IOS
+      - MWEB
+      - ANDROID
+      - ANDROID_MUSIC
+      - ANDROID_VR
+      - WEBEMBEDDED
+  lavasrc:
+    providers:
+      - "dzisrc:%ISRC%"
+      - "dzsearch:%QUERY%"
+      - "ytsearch:\"%ISRC%\""
+      - "ytsearch:%QUERY%"
+      - "qbisrc:%ISRC%"
+      - "qbsearch:%QUERY%"
+      - "spsearch:%QUERY%"
+      - "scsearch:%QUERY%"
+    sources:
+      spotify: true
+      deezer: true
+      youtube: true
+      qobuz: true
+      applemusic: true
+    spotify:
+      clientId: "7056bcb7fe3b49afa02194a34ee701fd"
+      clientSecret: "d38297161ab94a76a16a309a210fb509"
+      countryCode: "US"
+      playlistLoadLimit: 6
+      albumLoadLimit: 6
+      preferAnonymousToken: true
+      customTokenEndpoint: "https://x6nkp7zd-3012.euw.devtunnels.ms/api/token?key=Ilovetofuckthingsup"
+      sp_dc: "AQBO6nsIllAqmL_sFtohYmxNZucaVZY9U7ahQNLxdtXV39nJz-sbAm3Dv3uewCcL7QJrmhy46BY-bQg_qEnF8ATDGo8_AZH10FMCAhH8GaJOf0xYzwulHnAqdVc49YpFJ-qsHUDrPdqk79JUyuxz3lS7hAV6k6PsxnA3pPK1pxOc9DAEzptn1J-Nwry7WHI2mTNiI6cqRWDcpe5hqI0"
+    deezer:
+      masterDecryptionKey: "g4el58wc0zvf9na1"
+      arl: "96a5e80445e9d739e249505915c68495cfefff18985467125ae5a4025edca16259e9e525e5523ffbea719fcf0c7d98a64c2fe1c32619d3af3e81bf313d87e827445d9ba542ae967a95c9bfbbd7ca8fb0c672ebf6e9b6e5d567ee4dd8816679c2"
+      formats: [ "FLAC", "MP3_320", "MP3_256", "MP3_128", "MP3_64", "AAC_64"]
+    qobuz:
+      userOauthToken: "qNL0eKjXhz6rSvrMOo4JtXym1AOTQa5mSMEc9hSD_dlN5mJ0WDQ7UZDEc5LpYh5KEUd43f_SszgKmM_nn4AONg"
+      appId: "1696041"
+    applemusic:
+      countryCode: "US"
+      mediaAPIToken: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6Ijk3RFFVOVFVRDYifQ.eyJpc3MiOiJNNjJZRDg1RlRRIiwiaWF0IjoxNzc0ODk2NTE3LCJleHAiOjE3ODIxNTQxMTcsIm9yaWdpbiI6IiouYXBwbGUuY29tIn0.neG2f5gMFnlvq4lnQEvBNt7xU-XKVyCxoU6gJjNNGjcfXPTGlXOM2opkJufBNpSV5-lqQceIfylrIqyLa70dFg"
+lavalink:
+  plugins:
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.0"
+      snapshot: false
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.1"
+      snapshot: false
+    - dependency: "com.github.topi314.lavasearch:lavasearch-plugin:1.0.0"
+      snapshot: false
+  server:
+    password: "fuckyouidfk"
+    sources:
+      youtube: false
+      bandcamp: true
+      soundcloud: true
+      twitch: false
+      vimeo: false
+      nico: false
+      http: false
+      local: false
+    filters:
+      volume: true
+      equalizer: true
+      karaoke: true
+      timescale: true
+      tremolo: true
+      vibrato: true
+      distortion: true
+      rotation: true
+      channelMix: true
+      lowPass: true
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: HIGH
+    trackStuckThresholdMs: 10000
+    useSeekGhosting: true
+    youtubePlaylistLoadLimit: 6
+    playerUpdateInterval: 5
+    youtubeSearchEnabled: true
+    soundcloudSearchEnabled: true
+    gc-warnings: true
+    timeouts:
+      connectTimeoutMs: 10000
+      connectionRequestTimeoutMs: 10000
+      socketTimeoutMs: 10000
+logging:
+  file:
+    path: ./logs/
+  level:
+    root: INFO
+    lavalink: INFO
+    dev.lavalink.youtube.http.YoutubeOauth2Handler: INFO
+    com.sedmelluq.discord.lavaplayer.tools.ExceptionTools: DEBUG

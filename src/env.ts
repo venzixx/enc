@@ -52,6 +52,7 @@ const envSchema = z.object({
 		}
 		return val;
 	}, z.number().default(0)),
+	STREAMING_URL: z.string().default("https://twitch.tv/discord"),
 	DATABASE_URL: z.string().optional(),
 	SEARCH_ENGINE: z.preprocess(
 		(val) => {

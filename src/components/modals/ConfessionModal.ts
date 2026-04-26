@@ -80,7 +80,8 @@ export default class ConfessionModal extends Component {
 				buttons: [
 					new ButtonBuilder()
 						.setCustomId('confess_create')
-						.setLabel(`${this.client.emoji.edit} Write a Confession`)
+						.setLabel('Write a Confession')
+						.setEmoji('1494693086843109527')
 						.setStyle(ButtonStyle.Secondary)
 				]
 			});

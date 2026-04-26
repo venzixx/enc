@@ -29,11 +29,15 @@ export default class InteractionCreate extends Event {
 	}
 
 	public async run(interaction: Interaction<CacheType>): Promise<any> {
-		if (!(interaction.guild && interaction.guildId)) return;
+		// We allow interactions without a guild for DMs (like appeals)
+		// But slash commands usually require a guild in this bot's context
+
 		if (
 			interaction.type === InteractionType.ApplicationCommand &&
 			(interaction.isChatInputCommand() || interaction.isMessageContextMenuCommand())
 		) {
+			if (!interaction.guildId) return;
+
 			const [setup, locale] = await Promise.all([
 				this.client.db.getSetup(interaction.guildId),
 				this.client.db.getLanguage(interaction.guildId),
@@ -58,29 +62,31 @@ export default class InteractionCreate extends Event {
 
 			const ctx = new Context(this.client, interaction);
 			ctx.lng = locale || "en-US";
-			const clientMember = interaction.guild.members.resolve(this.client.user!)!;
+			const clientMember = interaction.guild ? interaction.guild.members.resolve(this.client.user!) : null;
 			
-			if (
-				!(
-					interaction.inGuild() &&
-					interaction.channel?.permissionsFor(clientMember)?.has(PermissionFlagsBits.ViewChannel)
+			if (interaction.inGuild()) {
+				if (
+					!clientMember ||
+					!interaction.channel?.permissionsFor(clientMember)?.has(PermissionFlagsBits.ViewChannel)
 				)
-			)
-				return;
+					return;
+			}
 
-			if (
-				!(
-					clientMember.permissions.has(PermissionFlagsBits.ViewChannel) &&
-					clientMember.permissions.has(PermissionFlagsBits.SendMessages) &&
-					clientMember.permissions.has(PermissionFlagsBits.EmbedLinks) &&
-					clientMember.permissions.has(PermissionFlagsBits.ReadMessageHistory)
-				)
-			) {
-				return await (interaction.member as GuildMember)
-					.send({
-						content: t(I18N.events.interaction.no_send_message, { lng: locale }),
-					})
-					.catch(() => {});
+			if (interaction.inGuild() && clientMember) {
+				if (
+					!(
+						clientMember.permissions.has(PermissionFlagsBits.ViewChannel) &&
+						clientMember.permissions.has(PermissionFlagsBits.SendMessages) &&
+						clientMember.permissions.has(PermissionFlagsBits.EmbedLinks) &&
+						clientMember.permissions.has(PermissionFlagsBits.ReadMessageHistory)
+					)
+				) {
+					return await (interaction.member as GuildMember)
+						.send({
+							content: t(I18N.events.interaction.no_send_message, { lng: locale }),
+						})
+						.catch(() => {});
+				}
 			}
 
 			if (command.permissions) {
@@ -90,7 +96,7 @@ export default class InteractionCreate extends Event {
 						: [command.permissions.client];
 
 					const missingClientPermissions = clientRequiredPermissions.filter(
-						(perm: any) => !clientMember.permissions.has(perm),
+						(perm: any) => !(clientMember as any).permissions.has(perm),
 					);
 
 					if (missingClientPermissions.length > 0) {
@@ -140,7 +146,7 @@ export default class InteractionCreate extends Event {
 						});
 					}
 
-					if (!clientMember.permissions.has(PermissionFlagsBits.Connect)) {
+					if (!clientMember!.permissions.has(PermissionFlagsBits.Connect)) {
 						return await ctx.replyV2({
 							description: t(I18N.events.interaction.no_connect_permission, { 
 								lng: locale,
@@ -151,7 +157,7 @@ export default class InteractionCreate extends Event {
 						});
 					}
 
-					if (!clientMember.permissions.has(PermissionFlagsBits.Speak)) {
+					if (!clientMember!.permissions.has(PermissionFlagsBits.Speak)) {
 						return await ctx.replyV2({
 							description: t(I18N.events.interaction.no_speak_permission, { 
 								lng: locale,
@@ -163,13 +169,13 @@ export default class InteractionCreate extends Event {
 					}
 
 					if (
-						clientMember.voice.channel &&
-						clientMember.voice.channelId !== (interaction.member as GuildMember).voice.channelId
+						clientMember!.voice.channel &&
+						clientMember!.voice.channelId !== (interaction.member as GuildMember).voice.channelId
 					) {
 						return await ctx.replyV2({
 							description: t(I18N.events.interaction.different_voice_channel, {
 								lng: locale,
-								channel: `<#${clientMember.voice.channelId}>`,
+								channel: `<#${clientMember!.voice.channelId}>`,
 								command: command.name,
 							}),
 							isAlert: true,
@@ -291,6 +297,7 @@ export default class InteractionCreate extends Event {
 
 		) {
 			const customId = (interaction as any).customId;
+            logger.info(`[DEBUG] Received component interaction: ${customId} from ${interaction.user.tag}`);
 			let component = this.client.components.get(customId);
 
 			if (!component) {

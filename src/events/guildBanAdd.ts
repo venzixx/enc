@@ -31,7 +31,13 @@ export default class GuildBanAdd extends Event {
             color: this.client.color.red
         });
 
-        // 3. Heat Tracking (Anti-Nuke)
+        // 3. Send Appeal DM (Only if not banned by this bot to avoid duplicates)
+        if (executorId !== this.client.user?.id) {
+            const { Appeals } = await import('../utils/Appeals');
+            await Appeals.sendAppealDM(this.client, ban.user, ban.guild, 'BAN', ban.reason || 'No reason provided');
+        }
+
+        // 4. Heat Tracking (Anti-Nuke)
         if (executorId && executorId !== this.client.user?.id) {
             await HeatManager.addHeat(this.client, ban.guild, executorId, 'BAN');
         }

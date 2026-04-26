@@ -1,21 +1,22 @@
 import { 
     EmbedBuilder, 
-    GuildMember, 
     ApplicationCommandOptionType,
-    ChannelType 
+    ChannelType,
+    version as djsVersion
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
+import os from 'os';
 
 export default class Info extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'info',
             description: {
-                content: 'Get information about the server, users, or bot status.',
+                content: 'Access the system information hub for server, user, or bot diagnostics.',
                 usage: 'info <subcommand>',
-                examples: ['info user', 'info server', 'info ping']
+                examples: ['info user @member', 'info server', 'info bot']
             },
             category: 'utility',
             cooldown: 3,
@@ -23,25 +24,25 @@ export default class Info extends Command {
             options: [
                 {
                     name: 'user',
-                    description: 'Get information about a specific user.',
+                    description: 'Analyze identity and membership data for a user.',
                     type: ApplicationCommandOptionType.Subcommand,
                     options: [
-                        { name: 'target', description: 'User to check', type: ApplicationCommandOptionType.User, required: false }
+                        { name: 'target', description: 'User to analyze', type: ApplicationCommandOptionType.User, required: false }
                     ]
                 },
                 {
                     name: 'server',
-                    description: 'Get information about the current server.',
+                    description: 'Retrieve technical and demographic data for this server.',
                     type: ApplicationCommandOptionType.Subcommand
                 },
                 {
-                    name: 'members',
-                    description: 'Check the server member count and statistics.',
+                    name: 'bot',
+                    description: 'View system status, resource usage, and core bot information.',
                     type: ApplicationCommandOptionType.Subcommand
                 },
                 {
                     name: 'ping',
-                    description: 'Check the bot heartbeat and latency.',
+                    description: 'Measure websocket heartbeat and node latency benchmarks.',
                     type: ApplicationCommandOptionType.Subcommand
                 }
             ]
@@ -57,8 +58,8 @@ export default class Info extends Command {
                 return this.handleUser(client, ctx, args);
             case 'server':
                 return this.handleServer(client, ctx);
-            case 'members':
-                return this.handleMembers(client, ctx);
+            case 'bot':
+                return this.handleBot(client, ctx);
             case 'ping':
                 return this.handlePing(client, ctx);
             default:
@@ -66,7 +67,7 @@ export default class Info extends Command {
         }
     }
 
-    private async handleUser(client: ExtendedClient, ctx: Context, args: string[]) {
+    public async handleUser(client: ExtendedClient, ctx: Context, args: string[]) {
         const member = await Resolver.resolveMember(ctx, ctx.options.getMember('target') || args[1]);
         if (!member) {
             return await ctx.replyV2({ description: 'Could not find that member.', isAlert: true });
@@ -83,8 +84,8 @@ export default class Info extends Command {
             .setThumbnail(user.displayAvatarURL())
             .setColor(member.displayColor || client.color.main)
             .addFields(
-                { name: `${client.emoji.user} User`, value: `**ID:** \`${user.id}\`\n**Bot:** \`${user.bot ? 'Yes' : 'No'}\`\n**Created:** <t:${Math.floor(user.createdTimestamp / 1000)}:R>`, inline: true },
-                { name: ' Membership', value: `**Joined:** <t:${Math.floor(member.joinedTimestamp! / 1000)}:R>\n**Top Role:** ${member.roles.highest}`, inline: true },
+                { name: `${client.emoji.user} Identity`, value: `**ID:** \`${user.id}\`\n**Created:** <t:${Math.floor(user.createdTimestamp / 1000)}:R>`, inline: true },
+                { name: `${client.emoji.shield} Membership`, value: `**Joined:** <t:${Math.floor(member.joinedTimestamp! / 1000)}:R>\n**Top Role:** ${member.roles.highest}`, inline: true },
                 { name: ` Roles (${roles.length})`, value: roles.length > 10 ? roles.slice(0, 10).join(', ') + ` and ${roles.length - 10} more...` : roles.join(', ') || 'None', inline: false }
             )
             .setTimestamp();
@@ -102,10 +103,10 @@ export default class Info extends Command {
             .setThumbnail(guild.iconURL({ forceStatic: false }))
             .setColor(client.color.main)
             .addFields(
-                { name: ' General', value: `**Owner:** <@${guild.ownerId}>\n**Created:** <t:${Math.floor(guild.createdTimestamp / 1000)}:R>\n**Verification:** \`${guild.verificationLevel}\`\n**ID:** \`${guild.id}\``, inline: false },
-                { name: ' Members', value: `**Total:** \`${guild.memberCount}\`\n**Boosts:** \`${guild.premiumSubscriptionCount || 0}\` (Tier ${guild.premiumTier})`, inline: true },
-                { name: ' Channels', value: `**Text:** \`${channels.filter((c: any) => c.type === ChannelType.GuildText).size}\`\n**Voice:** \`${channels.filter((c: any) => c.type === ChannelType.GuildVoice).size}\`\n**Threads:** \`${channels.filter((c: any) => c.isThread()).size}\``, inline: true },
-                { name: `${client.emoji.random} Misc`, value: `**Roles:** \`${roles.size}\`\n**Emojis:** \`${guild.emojis.cache.size}\`\n**Stickers:** \`${guild.stickers.cache.size}\``, inline: true }
+                { name: `${client.emoji.info} General`, value: `**Owner:** <@${guild.ownerId}>\n**Created:** <t:${Math.floor(guild.createdTimestamp / 1000)}:R>\n**Verification:** \`${guild.verificationLevel}\`\n**ID:** \`${guild.id}\``, inline: false },
+                { name: `${client.emoji.user} Members`, value: `**Total:** \`${guild.memberCount}\`\n**Boosts:** \`${guild.premiumSubscriptionCount || 0}\` (Tier ${guild.premiumTier})`, inline: true },
+                { name: ` Channels`, value: `**Text:** \`${channels.filter((c: any) => c.type === ChannelType.GuildText).size}\`\n**Voice:** \`${channels.filter((c: any) => c.type === ChannelType.GuildVoice).size}\``, inline: true },
+                { name: `${client.emoji.random} Misc`, value: `**Roles:** \`${roles.size}\` \u2022 **Emojis:** \`${guild.emojis.cache.size}\``, inline: true }
             )
             .setTimestamp();
 
@@ -113,47 +114,31 @@ export default class Info extends Command {
         return await ctx.reply({ embeds: [embed] });
     }
 
-    private async handleMembers(client: ExtendedClient, ctx: Context) {
-        const total = ctx.guild.memberCount;
-        const bots = ctx.guild.members.cache.filter((m: any) => m.user.bot).size;
-        const humans = total - bots;
+    public async handleBot(client: ExtendedClient, ctx: Context) {
+        const uptime = `${Math.floor(client.uptime! / 86400000)}d ${Math.floor(client.uptime! / 3600000) % 24}h ${Math.floor(client.uptime! / 60000) % 60}m`;
+        const memoryUsage = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
+        
+        const embed = new EmbedBuilder()
+            .setTitle(`${client.user?.username} System Overview`)
+            .setThumbnail(client.user?.displayAvatarURL() || null)
+            .setColor(client.color.main)
+            .setDescription(`**Enc Nexus** is a sovereign multi-purpose bot designed for elite guild governance and automated security.`)
+            .addFields(
+                { name: `${client.emoji.info} Statistics`, value: `**Guilds:** \`${client.guilds.cache.size}\`\n**Users:** \`${client.guilds.cache.reduce((a, g) => a + g.memberCount, 0)}\` identities\n**Channels:** \`${client.channels.cache.size}\``, inline: true },
+                { name: `${client.emoji.edit} Hardware`, value: `**Uptime:** \`${uptime}\`\n**Memory:** \`${memoryUsage} MB\` usage\n**Platform:** \`${os.platform()}\` (\`${os.arch()}\`)`, inline: true },
+                { name: `${client.emoji.music} Software`, value: `**Library:** \`Discord.js v${djsVersion}\`\n**Runtime:** \`Node ${process.version}\`\n**Dashboard:** [bot.encl.asia](https://bot.encl.asia)`, inline: false }
+            )
+            .setTimestamp()
+            .setFooter({ text: 'Enc Nexus OS v2.0' });
 
-        return await ctx.replyV2({
-            title: ` Member Statistics`,
-            description: `Analyzing population metrics for **${ctx.guild.name}**.`,
-            fields: [
-                { name: 'Total Accounts', value: `> \`${total}\` identities`, inline: true },
-                { name: 'Human Factors', value: `> \`${humans}\` members`, inline: true },
-                { name: 'Automated Units', value: `> \`${bots}\` bots`, inline: true }
-            ],
-            color: client.color.main
-        });
+        return await ctx.reply({ embeds: [embed] });
     }
 
     private async handlePing(client: ExtendedClient, ctx: Context) {
         const wsPing = client.ws.ping;
-        let nodePing = "N/A";
-
-        try {
-            const player = client.lavalink.getPlayer(ctx.guild.id);
-            if (player) {
-                const node = player.node;
-                if (node && (node as any).heartBeatPing !== undefined) {
-                    nodePing = `${(node as any).heartBeatPing}ms`;
-                }
-            }
-        } catch {}
-
-        const uptime = `${Math.floor(client.uptime! / 86400000)}d ${Math.floor(client.uptime! / 3600000) % 24}h ${Math.floor(client.uptime! / 60000) % 60}m`;
-
         return await ctx.replyV2({
-            title: `**System Heartbeat**`,
-            description: `Detailed diagnostics and latency benchmarks for **${client.user?.username}**.`,
-            fields: [
-                { name: `${client.emoji.info} **API LATENCY**`, value: `> \`${wsPing}ms\` (Discord API)`, inline: true },
-                { name: `${client.emoji.music} **LAVALINK**`, value: `> \`${nodePing}\` (Voice Node)`, inline: true },
-                { name: `${client.emoji.edit} **ENVIRONMENT**`, value: `> \`NodeJS ${process.version}\` \u2022 \`Up ${uptime}\``, inline: false }
-            ],
+            title: `System Latency`,
+            description: `**Websocket Heartbeat:** \`${wsPing}ms\``,
             color: client.color.main
         });
     }

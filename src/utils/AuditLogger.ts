@@ -78,11 +78,23 @@ export class AuditLogger {
             });
 
             // 3. High-Fidelity Discord Manifestation (Optional)
-            if (guildSettings.logChannelId) {
-                const logChannel = guild.channels.cache.get(guildSettings.logChannelId) as TextChannel;
+            let specificChannelId = guildSettings.logChannelId;
+            switch (data.type) {
+                case AuditLogType.MESSAGES: specificChannelId = guildSettings.logChannelMessages || specificChannelId; break;
+                case AuditLogType.CHANNELS: specificChannelId = guildSettings.logChannelChannels || specificChannelId; break;
+                case AuditLogType.ROLES: specificChannelId = guildSettings.logChannelRoles || specificChannelId; break;
+                case AuditLogType.MEMBERS: specificChannelId = guildSettings.logChannelMembers || specificChannelId; break;
+                case AuditLogType.MODERATION: specificChannelId = guildSettings.logChannelModeration || specificChannelId; break;
+                case AuditLogType.AUTOMOD: specificChannelId = guildSettings.logChannelModeration || specificChannelId; break;
+                case AuditLogType.SECURITY: specificChannelId = guildSettings.logChannelSecurity || specificChannelId; break;
+                case AuditLogType.VOICE: specificChannelId = guildSettings.logChannelVoice || specificChannelId; break;
+            }
+
+            if (specificChannelId) {
+                const logChannel = guild.channels.cache.get(specificChannelId) as TextChannel;
                 if (logChannel && logChannel.isTextBased()) {
                     const embed = new EmbedBuilder()
-                        .setTitle(`Event Log // ${data.event}`)
+                        .setTitle(`Audit Log // ${data.event}`)
                         .setColor(data.color || client.color.main)
                         .addFields(
                             { name: 'Category', value: `\`${data.type}\``, inline: true },

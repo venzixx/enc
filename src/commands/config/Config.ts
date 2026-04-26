@@ -1,16 +1,20 @@
 import { 
     ApplicationCommandOptionType,
     ChannelType,
-    PermissionFlagsBits 
+    PermissionFlagsBits,
+    ButtonBuilder,
+    ButtonStyle,
+    TextChannel
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
+import { V2Helper } from '../../utils/V2Helper';
 
 export default class Config extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
-            name: 'setup',
-            aliases: ['config', 'conf', 'setting'],
+            name: 'config',
+            aliases: ['setup', 'conf', 'setting'],
             description: {
                 content: 'Configure server modules and security systems.',
                 usage: 'setup <category> <subcommand>',
@@ -73,6 +77,14 @@ export default class Config extends Command {
                             options: [
                                 { name: 'channel', description: 'Announcement channel', type: ApplicationCommandOptionType.Channel, channel_types: [ChannelType.GuildText], required: true },
                                 { name: 'ping_role', description: 'Role to ping', type: ApplicationCommandOptionType.Role, required: false }
+                            ]
+                        },
+                        {
+                            name: 'confession',
+                            description: 'Setup the anonymous confession module.',
+                            type: ApplicationCommandOptionType.Subcommand,
+                            options: [
+                                { name: 'channel', description: 'Confession channel', type: ApplicationCommandOptionType.Channel, channel_types: [ChannelType.GuildText], required: true }
                             ]
                         }
                     ]
@@ -159,6 +171,31 @@ export default class Config extends Command {
                     create: { id: ctx.guild.id, birthdayChannelId: channel.id, birthdayPingRoleId: role?.id || null }
                 });
                 return ctx.replyV2({ description: `Successfully configured birthdays in ${channel}${role ? ` (Pinging ${role})` : ''}.` });
+            }
+            if (sub === 'confession') {
+                const channel = ctx.options.getChannel('channel', true) as TextChannel;
+                await client.prisma.guild.upsert({
+                    where: { id: ctx.guild.id },
+                    update: { confessionChannel: channel.id },
+                    create: { id: ctx.guild.id, confessionChannel: channel.id }
+                });
+
+                // Send the starter message with the fixed emoji
+                await channel.send(V2Helper.createLayout({
+                    title: ' Anonymous Confessions',
+                    description: 'Share your deepest secrets anonymously! Click the button below to send a confession.',
+                    color: client.color.main,
+                    footer: 'Your identity will remain completely hidden.',
+                    buttons: [
+                        new ButtonBuilder()
+                            .setCustomId('confess_create')
+                            .setLabel('Send Confession')
+                            .setEmoji('1494693086843109527')
+                            .setStyle(ButtonStyle.Primary)
+                    ]
+                }) as any).catch(() => {});
+
+                return ctx.replyV2({ description: `Successfully configured anonymous confessions in ${channel}.` });
             }
         }
 

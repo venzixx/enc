@@ -14,13 +14,26 @@ export async function loadCommands(client: ExtendedClient) {
 
     const slashCommands: any[] = [];
 
+    const loadedPaths = new Set<string>();
+    const commandNames = new Set<string>();
+
     for (const file of commandFiles) {
         const filePath = path.resolve(file);
+        const normalizedPath = filePath.toLowerCase();
+        if (loadedPaths.has(normalizedPath)) continue;
+        loadedPaths.add(normalizedPath);
+
         const module = await import(filePath);
         const CommandClass = module.default;
 
         if (CommandClass && CommandClass.prototype instanceof Command) {
             const command: Command = new CommandClass(client);
+            
+            if (commandNames.has(command.name)) {
+                logger.warn(`Duplicate command name detected: ${command.name}. Skipping file: ${file}`);
+                continue;
+            }
+            commandNames.add(command.name);
             
             // Set category from folder name
             const relativePath = path.relative(path.join(process.cwd(), 'src', 'commands'), filePath);

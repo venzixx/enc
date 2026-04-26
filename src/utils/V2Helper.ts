@@ -23,9 +23,14 @@ export interface V2Options {
     fields?: { name: string, value: string, inline?: boolean }[];
     color?: ColorResolvable;
     footer?: string;
+    footerIcon?: string;
     thumbnail?: string;
     image?: string;
     media?: string;
+    authorName?: string;
+    authorIcon?: string;
+    authorUrl?: string;
+    timestamp?: boolean;
     buttons?: ButtonBuilder[];
     selectMenu?: AnySelectMenuBuilder;
     ephemeral?: boolean;
@@ -38,7 +43,7 @@ export class V2Helper {
      * This bypasses @discordjs/builders validation.
      */
     public static createLayout(options: V2Options) {
-        const { title, description, fields, buttons, selectMenu, isAlert, color, footer, image, thumbnail, media } = options;
+        const { title, description, fields, buttons, selectMenu, isAlert, color, footer, image, thumbnail, media, authorName, authorIcon, authorUrl, timestamp } = options;
         const banner = image || media;
 
         // Start with basic container structure (Type 17)
@@ -52,6 +57,23 @@ export class V2Helper {
             container.accent_color = resolveColor(color || '#FFFFFF');
         } else {
             container.accent_color = resolveColor(color || '#FFFFFF');
+        }
+
+        // Add Author (Simulated in V2)
+        if (authorName) {
+            container.components.push({
+                type: 9, // Section
+                components: [
+                    {
+                        type: 10, // Text Display
+                        content: authorUrl ? `[${authorName}](${authorUrl})` : `**${authorName}**`
+                    }
+                ],
+                accessory: authorIcon ? {
+                    type: 11, // Thumbnail/Icon
+                    media: { url: authorIcon }
+                } : undefined
+            });
         }
 
         // Add Banner Image at the top (Type 12 - Media Gallery)
@@ -105,11 +127,19 @@ export class V2Helper {
             });
         }
 
-        // Add footer component (Type 10 with decoration)
         if (footer) {
+            let footerText = `-# ${footer}`;
+            if (timestamp) {
+                footerText += ` • <t:${Math.floor(Date.now() / 1000)}:R>`;
+            }
             container.components.push({
                 type: 10,
-                content: `-# ${footer}` // Reduced size text
+                content: footerText
+            });
+        } else if (timestamp) {
+             container.components.push({
+                type: 10,
+                content: `-# <t:${Math.floor(Date.now() / 1000)}:R>`
             });
         }
 

@@ -32,7 +32,13 @@ export default class GuildMemberRemove extends Event {
             color: isKick ? this.client.color.orange : this.client.color.red
         });
 
-        // 3. Heat Tracking if it's a kick
+        // 3. Send Appeal DM (Only if not kicked by this bot)
+        if (isKick && executorId !== this.client.user?.id) {
+            const { Appeals } = await import('../utils/Appeals');
+            await Appeals.sendAppealDM(this.client, member.user, member.guild, 'KICK', auditLog?.reason || 'No reason provided');
+        }
+
+        // 4. Heat Tracking if it's a kick
         if (isKick && executorId && executorId !== this.client.user?.id) {
             await HeatManager.addHeat(this.client, member.guild, executorId, 'KICK');
         }

@@ -8,6 +8,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
+import { Appeals } from '../../utils/Appeals';
 
 export default class Ban extends Command {
 	constructor(client: ExtendedClient) {
@@ -65,6 +66,9 @@ export default class Ban extends Command {
 		}
 
 		try {
+            // Send DM before banning so we have access to the member
+            await Appeals.sendAppealDM(client, target.user, ctx.guild!, 'BAN', reason);
+            
 			await target.ban({ reason: `Banned by ${ctx.author.tag}: ${reason}` });
 			
 			const embed = new EmbedBuilder()

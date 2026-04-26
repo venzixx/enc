@@ -18,6 +18,20 @@ export default class ServerData {
 		});
 	}
 
+	public async getLevelConfig(guildId: string) {
+		return await prisma.guild.upsert({
+			where: { id: guildId },
+			include: {
+				levelRoles: true,
+				roleBoosters: true,
+				channelBoosters: true,
+				ignoredChannels: true
+			},
+			update: {},
+			create: { id: guildId }
+		});
+	}
+
 	public async setPrefix(guildId: string, prefix: string): Promise<void> {
 		await prisma.guild.update({
 			where: { id: guildId },

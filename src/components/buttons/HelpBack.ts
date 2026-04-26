@@ -2,7 +2,7 @@ import { type ButtonInteraction } from "discord.js";
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
 import { V2Helper } from "../../utils/V2Helper";
-import Help from "../../commands/utility/help";
+import Help from "../../commands/utility/Help";
 
 export default class HelpBack extends Component {
 	constructor(client: ExtendedClient) {

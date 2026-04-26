@@ -8,6 +8,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
+import { Appeals } from '../../utils/Appeals';
 
 export default class Kick extends Command {
 	constructor(client: ExtendedClient) {
@@ -65,6 +66,9 @@ export default class Kick extends Command {
 		}
 
 		try {
+            // Send DM before kicking
+            await Appeals.sendAppealDM(client, target.user, ctx.guild!, 'KICK', reason);
+            
 			await target.kick(`Kicked by ${ctx.author.tag}: ${reason}`);
 			
 			const embed = new EmbedBuilder()

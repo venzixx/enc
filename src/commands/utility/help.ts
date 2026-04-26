@@ -1,4 +1,4 @@
-import { ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ApplicationCommandOptionType } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 
@@ -26,7 +26,7 @@ export default class Help extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
-		const commandName = ctx.options.getString('command');
+		const commandName = ctx.options.getString('command') || _args[0];
 
 		if (commandName) {
 			const command = client.commands.get(commandName) || client.commands.find(c => c.aliases.includes(commandName));
@@ -40,15 +40,41 @@ export default class Help extends Command {
                 });
 			}
 
+			const fields: any[] = [
+				{ name: `${client.emoji.edit} Module`, value: `\`${command.category}\``, inline: true },
+				{ name: `${client.emoji.clock} Cooldown`, value: `\`${command.cooldown}s\``, inline: true },
+				{ name: `${client.emoji.edit} Usage`, value: `\`/${command.name} ${command.description.usage}\``, inline: false },
+			];
+
+			if (command.options && command.options.length > 0) {
+				const subItems = command.options.filter((opt: any) => 
+					opt.type === ApplicationCommandOptionType.Subcommand || opt.type === ApplicationCommandOptionType.SubcommandGroup
+				);
+
+				if (subItems.length > 0) {
+					let subText = '';
+					subItems.forEach((sub: any) => {
+						if (sub.type === ApplicationCommandOptionType.Subcommand) {
+							subText += `\u2022 **\`${sub.name}\`**: ${sub.description}\n`;
+						} else if (sub.type === ApplicationCommandOptionType.SubcommandGroup) {
+							subText += `\u2022 **\`${sub.name}\`** (Group):\n`;
+							if (sub.options) {
+								sub.options.forEach((s: any) => {
+									subText += `\u3000\u2514 **\`${s.name}\`**: ${s.description}\n`;
+								});
+							}
+						}
+					});
+					fields.push({ name: `${client.emoji.info} Subcommands`, value: subText, inline: false });
+				}
+			}
+
+			fields.push({ name: `${client.emoji.info} Examples`, value: command.description.examples.map(e => `\`/${e}\``).join('\n'), inline: false });
+
 			return await ctx.replyV2({
                 title: `Command: ${command.name}`,
                 description: command.description.content,
-                fields: [
-					{ name: `${client.emoji.edit} Module`, value: `\`${command.category}\``, inline: true },
-					{ name: `${client.emoji.clock} Cooldown`, value: `\`${command.cooldown}s\``, inline: true },
-					{ name: `${client.emoji.edit} Usage`, value: `\`/${command.name} ${command.description.usage}\``, inline: false },
-					{ name: `${client.emoji.info} Examples`, value: command.description.examples.map(e => `\`/${e}\``).join('\n'), inline: false }
-                ],
+                fields: fields,
                 color: client.color.main,
                 image: 'https://i.imgur.com/uC0aLz1.png'
             });

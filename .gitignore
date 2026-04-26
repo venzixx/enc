@@ -6,17 +6,12 @@ dist/
 .npm/
 
 # Environment Protocols (CRITICAL)
-.env
-.env.example
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env*.local
+**/.env*
 *.pem
 *.key
 *.p12
 *.pfx
+**/*.pem
 
 # Sovereign Database (Clinical)
 *.db

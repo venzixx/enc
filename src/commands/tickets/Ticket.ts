@@ -219,7 +219,17 @@ export default class Ticket extends Command {
         await (client.prisma as any).ticketConfig.upsert({
             where: { guildId_panelId: { guildId: ctx.guild.id, panelId: panelId } },
             update: { name, description, channelId: channel.id, messageId: panelV2.id, isMulti: true },
-            create: { guildId: ctx.guild.id, panelId, name, description, channelId: channel.id, messageId: panelV2.id, isMulti: true }
+            create: { 
+                guildId: ctx.guild.id, 
+                panelId, 
+                name, 
+                description, 
+                channelId: channel.id, 
+                messageId: panelV2.id, 
+                isMulti: true,
+                categoryId: 'MULTI', // Placeholder since it's required in some versions of schema or logic
+                supportRoleId: 'MULTI' // Placeholder
+            }
         });
 
         return ctx.replyV2({ title: 'Multi-Panel Created', description: `Multi ticket panel **${name}** set up in ${channel}.`, color: client.color.main });
@@ -250,8 +260,31 @@ export default class Ticket extends Command {
             create: { panelId: panelConf.id, optionId: optionId, label, categoryId: categoryId.id, supportRoleId: roleId.id, emoji }
         });
 
-        // Refresh panel message logic (Simplified for now)
-        return ctx.replyV2({ title: 'Option Added', description: `Added **${label}** to Panel \`${panelId}\`.`, color: client.color.main });
+        // Refresh panel message
+        const channel = ctx.guild.channels.cache.get(panelConf.channelId) as any;
+        const message = await channel?.messages.fetch(panelConf.messageId).catch(() => null);
+
+        if (message) {
+            const allOptions = await (client.prisma as any).ticketPanelOption.findMany({
+                where: { panelId: panelConf.id }
+            });
+
+            const menu = new StringSelectMenuBuilder()
+                .setCustomId(`ticket_multi_${panelConf.panelId}`)
+                .setPlaceholder('Select a category to open a ticket')
+                .addOptions(allOptions.map((o: any) => ({
+                    label: o.label,
+                    value: o.optionId,
+                    emoji: o.emoji || undefined
+                })));
+
+            await message.edit({
+                embeds: [EmbedBuilder.from(message.embeds[0]).setDescription(panelConf.description)],
+                components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)]
+            });
+        }
+
+        return ctx.replyV2({ title: 'Option Added', description: `Added **${label}** to Panel \`${panelId}\` and refreshed the panel.`, color: client.color.main });
     }
 
     private async handleClose(client: ExtendedClient, ctx: Context) {

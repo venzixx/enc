@@ -24,6 +24,7 @@ export default class Ready extends Event {
 				{
 					name: env.BOT_ACTIVITY || "Music",
 					type: Number(env.BOT_ACTIVITY_TYPE) || 0,
+					url: env.STREAMING_URL || undefined,
 				},
 			],
 			status: (env.BOT_STATUS as any) || "online",

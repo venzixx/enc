@@ -31,7 +31,17 @@ export default class TicketMulti extends Component {
             return await interaction.reply({ content: `${this.client.emoji.cross} This ticket category is no longer valid.`, ephemeral: true });
         }
 
-		const channelName = `${optionId}-${interaction.user.username}`;
+        // Increment Ticket Count & Fetch Next ID
+        const updatedConfig = await (this.client.prisma as any).ticketConfig.update({
+            where: { id: config.id },
+            data: { ticketCount: { increment: 1 } }
+        });
+
+        const ticketId = updatedConfig.ticketCount.toString().padStart(4, '0');
+        const channelName = config.ticketNameFormat
+            .replace('{id}', ticketId)
+            .replace('{user}', interaction.user.username)
+            .replace('{panel}', optionInfo.label.toLowerCase().replace(/\s+/g, '-'));
 		
 		const ticketChannel = await interaction.guild.channels.create({
 			name: channelName,
@@ -59,19 +69,38 @@ export default class TicketMulti extends Component {
                 guildId: interaction.guild.id,
                 channelId: ticketChannel.id,
                 userId: interaction.user.id,
-                status: 'OPEN'
+                status: 'OPEN',
+                number: updatedConfig.ticketCount
             }
         });
 
+        // Parse custom fields if any
+        let customFields = [];
+        try {
+            if (config.welcomeFields) {
+                customFields = JSON.parse(config.welcomeFields);
+            }
+        } catch (e) {
+            console.error("Failed to parse welcomeFields", e);
+        }
+
 		const ticketLayout = V2Helper.createLayout({
-			title: ' Ticket Dashboard',
-			description: config.welcomeMessage ? config.welcomeMessage.replace('{user}', interaction.user.toString()) : `Hello ${interaction.user.toString()}, welcome to your support ticket. Our staff will be with you shortly.`,
+			title: config.welcomeTitle || 'Ticket Dashboard',
+			description: (config.welcomeDescription || config.welcomeMessage || '').replace('{user}', interaction.user.toString()),
             fields: [
                 { name: 'Creator', value: interaction.user.toString(), inline: true },
                 { name: 'Category', value: optionInfo.label, inline: true },
-                { name: 'Claimed By', value: 'Unclaimed', inline: true }
+                { name: 'Claimed By', value: 'Unclaimed', inline: true },
+                ...customFields
             ],
-			color: this.client.color.main,
+			color: config.welcomeColor || this.client.color.main,
+            image: config.welcomeImage,
+            thumbnail: config.welcomeThumbnail,
+            footer: config.welcomeFooterText,
+            authorName: config.welcomeAuthorName,
+            authorIcon: config.welcomeAuthorIcon,
+            authorUrl: config.welcomeAuthorUrl,
+            timestamp: config.welcomeTimestamp,
             buttons: [
                 new ButtonBuilder()
                     .setCustomId(`ticket_claim_${ticket.id}`)
@@ -84,6 +113,7 @@ export default class TicketMulti extends Component {
                 new ButtonBuilder()
                     .setCustomId(`ticket_rename`)
                     .setLabel('Rename')
+                    .setEmoji(this.client.emoji?.edit || '📝')
                     .setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder()
                     .setCustomId(`ticket_add`)

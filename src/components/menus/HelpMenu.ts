@@ -1,4 +1,4 @@
-import { type StringSelectMenuInteraction, ButtonBuilder, ButtonStyle } from "discord.js";
+import { type StringSelectMenuInteraction, ButtonBuilder, ButtonStyle, ApplicationCommandOptionType } from "discord.js";
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
 import { V2Helper } from "../../utils/V2Helper";
@@ -22,11 +22,37 @@ export default class HelpMenu extends Component {
                 .setStyle(ButtonStyle.Secondary)
         ];
 
+        const commandsList = commands.map(c => {
+            let text = `**\`/${c.name}\`** \u2022 ${c.description.content}`;
+            
+            if (c.options && c.options.length > 0) {
+                const subItems = c.options.filter(opt => 
+                    opt.type === ApplicationCommandOptionType.Subcommand || 
+                    opt.type === ApplicationCommandOptionType.SubcommandGroup
+                );
+
+                if (subItems.length > 0) {
+                    subItems.forEach(sub => {
+                        if (sub.type === ApplicationCommandOptionType.Subcommand) {
+                            text += `\n\u3000\u2514 **\`/${c.name} ${sub.name}\`** \u2022 ${sub.description}`;
+                        } else if (sub.type === ApplicationCommandOptionType.SubcommandGroup) {
+                            if (sub.options) {
+                                sub.options.forEach(s => {
+                                    text += `\n\u3000\u2514 **\`/${c.name} ${sub.name} ${s.name}\`** \u2022 ${s.description}`;
+                                });
+                            }
+                        }
+                    });
+                }
+            }
+            return text;
+        }).join('\n\n');
+
 		const layout = V2Helper.createLayout({
 			title: `${this.client.emoji.edit} **Module: ${category.charAt(0).toUpperCase() + category.slice(1)}**`,
 			description: [
                 `\u00BB **Commands in this module**`,
-                ...commands.map(c => `**\`/${c.name}\`** \u2022 ${c.description.content}`)
+                commandsList
             ].join('\n'),
 			color: this.client.color.main,
             buttons

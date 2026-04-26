@@ -8,6 +8,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
+import { Appeals } from '../../utils/Appeals';
 import ms from 'ms';
 
 export default class Mute extends Command {
@@ -78,6 +79,9 @@ export default class Mute extends Command {
 		}
 
 		try {
+            // Send DM before muting
+            await Appeals.sendAppealDM(client, target.user, ctx.guild!, 'MUTE', reason);
+            
 			await target.timeout(time as any, `Muted by ${ctx.author.tag}: ${reason}`);
 			
 			const embed = new EmbedBuilder()

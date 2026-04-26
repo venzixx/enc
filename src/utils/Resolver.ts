@@ -6,16 +6,19 @@ export class Resolver {
      * Resolves a member from a context or string input with high fidelity.
      * Handles: Interactions, Mentions, IDs, and Username/Nickname search.
      */
-    public static async resolveMember(ctx: Context, input?: string): Promise<GuildMember | null> {
-        // 1. If it's an interaction and the option is present, resolve immediately
+    public static async resolveMember(ctx: Context, input?: any): Promise<GuildMember | null> {
+        // 1. If input is already a member, return it
+        if (input && typeof input === 'object' && 'user' in input) return input;
+
+        // 2. If it's an interaction and the option is present, resolve immediately
         if (ctx.isInteraction) {
-            const member = ctx.options.getMember('user') as GuildMember;
-            if (member) return member;
+            const member = ctx.options.getMember('user') || ctx.options.getMember('target');
+            if (member && typeof member !== 'string') return member as GuildMember;
         }
 
-        // 2. Identify the target ID from input (handle mentions)
-        const targetStr = input || (ctx as any).args?.[0];
-        if (!targetStr) return null;
+        // 3. Identify the target ID from input (handle mentions)
+        const targetStr = typeof input === 'string' ? input : (ctx as any).args?.[0];
+        if (!targetStr || typeof targetStr !== 'string') return null;
 
         const id = targetStr.replace(/[<@!>]/g, '');
 
