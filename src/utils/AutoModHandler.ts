@@ -18,8 +18,8 @@ export class AutoModHandler {
         if (!guildData || !guildData.autoModEnabled) return false;
 
         // 2. Bypass Check (Owner, Immunity, Permit Permission)
-        if (await PermitManager.isImmune(client, message.guild, message.author.id)) return false;
-        if (await PermitManager.hasPermission(client, message.guild, message.author.id, PermitPermission.BYPASS_AUTOMOD)) return false;
+        if (await PermitManager.isImmune(client, message.guildId!, message.member!)) return false;
+        if (await PermitManager.hasPermission(client, message.guildId!, message.member!, PermitPermission.BYPASS_AUTOMOD)) return false;
 
         // 3. Fetch Filters
         const filters = await client.prisma.autoModFilter.findMany({

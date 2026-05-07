@@ -155,46 +155,56 @@ export default class VoiceCommand extends Command {
 			});
 
 			// Premium VoiceMaster Control Panel
-			const panelEmbed = new EmbedBuilder()
-				.setColor(client.color.main)
-				.setTitle('🎙️  VoiceMaster Control Panel')
-				.setDescription([
-					'> Manage your temporary voice channel with the controls below.',
-					'> Join the **➕ Create Voice** channel to get started!',
-					'',
-					'**🔒 Lock** — Prevent others from joining',
-					'**👁 Hide** — Make your channel invisible',
-					'**✏️ Rename** — Change your channel name',
-					'**👤 Limit** — Set max user count',
-					'**➕ Permit** — Allow a user to join',
-					'**❌ Kick** — Remove a user from your channel',
-					'**👑 Claim** — Claim an ownerless channel',
-					'**ℹ️ Info** — View channel details',
-					'**🗑️ Delete** — Delete your channel',
-				].join('\n'))
-				.setImage('https://i.imgur.com/8Q9S9Ym.png')
-				.setFooter({ text: `${guild?.name} — VoiceMaster`, iconURL: guild?.iconURL() || undefined })
-				.setTimestamp();
+			const { AttachmentBuilder } = await import('discord.js');
+			const bannerFile = new AttachmentBuilder('C:\\Users\\sidha\\.gemini\\antigravity\\brain\\fde5b7f1-eb52-4fbb-8216-ef68bdbaf3c7\\voicemaster_v2_banner_1778134274980.png', { name: 'voicemaster_banner.png' });
 
-			// Row 1: Core Controls
+			const panelEmbed = new EmbedBuilder()
+				.setColor(0x000000) // Monochromatic Black
+				.setAuthor({ name: 'VOICEMASTER | PREMIUM CONTROL INTERFACE', iconURL: client.user?.displayAvatarURL() })
+				.setDescription([
+					'### 🛠️ CHANNEL MANAGEMENT MATRIX',
+					'Execute administrative protocols on your temporary voice sanctuary using the neural-linked interface below.',
+					'',
+					'**🔐 ACCESS & PRIVACY**',
+					'- `Lock` — Seal channel connectivity',
+					'- `Hide` — Toggle directory visibility',
+					'- `Permit` — Authorize specific user access',
+					'',
+					'**⚙️ CONFIGURATION**',
+					'- `Rename` — Update channel designation',
+					'- `Limit` — Calibrate user capacity (+/-)',
+					'- `Claim` — Assume ownership of vacant nodes',
+					'',
+					'**☣️ SECURITY & TERMINATION**',
+					'- `Kick` — Disconnect unauthorized entities',
+					'- `Info` — Retrieve telemetry data',
+					'- `Terminate` — Decommission current session'
+				].join('\n'))
+				.setImage('attachment://voicemaster_banner.png')
+				.setFooter({ text: `SYSTEM STATUS: OPERATIONAL | DIMSCORD V2`, iconURL: guild?.iconURL() || undefined });
+
+			// Row 1: Privacy & Visibility
 			const row1Buttons = [
 				new ButtonBuilder().setCustomId('vc_lock').setLabel('Lock').setEmoji('🔒').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_hide').setLabel('Hide').setEmoji('👁').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_rename').setLabel('Rename').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_limit_up').setLabel('Limit').setEmoji('👤').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_unlock').setLabel('Unlock').setEmoji('🔓').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_hide').setLabel('Hide').setEmoji('👁️').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_show').setLabel('Show').setEmoji('🌐').setStyle(ButtonStyle.Secondary),
 			];
 
-			// Row 2: Member Management
+			// Row 2: Configuration
 			const row2Buttons = [
-				new ButtonBuilder().setCustomId('vc_add').setLabel('Permit').setEmoji('➕').setStyle(ButtonStyle.Success),
-				new ButtonBuilder().setCustomId('vc_kick').setLabel('Kick').setEmoji('❌').setStyle(ButtonStyle.Danger),
+				new ButtonBuilder().setCustomId('vc_rename').setLabel('Rename').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_limit_up').setLabel('Limit +').setEmoji('🔼').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_limit_down').setLabel('Limit -').setEmoji('🔽').setStyle(ButtonStyle.Secondary),
 				new ButtonBuilder().setCustomId('vc_claim').setLabel('Claim').setEmoji('👑').setStyle(ButtonStyle.Primary),
-				new ButtonBuilder().setCustomId('vc_info').setLabel('Info').setEmoji('ℹ️').setStyle(ButtonStyle.Secondary),
 			];
 
-			// Row 3: Danger Zone
+			// Row 3: Management
 			const row3Buttons = [
-				new ButtonBuilder().setCustomId('vc_delete').setLabel('Delete Channel').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+				new ButtonBuilder().setCustomId('vc_add').setLabel('Permit').setEmoji('👤').setStyle(ButtonStyle.Success),
+				new ButtonBuilder().setCustomId('vc_kick').setLabel('Kick').setEmoji('❌').setStyle(ButtonStyle.Danger),
+				new ButtonBuilder().setCustomId('vc_info').setLabel('Info').setEmoji('📊').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_delete').setLabel('Terminate').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
 			];
 
 			const { ActionRowBuilder } = await import('discord.js');
@@ -204,6 +214,7 @@ export default class VoiceCommand extends Command {
 
 			const panelMsg = await (panelChannel as any).send({
 				embeds: [panelEmbed],
+				files: [bannerFile],
 				components: [actionRow1, actionRow2, actionRow3]
 			});
 

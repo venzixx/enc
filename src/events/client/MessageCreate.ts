@@ -5,11 +5,13 @@ import {
 	ChannelType,
 	Collection,
 	EmbedBuilder,
+	AttachmentBuilder,
 	type GuildMember,
 	type Message,
 	PermissionFlagsBits,
 	type TextChannel,
 } from "discord.js";
+import { RankCardGenerator } from "../../utils/RankCardGenerator";
 import { I18N, t } from "../../structures/I18n";
 import { Context, Event } from "../../structures";
 import logger from "../../structures/Logger";
@@ -475,16 +477,105 @@ export default class MessageCreate extends Event {
 							.replace(/{user\.name}/g, message.author.username)
 							.replace(/{user\.level}/g, newLevel.toString());
 
-						const embed = new EmbedBuilder()
-							.setColor(this.client.color.main)
-							.setDescription(content)
-							.setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() });
-
-						const targetChannel = guild.levelChannelId ? 
-							(message.guild.channels.cache.get(guild.levelChannelId) as TextChannel) : 
+						// Resolve target channel: prefer levelUpChannelId > levelChannelId > current channel
+						const targetChannelId = guild.levelUpChannelId || guild.levelChannelId;
+						const targetChannel = targetChannelId ? 
+							(message.guild.channels.cache.get(targetChannelId) as TextChannel) : 
 							(message.channel as TextChannel);
 
-						if (targetChannel) await targetChannel.send({ embeds: [embed] }).catch(() => {});
+						if (!targetChannel) return;
+
+						let attachment: AttachmentBuilder | undefined;
+						if (guild.levelUpImageEnabled) {
+							try {
+								// Calculate rank for the card
+								const rank = await this.client.prisma.member.count({
+									where: {
+										guildId: message.guildId!,
+										xp: { gt: data.xp + xpToAdd }
+									}
+								}) + 1;
+
+								const nextLevelXP = (newLevel + 1) * (newLevel + 1) * 100;
+								const cardBuffer = await RankCardGenerator.generate({
+									username: message.author.username,
+									avatarUrl: message.author.displayAvatarURL({ extension: 'png', size: 256 }),
+									level: newLevel,
+									rank: rank,
+									currentXp: data.xp + xpToAdd,
+									requiredXp: nextLevelXP,
+									backgroundUrl: guild.rankCardBackgroundUrl || undefined,
+									color: guild.rankCardProgressColor || undefined,
+								});
+								attachment = new AttachmentBuilder(cardBuffer, { name: `levelup-${message.author.id}.png` });
+							} catch (err) {
+								logger.error(`[LEVEL_UP_CARD_ERROR] ${err}`);
+							}
+						}
+
+						// Check for custom embed data
+						if (guild.levelUpEmbedData) {
+							try {
+								const embedData = JSON.parse(guild.levelUpEmbedData);
+								const resolveField = (text: string | undefined) => {
+									if (!text) return undefined;
+									return text
+										.replace(/{user\.mention}/g, `<@${message.author.id}>`)
+										.replace(/{user}/g, `<@${message.author.id}>`)
+										.replace(/{user\.name}/g, message.author.username)
+										.replace(/{user\.level}/g, newLevel.toString())
+										.replace(/{server}/g, message.guild!.name);
+								};
+
+								const embed = new EmbedBuilder()
+									.setColor(embedData.color ? (embedData.color.startsWith('#') ? parseInt(embedData.color.replace('#', ''), 16) : embedData.color) : this.client.color.main)
+									.setTimestamp();
+
+								if (embedData.title) embed.setTitle(resolveField(embedData.title)!);
+								if (embedData.description) embed.setDescription(resolveField(embedData.description)!);
+								if (embedData.thumbnail?.url) embed.setThumbnail(embedData.thumbnail.url);
+								if (embedData.image?.url) embed.setImage(embedData.image.url);
+								if (embedData.footer?.text) embed.setFooter({ text: resolveField(embedData.footer.text)!, iconURL: embedData.footer.icon_url });
+								
+								// If rank card is enabled, set it as the image if no custom image is set
+								if (attachment && !embedData.image?.url) {
+									embed.setImage(`attachment://${attachment.name}`);
+								}
+
+								if (!embedData.title && !embedData.description) embed.setDescription(content);
+
+								await targetChannel.send({ 
+									embeds: [embed],
+									files: attachment ? [attachment] : []
+								}).catch(() => {});
+							} catch (e) {
+								// Fallback to standard embed on parse error
+								const embed = new EmbedBuilder()
+									.setColor(this.client.color.main)
+									.setDescription(content)
+									.setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() });
+								
+								if (attachment) embed.setImage(`attachment://${attachment.name}`);
+
+								await targetChannel.send({ 
+									embeds: [embed],
+									files: attachment ? [attachment] : []
+								}).catch(() => {});
+							}
+						} else {
+							// Standard text-based level-up embed
+							const embed = new EmbedBuilder()
+								.setColor(this.client.color.main)
+								.setDescription(content)
+								.setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() });
+
+							if (attachment) embed.setImage(`attachment://${attachment.name}`);
+
+							await targetChannel.send({ 
+								embeds: [embed],
+								files: attachment ? [attachment] : []
+							}).catch(() => {});
+						}
 					}
 				}
 			} else {
@@ -608,6 +699,7 @@ export default class MessageCreate extends Event {
 			const ctx = new Context(this.client, message);
 			ctx.lng = locale || "en-US";
 			ctx.command = command;
+			ctx.prefix = matchedPrefix;
 			(ctx as any).args = args;
 			(ctx as any).prefix = matchedPrefix;
 
@@ -735,7 +827,7 @@ export default class MessageCreate extends Event {
 				// Permit check: We check if they have a permit that allows this specific command's type
 				// For simplicity, we check if they have the BAN/KICK permit for moderation commands
                 const cmdName = command.name.toUpperCase() as any;
-				const hasPermit = await PermitManager.hasPermission(this.client, message.guild!, message.author.id, cmdName);
+				const hasPermit = await PermitManager.hasPermission(this.client, message.guildId!, message.member as GuildMember, cmdName);
 
 				if (!(isDev || hasDiscordPerm || hasPermit)) {
 					return await message.reply({

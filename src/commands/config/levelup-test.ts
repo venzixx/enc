@@ -1,7 +1,7 @@
-import { PermissionFlagsBits, EmbedBuilder, GuildMember } from "discord.js";
+import { PermissionFlagsBits, EmbedBuilder, GuildMember, AttachmentBuilder } from "discord.js";
 import { ExtendedClient } from "../../client";
 import { Command, Context } from "../../structures";
-import { PlaceholderManager } from "../../utils/PlaceholderManager";
+import { RankCardGenerator } from "../../utils/RankCardGenerator";
 
 export default class LevelupTest extends Command {
     constructor(client: ExtendedClient) {
@@ -18,7 +18,7 @@ export default class LevelupTest extends Command {
             slashCommand: true,
             permissions: {
                 user: [PermissionFlagsBits.Administrator],
-                client: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]
+                client: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles]
             },
             options: [
                 {
@@ -57,6 +57,28 @@ export default class LevelupTest extends Command {
         }
 
         const results: string[] = [];
+        let attachment: AttachmentBuilder | undefined;
+
+        // --- Generate Rank Card if enabled ---
+        if (guildData.levelUpImageEnabled) {
+            try {
+                const nextLevelXP = (level + 1) * (level + 1) * 100;
+                const cardBuffer = await RankCardGenerator.generate({
+                    username: member.user.username,
+                    avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
+                    level: level,
+                    rank: 1, // Mock rank
+                    currentXp: level * level * 100,
+                    requiredXp: nextLevelXP,
+                    backgroundUrl: guildData.rankCardBackgroundUrl || undefined,
+                    color: guildData.rankCardProgressColor || undefined,
+                });
+                attachment = new AttachmentBuilder(cardBuffer, { name: `levelup-test-${member.id}.png` });
+                results.push('✅ Rank card generated for preview');
+            } catch (err) {
+                results.push(`❌ Rank card generation failed: ${err}`);
+            }
+        }
 
         // --- Text-based level-up message ---
         const levelUpMsg = guildData.levelUpMessage || 'GG {user.mention}, you just reached level **{user.level}**!';
@@ -70,15 +92,15 @@ export default class LevelupTest extends Command {
             .replace(/{server\.member_count}/g, guild.memberCount.toString());
 
         await ctx.channel.send({
-            content: `📋 **Level-Up Message Preview** (Level ${level}):\n\n${resolvedMsg}`
+            content: `📋 **Level-Up Message Preview** (Level ${level}):\n\n${resolvedMsg}`,
+            files: attachment ? [attachment] : []
         });
         results.push('✅ Text level-up message previewed');
 
         // --- Embed-based level-up (if configured) ---
-        const guildAny = guildData as any;
-        if (guildAny.levelUpEmbedData) {
+        if (guildData.levelUpEmbedData) {
             try {
-                const embedData = JSON.parse(guildAny.levelUpEmbedData);
+                const embedData = JSON.parse(guildData.levelUpEmbedData);
                 const resolveField = (text: string | undefined) => {
                     if (!text) return undefined;
                     return text
@@ -90,7 +112,7 @@ export default class LevelupTest extends Command {
                 };
 
                 const embed = new EmbedBuilder()
-                    .setColor(embedData.color ? parseInt(embedData.color.replace('#', ''), 16) : client.color.main)
+                    .setColor(embedData.color ? (embedData.color.startsWith('#') ? parseInt(embedData.color.replace('#', ''), 16) : embedData.color) : client.color.main)
                     .setTimestamp();
 
                 if (embedData.title) embed.setTitle(resolveField(embedData.title)!);
@@ -99,9 +121,15 @@ export default class LevelupTest extends Command {
                 if (embedData.image?.url) embed.setImage(embedData.image.url);
                 if (embedData.footer?.text) embed.setFooter({ text: resolveField(embedData.footer.text)!, iconURL: embedData.footer.icon_url });
 
+                // If rank card is enabled, set it as the image if no custom image is set
+                if (attachment && !embedData.image?.url) {
+                    embed.setImage(`attachment://${attachment.name}`);
+                }
+
                 await ctx.channel.send({
                     content: '📋 **Embed Level-Up Preview:**',
-                    embeds: [embed]
+                    embeds: [embed],
+                    files: attachment ? [attachment] : []
                 });
                 results.push('✅ Embed level-up message previewed');
             } catch (e: any) {
@@ -112,12 +140,12 @@ export default class LevelupTest extends Command {
         }
 
         // --- Level-up channel info ---
-        const channelInfo = guildAny.levelUpChannelId 
-            ? `Level-up messages → <#${guildAny.levelUpChannelId}>` 
+        const channelInfo = guildData.levelUpChannelId 
+            ? `Level-up messages → <#${guildData.levelUpChannelId}>` 
             : 'Level-up messages → Current channel (no override set)';
         
-        const rankChannelInfo = guildAny.rankCardChannelId
-            ? `Rank card output → <#${guildAny.rankCardChannelId}>`
+        const rankChannelInfo = guildData.rankCardChannelId
+            ? `Rank card output → <#${guildData.rankCardChannelId}>`
             : 'Rank card output → Current channel (no override set)';
 
         const summaryEmbed = new EmbedBuilder()

@@ -14,7 +14,11 @@ export default class Download extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'download',
-            description: 'Download a video from YouTube or other sites',
+            description: {
+                content: 'Download a video from YouTube or other sites',
+                usage: 'download <url>',
+                examples: ['download https://youtube.com/watch?v=...']
+            },
             category: 'utility',
             cooldown: 15,
             slashCommand: true,
@@ -32,7 +36,7 @@ export default class Download extends Command {
     }
 
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-        let url = ctx.interaction?.options.getString('url') || args[0];
+        let url = ctx.options.getString('url') || args[0];
         if (!url) {
             return await ctx.replyV2({
                 description: '❌ Please provide a valid URL!',

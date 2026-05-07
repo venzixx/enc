@@ -15,7 +15,7 @@ export default class InviteCreate extends Event {
     public async run(invite: Invite): Promise<void> {
         if (!invite.guild) return;
 
-        await AuditLogger.log(this.client, invite.guild, {
+        await AuditLogger.log(this.client, invite.guild as any, {
             type: AuditLogType.INVITES,
             event: 'Invite Created',
             status: AuditLogStatus.INFO,

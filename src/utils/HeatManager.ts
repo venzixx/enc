@@ -20,7 +20,9 @@ export class HeatManager {
      */
     public static async addHeat(client: ExtendedClient, guild: Guild, userId: string, actionType: 'BAN' | 'KICK' | 'CHANNEL' | 'ROLE' | 'WEBHOOK'): Promise<void> {
         // 1. Bypass check
-        if (await PermitManager.isImmune(client, guild, userId)) return;
+        const member = await guild.members.fetch(userId).catch(() => null);
+        if (!member) return;
+        if (await PermitManager.isImmune(client, guild.id, member)) return;
 
         // 2. Fetch Config
         const config = await client.prisma.antiNukeConfig.findUnique({

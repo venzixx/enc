@@ -78,13 +78,12 @@ export default class RoleCommand extends Command {
 			const roleQuery = args.slice(2).join(' ');
 			const roleId = roleQuery.replace(/[<@&>]/g, '');
 			role = ctx.guild.roles.cache.get(roleId) || 
-				   ctx.guild.roles.cache.find(r => r.name.toLowerCase() === roleQuery.toLowerCase()) ||
-				   ctx.guild.roles.cache.find(r => r.name.toLowerCase().includes(roleQuery.toLowerCase()));
+				   ctx.guild.roles.cache.find((r: any) => r.name.toLowerCase() === roleQuery.toLowerCase()) ||
+				   ctx.guild.roles.cache.find((r: any) => r.name.toLowerCase().includes(roleQuery.toLowerCase()));
 		}
 
-		// @ts-ignore
         const prefix = ctx.prefix || client.config.prefix;
-        if (!client.db || !ctx.guildId) {
+        if (!client.db || !ctx.guild.id) {
             const errorEmbed = new EmbedBuilder()
                 .setTitle(`${client.emoji.cross} Not Found`)
                 .setDescription(`Could not find that ${!target ? 'member' : 'role'}.`)

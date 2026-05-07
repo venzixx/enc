@@ -40,6 +40,22 @@ export default class Customrole extends Command {
 					name: 'delete',
 					description: 'Delete your custom role',
 					type: 1
+				},
+				{
+					name: 'icon',
+					description: 'Set an icon for your custom role (Server Level 2+ required)',
+					type: 1,
+					options: [
+						{ name: 'icon', description: 'Emoji (unicode) or Image URL for the role icon', type: 3, required: true }
+					]
+				},
+				{
+					name: 'rename',
+					description: 'Rename your custom role',
+					type: 1,
+					options: [
+						{ name: 'name', description: 'New name for the role', type: 3, required: true }
+					]
 				}
 			]
 		});
@@ -132,6 +148,66 @@ export default class Customrole extends Command {
                 .setDescription('Successfully deleted your custom role.')
                 .setColor(client.color.main)
                 .setTimestamp();
+			return await ctx.reply({ embeds: [successEmbed] });
+		}
+
+		if (sub === 'icon') {
+			if (!role) {
+				const errorEmbed = new EmbedBuilder()
+					.setTitle(' Role Lost')
+					.setDescription('Your role was manually deleted from the server.')
+					.setColor(client.color.red);
+				return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
+			}
+
+			if (ctx.guild.premiumTier < 2) {
+				const errorEmbed = new EmbedBuilder()
+					.setTitle(' Boost Level Too Low')
+					.setDescription('Server must be at least Boost Level 2 to set role icons.')
+					.setColor(client.color.red);
+				return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
+			}
+
+			const iconInput = ctx.options.getString('icon')!;
+			try {
+				const isUrl = iconInput.startsWith('http');
+				await role.edit({
+					icon: isUrl ? iconInput : undefined,
+					unicodeEmoji: !isUrl ? iconInput : undefined
+				}, `Custom role icon set by ${ctx.author.tag}`);
+
+				const successEmbed = new EmbedBuilder()
+					.setTitle(`${client.emoji.success} Role Icon Updated`)
+					.setDescription(`Updated your custom role icon to ${isUrl ? 'a custom image' : iconInput}.`)
+					.setColor(client.color.main)
+					.setTimestamp();
+				return await ctx.reply({ embeds: [successEmbed] });
+			} catch (e: any) {
+				const errorEmbed = new EmbedBuilder()
+					.setTitle(' Error')
+					.setDescription(`Failed to set icon: ${e.message}`)
+					.setColor(client.color.red);
+				return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
+			}
+		}
+
+		if (sub === 'rename') {
+			if (!role) {
+				const errorEmbed = new EmbedBuilder()
+					.setTitle(' Role Lost')
+					.setDescription('Your role was manually deleted from the server.')
+					.setColor(client.color.red);
+				return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
+			}
+
+			const newName = ctx.options.getString('name')!;
+			await role.setName(newName, `Renamed by ${ctx.author.tag}`);
+
+			const successEmbed = new EmbedBuilder()
+				.setTitle(`${client.emoji.success} Role Renamed`)
+				.setDescription(`Your custom role has been renamed to **${newName}**.`)
+				.setColor(client.color.main)
+				.setTimestamp();
 			return await ctx.reply({ embeds: [successEmbed] });
 		}
 	}

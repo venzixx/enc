@@ -142,6 +142,32 @@ export const PERMIT_TO_DISCORD_PERM: Partial<Record<PermitPermission, bigint>> =
 
 export class PermitManager {
     /**
+     * Check if a user/member is immune (bypass moderation).
+     */
+    public static async isImmune(
+        client: ExtendedClient,
+        guildId: string,
+        member: GuildMember
+    ): Promise<boolean> {
+        // Check user-level immunity
+        const userPermit = await client.prisma.permit.findUnique({
+            where: { guildId_targetId: { guildId, targetId: member.id } }
+        });
+        if (userPermit?.immunity) return true;
+
+        // Check role-level immunity
+        const roleIds = member.roles.cache.map(r => r.id);
+        for (const roleId of roleIds) {
+            const rolePermit = await client.prisma.permit.findUnique({
+                where: { guildId_targetId: { guildId, targetId: roleId } }
+            });
+            if (rolePermit?.immunity) return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Check if a user or any of their roles has a specific permit permission.
      */
     public static async hasPermission(
@@ -151,27 +177,32 @@ export class PermitManager {
         permission: PermitPermission
     ): Promise<boolean> {
         // Check user-specific permits
-        const userPermit = await client.prisma.permit.findFirst({
-            where: {
-                guildId,
-                userId: member.id,
-                permission
-            }
+        const userPermit = await client.prisma.permit.findUnique({
+            where: { guildId_targetId: { guildId, targetId: member.id } }
         });
 
-        if (userPermit) return true;
+        if (userPermit) {
+            try {
+                const perms: string[] = JSON.parse(userPermit.permissions);
+                if (perms.includes(permission)) return true;
+            } catch {}
+        }
 
         // Check role-based permits — check all member roles
         const roleIds = member.roles.cache.map(r => r.id);
-        const rolePermit = await client.prisma.permit.findFirst({
-            where: {
-                guildId,
-                roleId: { in: roleIds },
-                permission
+        for (const roleId of roleIds) {
+            const rolePermit = await client.prisma.permit.findUnique({
+                where: { guildId_targetId: { guildId, targetId: roleId } }
+            });
+            if (rolePermit) {
+                try {
+                    const perms: string[] = JSON.parse(rolePermit.permissions);
+                    if (perms.includes(permission)) return true;
+                } catch {}
             }
-        });
+        }
 
-        return !!rolePermit;
+        return false;
     }
 
     /**
@@ -183,19 +214,25 @@ export class PermitManager {
         member: GuildMember
     ): Promise<PermitPermission[]> {
         const roleIds = member.roles.cache.map(r => r.id);
+        const allTargets = [member.id, ...roleIds];
 
         const permits = await client.prisma.permit.findMany({
             where: {
                 guildId,
-                OR: [
-                    { userId: member.id },
-                    { roleId: { in: roleIds } }
-                ]
+                targetId: { in: allTargets }
             }
         });
 
-        // Return unique permissions
-        return [...new Set(permits.map(p => p.permission as PermitPermission))];
+        // Merge all permissions from all permits
+        const allPerms = new Set<PermitPermission>();
+        for (const permit of permits) {
+            try {
+                const perms: string[] = JSON.parse(permit.permissions);
+                perms.forEach(p => allPerms.add(p as PermitPermission));
+            } catch {}
+        }
+
+        return [...allPerms];
     }
 
     /**
@@ -205,16 +242,31 @@ export class PermitManager {
         client: ExtendedClient,
         guildId: string,
         permission: PermitPermission,
-        options: { userId?: string; roleId?: string }
+        options: { targetId: string; type: 'USER' | 'ROLE' }
     ): Promise<void> {
-        await client.prisma.permit.create({
-            data: {
-                guildId,
-                permission,
-                userId: options.userId || null,
-                roleId: options.roleId || null,
-            }
+        const existing = await client.prisma.permit.findUnique({
+            where: { guildId_targetId: { guildId, targetId: options.targetId } }
         });
+
+        if (existing) {
+            const perms: string[] = JSON.parse(existing.permissions);
+            if (!perms.includes(permission)) {
+                perms.push(permission);
+                await client.prisma.permit.update({
+                    where: { guildId_targetId: { guildId, targetId: options.targetId } },
+                    data: { permissions: JSON.stringify(perms) }
+                });
+            }
+        } else {
+            await client.prisma.permit.create({
+                data: {
+                    guildId,
+                    targetId: options.targetId,
+                    type: options.type,
+                    permissions: JSON.stringify([permission]),
+                }
+            });
+        }
     }
 
     /**
@@ -224,14 +276,32 @@ export class PermitManager {
         client: ExtendedClient,
         guildId: string,
         permission: PermitPermission,
-        options: { userId?: string; roleId?: string }
+        options: { targetId: string }
     ): Promise<boolean> {
-        const where: any = { guildId, permission };
-        if (options.userId) where.userId = options.userId;
-        if (options.roleId) where.roleId = options.roleId;
+        const existing = await client.prisma.permit.findUnique({
+            where: { guildId_targetId: { guildId, targetId: options.targetId } }
+        });
 
-        const result = await client.prisma.permit.deleteMany({ where });
-        return result.count > 0;
+        if (!existing) return false;
+
+        const perms: string[] = JSON.parse(existing.permissions);
+        const idx = perms.indexOf(permission);
+        if (idx === -1) return false;
+
+        perms.splice(idx, 1);
+
+        if (perms.length === 0) {
+            await client.prisma.permit.delete({
+                where: { guildId_targetId: { guildId, targetId: options.targetId } }
+            });
+        } else {
+            await client.prisma.permit.update({
+                where: { guildId_targetId: { guildId, targetId: options.targetId } },
+                data: { permissions: JSON.stringify(perms) }
+            });
+        }
+
+        return true;
     }
 
     /**
@@ -275,7 +345,8 @@ export class PermitManager {
     ) {
         return client.prisma.permit.findMany({
             where: { guildId },
-            orderBy: { permission: 'asc' }
+            orderBy: { type: 'asc' }
         });
     }
 }
+

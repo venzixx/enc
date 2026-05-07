@@ -40,9 +40,11 @@ export default class Context {
 	public member: GuildMember | null;
 	public memberVoiceChannel: Channel | null;
 	public targetMessage: Message | null = null;
+	public targetUser: User | null = null;
 	public response: Message | null = null;
 	public deferred = false;
 	public replied = false;
+	public prefix = "";
 	public lng = "en-US";
 	public command: any = null;
 
@@ -147,6 +149,9 @@ export default class Context {
 
 		if (!(ctx instanceof Message) && ctx.isMessageContextMenuCommand()) {
 			this.targetMessage = ctx.targetMessage as Message;
+		}
+		if (!(ctx instanceof Message) && ctx.isUserContextMenuCommand()) {
+			this.targetUser = ctx.targetUser as User;
 		}
 	}
 

@@ -129,7 +129,7 @@ export default class LogSetup extends Command {
             });
 
             return ctx.sendV2({
-                title: `${client.emoji.check} Core Logging Enabled`,
+                title: `${client.emoji.success} Core Logging Enabled`,
                 description: `All logs will now be sent to ${targetChannel}.\nToggle individual categories with \`/log toggle <category>\`.`,
                 color: client.color.main
             });
@@ -238,7 +238,7 @@ export default class LogSetup extends Command {
 
             const createdCount = Object.keys(channelMap).length;
             return ctx.sendV2({
-                title: `${client.emoji.check} Category Logging Enabled`,
+                title: `${client.emoji.success} Category Logging Enabled`,
                 description: `Created **${createdCount}** log channels under ${category}.\nEach log type will be sent to its own channel.\nToggle individual categories with \`/log toggle <category>\`.`,
                 color: client.color.main
             });
@@ -257,7 +257,7 @@ export default class LogSetup extends Command {
             });
 
             return ctx.sendV2({
-                title: `${client.emoji.check} Logging Disabled`,
+                title: `${client.emoji.success} Logging Disabled`,
                 description: 'All logging has been disabled. No log events will be recorded to channels.',
                 color: client.color.red
             });

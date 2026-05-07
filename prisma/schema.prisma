@@ -837,3 +837,13 @@ model SocialAction {
   @@unique([userId, fromId, action])
   @@index([userId, action])
 }
+
+model SavedEmbed {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  tag       String
+  data      String   // JSON string of embed data
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, tag])
+}

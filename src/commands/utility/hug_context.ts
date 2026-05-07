@@ -4,7 +4,6 @@ import {
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
-import axios from 'axios';
 
 export default class GiveHug extends Command {
     constructor(client: ExtendedClient) {
@@ -30,8 +29,9 @@ export default class GiveHug extends Command {
         await ctx.deferReply();
 
         try {
-            const res = await axios.get('https://api.otakugifs.xyz/gif?reaction=hug');
-            const gifUrl = res.data.url;
+            const res = await fetch('https://api.otakugifs.xyz/gif?reaction=hug');
+            const data = await res.json() as any;
+            const gifUrl = data.url;
 
             // Increment database count
             const pair = await client.prisma.socialAction.upsert({

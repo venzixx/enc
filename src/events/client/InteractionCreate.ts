@@ -67,6 +67,7 @@ export default class InteractionCreate extends Event {
 
 			const ctx = new Context(this.client, interaction);
 			ctx.lng = locale || "en-US";
+			ctx.prefix = '/';
 			
 			const clientMember = interaction.guild ? interaction.guild.members.resolve(this.client.user!) : null;
 			
@@ -321,32 +322,9 @@ export default class InteractionCreate extends Event {
 					logger.error(error);
 				}
 			} else if (interaction.guildId) {
-                // @ts-ignore
-                const prefix = ctx.prefix || client.config.prefix;
-                if (!client.db || !ctx.guildId) {
-                // Check database for interactive actions
-                try {
-                    // @ts-ignore
-                    const forcedData = await this.client.prisma.forcedNickname.findUnique({
-                        where: {
-                            guildId_customId: {
-                                guildId: interaction.guildId,
-                                customId: customId
-                            }
-                        }
-                    });
-
-                    if (dbAction) {
-                        const logic = JSON.parse(dbAction.logic);
-                        // Execute Action Flow
-                        const { ActionFlowExecutor } = await import('../../utils/ActionFlowExecutor');
-                        await ActionFlowExecutor.execute(this.client, interaction as any, logic);
-                    }
-                } catch (error) {
-                    logger.error(`[ACTION_FLOW_ERROR] ${error}`);
-                }
-            }
-
+				// Unhandled component interaction — log for debug
+				logger.info(`[COMPONENT] Unhandled component interaction: ${customId}`);
+			}
 		} else if (interaction.type === InteractionType.ApplicationCommandAutocomplete) {
 			const command = this.client.commands.get(interaction.commandName);
 			if (!command) return;

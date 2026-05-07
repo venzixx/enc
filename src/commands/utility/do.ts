@@ -7,7 +7,6 @@ import {
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
-import axios from 'axios';
 
 const TARGETED_REACTIONS = [
     'airkiss', 'bite', 'brofist', 'cuddle', 'handhold', 'hug', 'kiss', 'lick', 
@@ -71,7 +70,7 @@ export default class Do extends Command {
             action = ctx.options.getSubcommand();
             targetUser = ctx.options.getUser('user');
         } else {
-            const prefix = (ctx as any).prefix || client.config.PREFIX || ',';
+            const prefix = (ctx as any).prefix || client.config.prefix || ',';
             const triggeredName = ctx.message!.content.split(' ')[0].slice(prefix.length).toLowerCase();
             action = triggeredName;
             
@@ -102,11 +101,13 @@ export default class Do extends Command {
             // 2. Fetch GIF
             let gifUrl = '';
             try {
-                const res = await axios.get(`https://api.otakugifs.xyz/gif?reaction=${action}`);
-                gifUrl = res.data.url;
+                const res = await fetch(`https://api.otakugifs.xyz/gif?reaction=${action}`);
+                const data = await res.json() as any;
+                gifUrl = data.url;
             } catch {
-                const res = await axios.get(`https://nekos.best/api/v2/${action === 'hug' ? 'hug' : action}`);
-                gifUrl = res.data.results[0].url;
+                const res = await fetch(`https://nekos.best/api/v2/${action === 'hug' ? 'hug' : action}`);
+                const data = await res.json() as any;
+                gifUrl = data.results[0].url;
             }
 
             // 3. Database Tracking
@@ -154,18 +155,20 @@ export default class Do extends Command {
 
             // 5. Button Collector
             if (isTargeted && targetUser) {
-                const collector = response.createMessageComponentCollector({
+                const msg = ctx.interaction ? await ctx.interaction.fetchReply() : response as any;
+                const collector = msg.createMessageComponentCollector({
                     componentType: ComponentType.Button,
                     time: 60000
                 });
 
-                collector.on('collect', async (i) => {
+                collector.on('collect', async (i: any) => {
                     if (i.user.id !== targetUser!.id) {
                         return i.reply({ content: `Only ${targetUser!.username} can react back!`, ephemeral: true });
                     }
 
                     await i.deferUpdate();
-                    const resBack = await axios.get(`https://api.otakugifs.xyz/gif?reaction=${action}`);
+                    const resBack = await fetch(`https://api.otakugifs.xyz/gif?reaction=${action}`);
+                    const dataBack = await resBack.json() as any;
                     
                     const pairBack = await (client.prisma as any).socialAction.upsert({
                         where: { userId_fromId_action: { userId: ctx.author.id, fromId: targetUser!.id, action } },
@@ -178,7 +181,7 @@ export default class Do extends Command {
                         embeds: [
                             client.embed()
                                 .setDescription(`💞 **${targetUser!.username}** ${action}ed **${ctx.author.username}** back!\n\n*They've ${action}ed you **${pairBack.count}** times now!*`)
-                                .setImage(resBack.data.url)
+                                .setImage(dataBack.url)
                                 .setColor(client.color.main)
                         ]
                     });
