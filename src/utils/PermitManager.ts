@@ -1,88 +1,281 @@
-import { Guild, GuildMember, Role } from 'discord.js';
+import { PermissionsBitField, GuildMember, Guild, PermissionFlagsBits } from 'discord.js';
 import { ExtendedClient } from '../client';
 
 export enum PermitPermission {
+    // ─── Moderation ─────────────────────────────
     BAN = 'BAN',
     KICK = 'KICK',
     MUTE = 'MUTE',
-    LOCKDOWN = 'LOCKDOWN',
+    MODERATE_MEMBERS = 'MODERATE_MEMBERS',
+    MANAGE_MESSAGES = 'MANAGE_MESSAGES',
+    MANAGE_NICKNAMES = 'MANAGE_NICKNAMES',
+    
+    // ─── Channel Management ─────────────────────
     MANAGE_CHANNELS = 'MANAGE_CHANNELS',
+    MANAGE_THREADS = 'MANAGE_THREADS',
+    
+    // ─── Role Management ────────────────────────
     MANAGE_ROLES = 'MANAGE_ROLES',
+    
+    // ─── Server Management ──────────────────────
+    ADMINISTRATOR = 'ADMINISTRATOR',
+    MANAGE_GUILD = 'MANAGE_GUILD',
     MANAGE_WEBHOOKS = 'MANAGE_WEBHOOKS',
+    MANAGE_EMOJIS_AND_STICKERS = 'MANAGE_EMOJIS_AND_STICKERS',
+    MANAGE_EVENTS = 'MANAGE_EVENTS',
+    VIEW_AUDIT_LOG = 'VIEW_AUDIT_LOG',
+    VIEW_GUILD_INSIGHTS = 'VIEW_GUILD_INSIGHTS',
+    
+    // ─── Voice ──────────────────────────────────
+    MOVE_MEMBERS = 'MOVE_MEMBERS',
+    MUTE_MEMBERS = 'MUTE_MEMBERS',
+    DEAFEN_MEMBERS = 'DEAFEN_MEMBERS',
+    PRIORITY_SPEAKER = 'PRIORITY_SPEAKER',
+    CONNECT = 'CONNECT',
+    SPEAK = 'SPEAK',
+    USE_VAD = 'USE_VAD',
+    STREAM = 'STREAM',
+    
+    // ─── Communication ──────────────────────────
+    MENTION_EVERYONE = 'MENTION_EVERYONE',
+    SEND_TTS_MESSAGES = 'SEND_TTS_MESSAGES',
+    ATTACH_FILES = 'ATTACH_FILES',
+    EMBED_LINKS = 'EMBED_LINKS',
+    ADD_REACTIONS = 'ADD_REACTIONS',
+    USE_EXTERNAL_EMOJIS = 'USE_EXTERNAL_EMOJIS',
+    USE_EXTERNAL_STICKERS = 'USE_EXTERNAL_STICKERS',
+    CREATE_INSTANT_INVITE = 'CREATE_INSTANT_INVITE',
+    
+    // ─── Bot-Specific ───────────────────────────
+    LOCKDOWN = 'LOCKDOWN',
     BYPASS_ANTINUKE = 'BYPASS_ANTINUKE',
     BYPASS_AUTOMOD = 'BYPASS_AUTOMOD',
 }
 
+export const PERMIT_CATEGORIES: Record<string, PermitPermission[]> = {
+    'Moderation': [
+        PermitPermission.BAN,
+        PermitPermission.KICK,
+        PermitPermission.MUTE,
+        PermitPermission.MODERATE_MEMBERS,
+        PermitPermission.MANAGE_MESSAGES,
+        PermitPermission.MANAGE_NICKNAMES,
+    ],
+    'Channel Management': [
+        PermitPermission.MANAGE_CHANNELS,
+        PermitPermission.MANAGE_THREADS,
+    ],
+    'Role Management': [
+        PermitPermission.MANAGE_ROLES,
+    ],
+    'Server Management': [
+        PermitPermission.ADMINISTRATOR,
+        PermitPermission.MANAGE_GUILD,
+        PermitPermission.MANAGE_WEBHOOKS,
+        PermitPermission.MANAGE_EMOJIS_AND_STICKERS,
+        PermitPermission.MANAGE_EVENTS,
+        PermitPermission.VIEW_AUDIT_LOG,
+        PermitPermission.VIEW_GUILD_INSIGHTS,
+    ],
+    'Voice': [
+        PermitPermission.MOVE_MEMBERS,
+        PermitPermission.MUTE_MEMBERS,
+        PermitPermission.DEAFEN_MEMBERS,
+        PermitPermission.PRIORITY_SPEAKER,
+        PermitPermission.CONNECT,
+        PermitPermission.SPEAK,
+        PermitPermission.USE_VAD,
+        PermitPermission.STREAM,
+    ],
+    'Communication': [
+        PermitPermission.MENTION_EVERYONE,
+        PermitPermission.SEND_TTS_MESSAGES,
+        PermitPermission.ATTACH_FILES,
+        PermitPermission.EMBED_LINKS,
+        PermitPermission.ADD_REACTIONS,
+        PermitPermission.USE_EXTERNAL_EMOJIS,
+        PermitPermission.USE_EXTERNAL_STICKERS,
+        PermitPermission.CREATE_INSTANT_INVITE,
+    ],
+    'Bot-Specific': [
+        PermitPermission.LOCKDOWN,
+        PermitPermission.BYPASS_ANTINUKE,
+        PermitPermission.BYPASS_AUTOMOD,
+    ],
+};
+
+// Map PermitPermissions to Discord's PermissionFlagsBits
+export const PERMIT_TO_DISCORD_PERM: Partial<Record<PermitPermission, bigint>> = {
+    [PermitPermission.BAN]: PermissionFlagsBits.BanMembers,
+    [PermitPermission.KICK]: PermissionFlagsBits.KickMembers,
+    [PermitPermission.MUTE]: PermissionFlagsBits.ModerateMembers,
+    [PermitPermission.MODERATE_MEMBERS]: PermissionFlagsBits.ModerateMembers,
+    [PermitPermission.MANAGE_MESSAGES]: PermissionFlagsBits.ManageMessages,
+    [PermitPermission.MANAGE_NICKNAMES]: PermissionFlagsBits.ManageNicknames,
+    [PermitPermission.MANAGE_CHANNELS]: PermissionFlagsBits.ManageChannels,
+    [PermitPermission.MANAGE_THREADS]: PermissionFlagsBits.ManageThreads,
+    [PermitPermission.MANAGE_ROLES]: PermissionFlagsBits.ManageRoles,
+    [PermitPermission.ADMINISTRATOR]: PermissionFlagsBits.Administrator,
+    [PermitPermission.MANAGE_GUILD]: PermissionFlagsBits.ManageGuild,
+    [PermitPermission.MANAGE_WEBHOOKS]: PermissionFlagsBits.ManageWebhooks,
+    [PermitPermission.MANAGE_EMOJIS_AND_STICKERS]: PermissionFlagsBits.ManageGuildExpressions,
+    [PermitPermission.MANAGE_EVENTS]: PermissionFlagsBits.ManageEvents,
+    [PermitPermission.VIEW_AUDIT_LOG]: PermissionFlagsBits.ViewAuditLog,
+    [PermitPermission.VIEW_GUILD_INSIGHTS]: PermissionFlagsBits.ViewGuildInsights,
+    [PermitPermission.MOVE_MEMBERS]: PermissionFlagsBits.MoveMembers,
+    [PermitPermission.MUTE_MEMBERS]: PermissionFlagsBits.MuteMembers,
+    [PermitPermission.DEAFEN_MEMBERS]: PermissionFlagsBits.DeafenMembers,
+    [PermitPermission.PRIORITY_SPEAKER]: PermissionFlagsBits.PrioritySpeaker,
+    [PermitPermission.CONNECT]: PermissionFlagsBits.Connect,
+    [PermitPermission.SPEAK]: PermissionFlagsBits.Speak,
+    [PermitPermission.USE_VAD]: PermissionFlagsBits.UseVAD,
+    [PermitPermission.STREAM]: PermissionFlagsBits.Stream,
+    [PermitPermission.MENTION_EVERYONE]: PermissionFlagsBits.MentionEveryone,
+    [PermitPermission.SEND_TTS_MESSAGES]: PermissionFlagsBits.SendTTSMessages,
+    [PermitPermission.ATTACH_FILES]: PermissionFlagsBits.AttachFiles,
+    [PermitPermission.EMBED_LINKS]: PermissionFlagsBits.EmbedLinks,
+    [PermitPermission.ADD_REACTIONS]: PermissionFlagsBits.AddReactions,
+    [PermitPermission.USE_EXTERNAL_EMOJIS]: PermissionFlagsBits.UseExternalEmojis,
+    [PermitPermission.USE_EXTERNAL_STICKERS]: PermissionFlagsBits.UseExternalStickers,
+    [PermitPermission.CREATE_INSTANT_INVITE]: PermissionFlagsBits.CreateInstantInvite,
+};
+
 export class PermitManager {
     /**
-     * Checks if a member has a specific permit permission or full immunity.
+     * Check if a user or any of their roles has a specific permit permission.
      */
-    public static async hasPermission(client: ExtendedClient, guild: Guild, userId: string, permission: PermitPermission): Promise<boolean> {
-        // Server Owner always has all permissions
-        if (userId === guild.ownerId) return true;
+    public static async hasPermission(
+        client: ExtendedClient,
+        guildId: string,
+        member: GuildMember,
+        permission: PermitPermission
+    ): Promise<boolean> {
+        // Check user-specific permits
+        const userPermit = await client.prisma.permit.findFirst({
+            where: {
+                guildId,
+                userId: member.id,
+                permission
+            }
+        });
 
-        // Fetch permit data for the user and their roles
-        const member = await guild.members.fetch(userId).catch(() => null);
-        if (!member) return false;
+        if (userPermit) return true;
 
+        // Check role-based permits — check all member roles
+        const roleIds = member.roles.cache.map(r => r.id);
+        const rolePermit = await client.prisma.permit.findFirst({
+            where: {
+                guildId,
+                roleId: { in: roleIds },
+                permission
+            }
+        });
+
+        return !!rolePermit;
+    }
+
+    /**
+     * Get all permits for a user (both user-specific and role-based).
+     */
+    public static async getUserPermits(
+        client: ExtendedClient,
+        guildId: string,
+        member: GuildMember
+    ): Promise<PermitPermission[]> {
         const roleIds = member.roles.cache.map(r => r.id);
 
         const permits = await client.prisma.permit.findMany({
             where: {
-                guildId: guild.id,
+                guildId,
                 OR: [
-                    { targetId: userId, type: 'USER' },
-                    { targetId: { in: roleIds }, type: 'ROLE' }
+                    { userId: member.id },
+                    { roleId: { in: roleIds } }
                 ]
             }
         });
 
-        if (permits.length === 0) return false;
+        // Return unique permissions
+        return [...new Set(permits.map(p => p.permission as PermitPermission))];
+    }
 
-        // Check for full immunity or specific permission
-        for (const permit of permits) {
-            if (permit.immunity) return true;
-            
-            const perms: string[] = JSON.parse(permit.permissions || '[]');
-            if (perms.includes(permission) || perms.includes('ADMINISTRATOR')) return true;
+    /**
+     * Grant a permission to a user or role.
+     */
+    public static async grant(
+        client: ExtendedClient,
+        guildId: string,
+        permission: PermitPermission,
+        options: { userId?: string; roleId?: string }
+    ): Promise<void> {
+        await client.prisma.permit.create({
+            data: {
+                guildId,
+                permission,
+                userId: options.userId || null,
+                roleId: options.roleId || null,
+            }
+        });
+    }
+
+    /**
+     * Revoke a permission from a user or role.
+     */
+    public static async revoke(
+        client: ExtendedClient,
+        guildId: string,
+        permission: PermitPermission,
+        options: { userId?: string; roleId?: string }
+    ): Promise<boolean> {
+        const where: any = { guildId, permission };
+        if (options.userId) where.userId = options.userId;
+        if (options.roleId) where.roleId = options.roleId;
+
+        const result = await client.prisma.permit.deleteMany({ where });
+        return result.count > 0;
+    }
+
+    /**
+     * Get the effective permission "level" for a member (higher = more perms).
+     */
+    public static async getLevel(
+        client: ExtendedClient,
+        guildId: string,
+        member: GuildMember
+    ): Promise<number> {
+        const perms = await this.getUserPermits(client, guildId, member);
+        
+        // Weight dangerous permissions higher
+        const weights: Partial<Record<PermitPermission, number>> = {
+            [PermitPermission.ADMINISTRATOR]: 100,
+            [PermitPermission.MANAGE_GUILD]: 50,
+            [PermitPermission.BAN]: 40,
+            [PermitPermission.KICK]: 30,
+            [PermitPermission.MANAGE_ROLES]: 35,
+            [PermitPermission.MANAGE_CHANNELS]: 30,
+            [PermitPermission.BYPASS_ANTINUKE]: 90,
+            [PermitPermission.BYPASS_AUTOMOD]: 20,
+            [PermitPermission.LOCKDOWN]: 45,
+            [PermitPermission.MUTE]: 25,
+            [PermitPermission.MODERATE_MEMBERS]: 25,
+        };
+
+        let level = 0;
+        for (const p of perms) {
+            level += weights[p] || 5;
         }
-
-        return false;
+        return level;
     }
 
     /**
-     * Checks if a user is immune to Auto-Mod / Anti-Nuke
+     * List all permits in a guild, grouped by user/role.
      */
-    public static async isImmune(client: ExtendedClient, guild: Guild, userId: string): Promise<boolean> {
-        if (userId === guild.ownerId) return true;
-
-        const member = await guild.members.fetch(userId).catch(() => null);
-        if (!member) return false;
-
-        const permits = await client.prisma.permit.findMany({
-            where: {
-                guildId: guild.id,
-                OR: [
-                    { targetId: userId, type: 'USER' },
-                    { targetId: { in: member.roles.cache.map(r => r.id) }, type: 'ROLE' }
-                ]
-            }
+    public static async listAll(
+        client: ExtendedClient,
+        guildId: string
+    ) {
+        return client.prisma.permit.findMany({
+            where: { guildId },
+            orderBy: { permission: 'asc' }
         });
-
-        return permits.some(p => p.immunity);
-    }
-
-    /**
-     * Calculates the "Trust Level" (1-6) based on the number of permissions.
-     */
-    public static getLevel(permissions: string[]): number {
-        const count = permissions.length;
-        if (count >= 8) return 6;
-        if (count >= 6) return 5;
-        if (count >= 4) return 4;
-        if (count >= 3) return 3;
-        if (count >= 2) return 2;
-        if (count >= 1) return 1;
-        return 0;
     }
 }

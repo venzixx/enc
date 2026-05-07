@@ -24,9 +24,19 @@ export class PlaceholderManager {
             .replace(/{user\.name}/g, member.user.username)
             .replace(/{user\.id}/g, member.id)
             .replace(/{user\.mention}/g, member.toString())
+            .replace(/{user\.tag}/g, member.user.tag || member.user.username)
+            .replace(/{user\.avatar}/g, member.user.displayAvatarURL({ extension: 'png', size: 256 }))
+            .replace(/{user\.created}/g, `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`)
+            .replace(/{user\.joined}/g, member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Unknown')
+            .replace(/{user\.level}/g, '{user.level}') // Preserved for leveling system to resolve later
             .replace(/{server}/g, guild.name)
             .replace(/{server\.id}/g, guild.id)
+            .replace(/{server\.name}/g, guild.name)
             .replace(/{server\.member_count}/g, guild.memberCount.toString())
+            .replace(/{server\.icon}/g, guild.iconURL({ extension: 'png', size: 256 }) || '')
+            .replace(/{server\.boost_count}/g, (guild.premiumSubscriptionCount || 0).toString())
+            .replace(/{server\.boost_tier}/g, guild.premiumTier.toString())
+            .replace(/{member\.count}/g, guild.memberCount.toString())
             .replace(/{mentionID}/g, `<@${member.id}>`);
 
         // Find all tags in { }
@@ -131,9 +141,18 @@ export class PlaceholderManager {
             .replace(/{user\.name}/g, member.user.username)
             .replace(/{user\.id}/g, member.id)
             .replace(/{user\.mention}/g, member.toString())
+            .replace(/{user\.tag}/g, member.user.tag || member.user.username)
+            .replace(/{user\.avatar}/g, member.user.displayAvatarURL({ extension: 'png', size: 256 }))
+            .replace(/{user\.created}/g, `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`)
+            .replace(/{user\.joined}/g, member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Unknown')
             .replace(/{server}/g, guild.name)
             .replace(/{server\.id}/g, guild.id)
+            .replace(/{server\.name}/g, guild.name)
             .replace(/{server\.member_count}/g, guild.memberCount.toString())
+            .replace(/{server\.icon}/g, guild.iconURL({ extension: 'png', size: 256 }) || '')
+            .replace(/{server\.boost_count}/g, (guild.premiumSubscriptionCount || 0).toString())
+            .replace(/{server\.boost_tier}/g, guild.premiumTier.toString())
+            .replace(/{member\.count}/g, guild.memberCount.toString())
             .replace(/{mentionID}/g, `<@${member.id}>`);
     }
 }

@@ -36,7 +36,7 @@ export class AutoModHandler {
                     triggered = this.checkWords(message, filter.data);
                     break;
                 case 'LINKS':
-                    triggered = this.checkLinks(message);
+                    triggered = this.checkLinks(message, filter.data);
                     break;
                 case 'INVITES':
                     triggered = this.checkInvites(message);
@@ -65,9 +65,56 @@ export class AutoModHandler {
         return blacklisted.some(word => content.includes(word.toLowerCase()));
     }
 
-    private static checkLinks(message: Message): boolean {
-        const linkRegex = /https?:\/\/[^\s]+/gi;
-        return linkRegex.test(message.content);
+    private static readonly SAFE_DOMAINS = [
+        // GIF / Media hosts
+        'tenor.com', 'giphy.com', 'imgur.com', 'gfycat.com',
+        'media.tenor.com', 'media.giphy.com', 'i.imgur.com',
+        // Discord CDN
+        'cdn.discordapp.com', 'media.discordapp.net', 'images-ext-1.discordapp.net',
+        'images-ext-2.discordapp.net',
+        // Social / Video
+        'youtube.com', 'youtu.be', 'www.youtube.com',
+        'twitter.com', 'x.com', 'reddit.com', 'www.reddit.com',
+        'twitch.tv', 'www.twitch.tv', 'clips.twitch.tv',
+        'tiktok.com', 'www.tiktok.com', 'vm.tiktok.com',
+        'instagram.com', 'www.instagram.com',
+        'facebook.com', 'www.facebook.com',
+        'pinterest.com', 'www.pinterest.com',
+        // Music
+        'spotify.com', 'open.spotify.com',
+        'soundcloud.com',
+        'music.apple.com',
+        // Dev / Code
+        'github.com', 'gitlab.com', 'stackoverflow.com',
+        // Media / Image hosting
+        'prnt.sc', 'prntscr.com', 'gyazo.com',
+        'steamuserimages-a.akamaihd.net', 'steamcommunity.com',
+        'i.redd.it', 'v.redd.it', 'preview.redd.it',
+    ];
+
+    private static checkLinks(message: Message, customWhitelist?: string | null): boolean {
+        const content = message.content;
+        const urlRegex = /https?:\/\/([^\s/]+)[^\s]*/gi;
+
+        // Merge safe domains with any custom whitelist from filter data
+        let safeDomains = [...this.SAFE_DOMAINS];
+        if (customWhitelist) {
+            try {
+                const extra: string[] = JSON.parse(customWhitelist);
+                safeDomains.push(...extra);
+            } catch { /* ignore parse errors */ }
+        }
+
+        let match;
+        while ((match = urlRegex.exec(content)) !== null) {
+            const domain = match[1].toLowerCase().replace(/^www\./, '');
+            const isSafe = safeDomains.some(safe => {
+                const cleanSafe = safe.replace(/^www\./, '');
+                return domain === cleanSafe || domain.endsWith('.' + cleanSafe);
+            });
+            if (!isSafe) return true; // Suspicious/unknown link found
+        }
+        return false;
     }
 
     private static checkInvites(message: Message): boolean {

@@ -1,3 +1,4 @@
+import { EmbedBuilder, AttachmentBuilder } from 'discord.js';
 import { ExtendedClient } from "../client";
 
 export class StreakManager {
@@ -33,16 +34,18 @@ export class StreakManager {
                 })
             ]);
 
-            // 2. Fetch configured streak tiers
+            // 2. Fetch configured streak tiers — SORTED BY THRESHOLD (ascending)
+            // This ensures Bronze (5) → Silver (15) → Gold (30) fires in correct order
             const tiers = await client.prisma.streakTier.findMany({
-                where: { guildId }
+                where: { guildId },
+                orderBy: { threshold: 'asc' }
             });
 
-            if (tiers.length === 0) return; // No tiers configured
+            if (tiers.length === 0) return;
 
             const streakChannel = guild.streakChannelId ? client.channels.cache.get(guild.streakChannelId) : null;
 
-            // 3. Check each tier
+            // 3. Check each tier — only process the tier that matches current message count
             for (const tier of tiers) {
                 // We only award the streak exactly when they hit the threshold for the day.
                 if (activity.messageCount === tier.threshold) {
@@ -78,7 +81,7 @@ export class StreakManager {
                     } else {
                         // Compare lastActiveDate
                         if (userStreak.lastActiveDate === today) {
-                            // Already awarded today
+                            // Already awarded today — skip this tier entirely
                             continue;
                         } else if (userStreak.lastActiveDate === yesterday) {
                             // Maintained streak!
@@ -109,14 +112,64 @@ export class StreakManager {
                     // Send notification
                     if (streakChannel?.isTextBased()) {
                         const user = await client.users.fetch(userId);
-                        if (isNew) {
-                            (streakChannel as any).send({
-                                content: `🔥 **${user.username}** started a **${tier.name}** streak! (Threshold: ${tier.threshold} msgs/day)`
-                            }).catch(() => {});
-                        } else if (isMaintained) {
-                            (streakChannel as any).send({
-                                content: `🔥 **${user.username}** maintained their **${tier.name}** streak for **${newStreakCount} days**!`
-                            }).catch(() => {});
+                        const tierAny = tier as any;
+
+                        // Resolve message template with placeholders
+                        const resolveTemplate = (template: string) => {
+                            return template
+                                .replace(/{user}/g, `<@${userId}>`)
+                                .replace(/{user\.name}/g, user.username)
+                                .replace(/{user\.mention}/g, `<@${userId}>`)
+                                .replace(/{user\.id}/g, userId)
+                                .replace(/{tier\.name}/g, tier.name)
+                                .replace(/{streak\.count}/g, newStreakCount.toString())
+                                .replace(/{streak\.longest}/g, (userStreak?.longestStreak || newStreakCount).toString())
+                                .replace(/{tier\.threshold}/g, tier.threshold.toString());
+                        };
+
+                        // Check for custom embed data
+                        if (tierAny.embedData) {
+                            try {
+                                const embedData = JSON.parse(tierAny.embedData);
+                                const embed = new EmbedBuilder()
+                                    .setColor(embedData.color ? parseInt(embedData.color.replace('#', ''), 16) : 0xFF6600)
+                                    .setTimestamp();
+
+                                if (embedData.title) embed.setTitle(resolveTemplate(embedData.title));
+                                if (embedData.description) embed.setDescription(resolveTemplate(embedData.description));
+                                if (embedData.thumbnail?.url) embed.setThumbnail(embedData.thumbnail.url);
+                                if (embedData.image?.url) embed.setImage(embedData.image.url);
+                                if (embedData.footer?.text) embed.setFooter({ 
+                                    text: resolveTemplate(embedData.footer.text),
+                                    iconURL: embedData.footer.icon_url 
+                                });
+
+                                const sendData: any = { embeds: [embed] };
+
+                                // Attach image card if configured
+                                if (tierAny.imageUrl) {
+                                    embed.setImage(tierAny.imageUrl);
+                                }
+
+                                (streakChannel as any).send(sendData).catch(() => {});
+                            } catch (e) {
+                                console.error(`Failed to parse streak embed for tier ${tier.name}:`, e);
+                            }
+                        } else {
+                            // Use custom template or fallback to default
+                            let content: string;
+
+                            if (tierAny.message) {
+                                content = resolveTemplate(tierAny.message);
+                            } else if (isNew) {
+                                content = `🔥 **${user.username}** started a **${tier.name}** streak! (Threshold: ${tier.threshold} msgs/day)`;
+                            } else if (isMaintained) {
+                                content = `🔥 **${user.username}** maintained their **${tier.name}** streak for **${newStreakCount} days**!`;
+                            } else {
+                                continue;
+                            }
+
+                            (streakChannel as any).send({ content }).catch(() => {});
                         }
                     }
                 }

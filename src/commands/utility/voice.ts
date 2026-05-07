@@ -154,25 +154,58 @@ export default class VoiceCommand extends Command {
 				]
 			});
 
-			const buttons = [
-				new ButtonBuilder().setCustomId('vc_hide').setEmoji('👻').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_lock').setEmoji('🔒').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_rename').setEmoji('🔧').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_limit_up').setEmoji('🔼').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_limit_down').setEmoji('🔽').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_add').setEmoji(client.emoji.user).setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_claim').setEmoji('👑').setStyle(ButtonStyle.Primary),
-				new ButtonBuilder().setCustomId('vc_info').setEmoji('ℹ️').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_delete').setEmoji(client.emoji.cross).setStyle(ButtonStyle.Danger)
+			// Premium VoiceMaster Control Panel
+			const panelEmbed = new EmbedBuilder()
+				.setColor(client.color.main)
+				.setTitle('🎙️  VoiceMaster Control Panel')
+				.setDescription([
+					'> Manage your temporary voice channel with the controls below.',
+					'> Join the **➕ Create Voice** channel to get started!',
+					'',
+					'**🔒 Lock** — Prevent others from joining',
+					'**👁 Hide** — Make your channel invisible',
+					'**✏️ Rename** — Change your channel name',
+					'**👤 Limit** — Set max user count',
+					'**➕ Permit** — Allow a user to join',
+					'**❌ Kick** — Remove a user from your channel',
+					'**👑 Claim** — Claim an ownerless channel',
+					'**ℹ️ Info** — View channel details',
+					'**🗑️ Delete** — Delete your channel',
+				].join('\n'))
+				.setImage('https://i.imgur.com/8Q9S9Ym.png')
+				.setFooter({ text: `${guild?.name} — VoiceMaster`, iconURL: guild?.iconURL() || undefined })
+				.setTimestamp();
+
+			// Row 1: Core Controls
+			const row1Buttons = [
+				new ButtonBuilder().setCustomId('vc_lock').setLabel('Lock').setEmoji('🔒').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_hide').setLabel('Hide').setEmoji('👁').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_rename').setLabel('Rename').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_limit_up').setLabel('Limit').setEmoji('👤').setStyle(ButtonStyle.Secondary),
 			];
 
-			const layout = V2Helper.createLayout({
-				image: 'https://i.imgur.com/8Q9S9Ym.png',
-				color: client.color.main,
-				buttons
-			});
+			// Row 2: Member Management
+			const row2Buttons = [
+				new ButtonBuilder().setCustomId('vc_add').setLabel('Permit').setEmoji('➕').setStyle(ButtonStyle.Success),
+				new ButtonBuilder().setCustomId('vc_kick').setLabel('Kick').setEmoji('❌').setStyle(ButtonStyle.Danger),
+				new ButtonBuilder().setCustomId('vc_claim').setLabel('Claim').setEmoji('👑').setStyle(ButtonStyle.Primary),
+				new ButtonBuilder().setCustomId('vc_info').setLabel('Info').setEmoji('ℹ️').setStyle(ButtonStyle.Secondary),
+			];
 
-			const panelMsg = await (panelChannel as any).send(layout);
+			// Row 3: Danger Zone
+			const row3Buttons = [
+				new ButtonBuilder().setCustomId('vc_delete').setLabel('Delete Channel').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+			];
+
+			const { ActionRowBuilder } = await import('discord.js');
+			const actionRow1 = new ActionRowBuilder<ButtonBuilder>().addComponents(...row1Buttons);
+			const actionRow2 = new ActionRowBuilder<ButtonBuilder>().addComponents(...row2Buttons);
+			const actionRow3 = new ActionRowBuilder<ButtonBuilder>().addComponents(...row3Buttons);
+
+			const panelMsg = await (panelChannel as any).send({
+				embeds: [panelEmbed],
+				components: [actionRow1, actionRow2, actionRow3]
+			});
 
 			// Save to Database
 			await (client.prisma as any).voiceConfig.upsert({
@@ -192,7 +225,7 @@ export default class VoiceCommand extends Command {
 				}
 			});
 
-			return await ctx.editReply({ content: `${client.emoji.success} Voice system setup complete!\n- **Create Channel**: ${createChannel}\n- **Panel Channel**: ${panelChannel}` });
+			return await ctx.editReply({ content: `${client.emoji.success} VoiceMaster system deployed!\\n- **Create Channel**: ${createChannel}\\n- **Panel Channel**: ${panelChannel}\\n\\nThe control panel is now live with premium controls.` });
 		}
 
 		// --- Control Subcommands ---

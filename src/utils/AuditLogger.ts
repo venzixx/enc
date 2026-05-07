@@ -11,6 +11,15 @@ export enum AuditLogType {
     VOICE = 'VOICE',
     WEBHOOKS = 'WEBHOOKS',
     MESSAGES = 'MESSAGES',
+    BOT = 'BOT',
+    INVITES = 'INVITES',
+    EMOJI = 'EMOJI',
+    STICKER = 'STICKER',
+    EVENTS = 'EVENTS',
+    STAGE = 'STAGE',
+    SERVER = 'SERVER',
+    THREADS = 'THREADS',
+    VANITY = 'VANITY',
 }
 
 export enum AuditLogStatus {
@@ -53,10 +62,19 @@ export class AuditLogger {
                 case AuditLogType.ROLES: isEnabled = guildSettings.logRolesEnabled; break;
                 case AuditLogType.MEMBERS: isEnabled = guildSettings.logMembersEnabled; break;
                 case AuditLogType.MODERATION: isEnabled = guildSettings.logModerationEnabled; break;
-                case AuditLogType.AUTOMOD: isEnabled = guildSettings.logModerationEnabled; break;
+                case AuditLogType.AUTOMOD: isEnabled = (guildSettings as any).logAutomodEnabled ?? guildSettings.logModerationEnabled; break;
                 case AuditLogType.SECURITY: isEnabled = guildSettings.logSecurityEnabled; break;
                 case AuditLogType.VOICE: isEnabled = guildSettings.logVoiceEnabled; break;
-                case AuditLogType.WEBHOOKS: isEnabled = true; break; // Webhooks currently always logged if enabled
+                case AuditLogType.BOT: isEnabled = (guildSettings as any).logBotEnabled ?? true; break;
+                case AuditLogType.INVITES: isEnabled = (guildSettings as any).logInvitesEnabled ?? true; break;
+                case AuditLogType.EMOJI: isEnabled = (guildSettings as any).logEmojiEnabled ?? true; break;
+                case AuditLogType.STICKER: isEnabled = (guildSettings as any).logStickerEnabled ?? true; break;
+                case AuditLogType.EVENTS: isEnabled = (guildSettings as any).logEventsEnabled ?? true; break;
+                case AuditLogType.STAGE: isEnabled = (guildSettings as any).logStageEnabled ?? true; break;
+                case AuditLogType.SERVER: isEnabled = (guildSettings as any).logServerEnabled ?? true; break;
+                case AuditLogType.THREADS: isEnabled = (guildSettings as any).logThreadsEnabled ?? true; break;
+                case AuditLogType.VANITY: isEnabled = (guildSettings as any).logVanityEnabled ?? true; break;
+                case AuditLogType.WEBHOOKS: isEnabled = (guildSettings as any).logWebhooksEnabled ?? true; break;
             }
 
             if (!isEnabled) return;
@@ -77,17 +95,32 @@ export class AuditLogger {
                 },
             });
 
-            // 3. High-Fidelity Discord Manifestation (Optional)
+            // 3. Resolve the correct log channel
+            const s = guildSettings as any;
             let specificChannelId = guildSettings.logChannelId;
-            switch (data.type) {
-                case AuditLogType.MESSAGES: specificChannelId = guildSettings.logChannelMessages || specificChannelId; break;
-                case AuditLogType.CHANNELS: specificChannelId = guildSettings.logChannelChannels || specificChannelId; break;
-                case AuditLogType.ROLES: specificChannelId = guildSettings.logChannelRoles || specificChannelId; break;
-                case AuditLogType.MEMBERS: specificChannelId = guildSettings.logChannelMembers || specificChannelId; break;
-                case AuditLogType.MODERATION: specificChannelId = guildSettings.logChannelModeration || specificChannelId; break;
-                case AuditLogType.AUTOMOD: specificChannelId = guildSettings.logChannelModeration || specificChannelId; break;
-                case AuditLogType.SECURITY: specificChannelId = guildSettings.logChannelSecurity || specificChannelId; break;
-                case AuditLogType.VOICE: specificChannelId = guildSettings.logChannelVoice || specificChannelId; break;
+
+            // In CATEGORY mode, use category-specific channels. In CORE mode, fallback to the core channel.
+            if (s.logMode === 'CATEGORY' || specificChannelId) {
+                switch (data.type) {
+                    case AuditLogType.MESSAGES: specificChannelId = guildSettings.logChannelMessages || specificChannelId; break;
+                    case AuditLogType.CHANNELS: specificChannelId = guildSettings.logChannelChannels || specificChannelId; break;
+                    case AuditLogType.ROLES: specificChannelId = guildSettings.logChannelRoles || specificChannelId; break;
+                    case AuditLogType.MEMBERS: specificChannelId = guildSettings.logChannelMembers || specificChannelId; break;
+                    case AuditLogType.MODERATION: specificChannelId = guildSettings.logChannelModeration || specificChannelId; break;
+                    case AuditLogType.AUTOMOD: specificChannelId = s.logChannelAutomod || guildSettings.logChannelModeration || specificChannelId; break;
+                    case AuditLogType.SECURITY: specificChannelId = guildSettings.logChannelSecurity || specificChannelId; break;
+                    case AuditLogType.VOICE: specificChannelId = guildSettings.logChannelVoice || specificChannelId; break;
+                    case AuditLogType.BOT: specificChannelId = s.logChannelBot || specificChannelId; break;
+                    case AuditLogType.INVITES: specificChannelId = s.logChannelInvites || specificChannelId; break;
+                    case AuditLogType.EMOJI: specificChannelId = s.logChannelEmoji || specificChannelId; break;
+                    case AuditLogType.STICKER: specificChannelId = s.logChannelSticker || specificChannelId; break;
+                    case AuditLogType.EVENTS: specificChannelId = s.logChannelEvents || specificChannelId; break;
+                    case AuditLogType.STAGE: specificChannelId = s.logChannelStage || specificChannelId; break;
+                    case AuditLogType.SERVER: specificChannelId = s.logChannelServer || specificChannelId; break;
+                    case AuditLogType.THREADS: specificChannelId = s.logChannelThreads || specificChannelId; break;
+                    case AuditLogType.VANITY: specificChannelId = s.logChannelVanity || specificChannelId; break;
+                    case AuditLogType.WEBHOOKS: specificChannelId = s.logChannelWebhooks || specificChannelId; break;
+                }
             }
 
             if (specificChannelId) {

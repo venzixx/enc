@@ -50,6 +50,17 @@ export default class Log extends Command {
                                 { name: 'Moderation (Bans/Kicks)', value: 'Moderation' },
                                 { name: 'Security (Anti-Nuke)', value: 'Security' },
                                 { name: 'Voice (Join/Leave/Move)', value: 'Voice' },
+                                { name: 'Automod (Filter Actions)', value: 'Automod' },
+                                { name: 'Bot (Bot Events)', value: 'Bot' },
+                                { name: 'Invites (Create/Delete)', value: 'Invites' },
+                                { name: 'Emoji (Create/Delete/Update)', value: 'Emoji' },
+                                { name: 'Sticker (Create/Delete/Update)', value: 'Sticker' },
+                                { name: 'Events (Scheduled Events)', value: 'Events' },
+                                { name: 'Stage (Start/End)', value: 'Stage' },
+                                { name: 'Server (Settings Changes)', value: 'Server' },
+                                { name: 'Threads (Create/Delete/Update)', value: 'Threads' },
+                                { name: 'Vanity (URL Changes)', value: 'Vanity' },
+                                { name: 'Webhooks (Create/Delete)', value: 'Webhooks' },
                             ]
                         },
                         {
@@ -93,19 +104,37 @@ export default class Log extends Command {
 
         if (!guildData) return ctx.sendV2({ title: 'Error', description: 'Guild data not found in manifest.', isAlert: true });
 
+        const s = guildData as any;
+        const logMode = s.logMode || 'CORE';
+
+        const formatField = (name: string, emoji: string, enabled: boolean, channel: string | null) => {
+            return { name: `${emoji} ${name}`, value: `${enabled ? client.emoji.success : client.emoji.cross} **${enabled ? 'Active' : 'Disabled'}**\nChannel: ${channel ? `<#${channel}>` : '\`Default\`'}`, inline: true };
+        };
+
         const embed = new EmbedBuilder()
             .setTitle(`${client.emoji.info} Server Audit Logging Manifest`)
-            .setDescription('Current status of all granular logging categories. These settings sync with your web dashboard.')
+            .setDescription(`Mode: \`${logMode}\` | Core Channel: ${guildData.logChannelId ? `<#${guildData.logChannelId}>` : '\`Not Set\`'}`)
             .setColor(client.color.main)
             .setThumbnail(ctx.guild!.iconURL())
             .addFields(
-                { name: `${client.emoji.edit} Messages`, value: `${guildData.logMessagesEnabled ? client.emoji.success : client.emoji.cross} **${guildData.logMessagesEnabled ? 'Active' : 'Disabled'}**\nChannel: ${guildData.logChannelMessages ? `<#${guildData.logChannelMessages}>` : '`Default`'}`, inline: true },
-                { name: `${client.emoji.cat} Channels`, value: `${guildData.logChannelsEnabled ? client.emoji.success : client.emoji.cross} **${guildData.logChannelsEnabled ? 'Active' : 'Disabled'}**\nChannel: ${guildData.logChannelChannels ? `<#${guildData.logChannelChannels}>` : '`Default`'}`, inline: true },
-                { name: `${client.emoji.rank} Roles`, value: `${guildData.logRolesEnabled ? client.emoji.success : client.emoji.cross} **${guildData.logRolesEnabled ? 'Active' : 'Disabled'}**\nChannel: ${guildData.logChannelRoles ? `<#${guildData.logChannelRoles}>` : '`Default`'}`, inline: true },
-                { name: `${client.emoji.user} Members`, value: `${guildData.logMembersEnabled ? client.emoji.success : client.emoji.cross} **${guildData.logMembersEnabled ? 'Active' : 'Disabled'}**\nChannel: ${guildData.logChannelMembers ? `<#${guildData.logChannelMembers}>` : '`Default`'}`, inline: true },
-                { name: `${client.emoji.hammer} Moderation`, value: `${guildData.logModerationEnabled ? client.emoji.success : client.emoji.cross} **${guildData.logModerationEnabled ? 'Active' : 'Disabled'}**\nChannel: ${guildData.logChannelModeration ? `<#${guildData.logChannelModeration}>` : '`Default`'}`, inline: true },
-                { name: `${client.emoji.shield} Security`, value: `${guildData.logSecurityEnabled ? client.emoji.success : client.emoji.cross} **${guildData.logSecurityEnabled ? 'Active' : 'Disabled'}**\nChannel: ${guildData.logChannelSecurity ? `<#${guildData.logChannelSecurity}>` : '`Default`'}`, inline: true },
-                { name: `${client.emoji.mic} Voice`, value: `${guildData.logVoiceEnabled ? client.emoji.success : client.emoji.cross} **${guildData.logVoiceEnabled ? 'Active' : 'Disabled'}**\nChannel: ${guildData.logChannelVoice ? `<#${guildData.logChannelVoice}>` : '`Default`'}`, inline: true },
+                formatField('Messages', '📝', guildData.logMessagesEnabled, guildData.logChannelMessages),
+                formatField('Channels', '📁', guildData.logChannelsEnabled, guildData.logChannelChannels),
+                formatField('Roles', '🎭', guildData.logRolesEnabled, guildData.logChannelRoles),
+                formatField('Members', '👤', guildData.logMembersEnabled, guildData.logChannelMembers),
+                formatField('Moderation', '🔨', guildData.logModerationEnabled, guildData.logChannelModeration),
+                formatField('Security', '🛡️', guildData.logSecurityEnabled, guildData.logChannelSecurity),
+                formatField('Voice', '🎙️', guildData.logVoiceEnabled, guildData.logChannelVoice),
+                formatField('Automod', '🤖', s.logAutomodEnabled ?? true, s.logChannelAutomod),
+                formatField('Bot', '⚙️', s.logBotEnabled ?? true, s.logChannelBot),
+                formatField('Invites', '✉️', s.logInvitesEnabled ?? true, s.logChannelInvites),
+                formatField('Emoji', '😀', s.logEmojiEnabled ?? true, s.logChannelEmoji),
+                formatField('Sticker', '🏷️', s.logStickerEnabled ?? true, s.logChannelSticker),
+                formatField('Events', '📅', s.logEventsEnabled ?? true, s.logChannelEvents),
+                formatField('Stage', '🎤', s.logStageEnabled ?? true, s.logChannelStage),
+                formatField('Server', '🏠', s.logServerEnabled ?? true, s.logChannelServer),
+                formatField('Threads', '🧵', s.logThreadsEnabled ?? true, s.logChannelThreads),
+                formatField('Vanity', '🔗', s.logVanityEnabled ?? true, s.logChannelVanity),
+                formatField('Webhooks', '🪝', s.logWebhooksEnabled ?? true, s.logChannelWebhooks),
             )
             .setFooter({ text: 'Use /log config to customize these settings.' })
             .setTimestamp();
@@ -125,12 +154,12 @@ export default class Log extends Command {
             if (channel) channelId = channel.id;
         } else {
             const inputCat = args[0]?.toLowerCase();
-            const validCats = ['messages', 'channels', 'roles', 'members', 'moderation', 'security', 'voice'];
+            const validCats = ['messages', 'channels', 'roles', 'members', 'moderation', 'security', 'voice', 'automod', 'bot', 'invites', 'emoji', 'sticker', 'events', 'stage', 'server', 'threads', 'vanity', 'webhooks'];
             
             if (!validCats.includes(inputCat)) {
                 return ctx.sendV2({
                     title: 'Invalid Category',
-                    description: 'Specify a valid category: `messages`, `channels`, `roles`, `members`, `moderation`, `security`, `voice`.',
+                    description: `Specify a valid category: ${validCats.map(c => '\`' + c + '\`').join(', ')}.`,
                     isAlert: true,
                     color: client.color.red
                 });

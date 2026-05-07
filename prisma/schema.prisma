@@ -46,6 +46,17 @@ model Guild {
   logModerationEnabled  Boolean           @default(true)
   logSecurityEnabled    Boolean           @default(true)
   logVoiceEnabled       Boolean           @default(true)
+  logAutomodEnabled     Boolean           @default(true)
+  logBotEnabled         Boolean           @default(true)
+  logInvitesEnabled     Boolean           @default(true)
+  logEmojiEnabled       Boolean           @default(true)
+  logStickerEnabled     Boolean           @default(true)
+  logEventsEnabled      Boolean           @default(true)
+  logStageEnabled       Boolean           @default(true)
+  logServerEnabled      Boolean           @default(true)
+  logThreadsEnabled     Boolean           @default(true)
+  logVanityEnabled      Boolean           @default(true)
+  logWebhooksEnabled    Boolean           @default(true)
   logChannelMessages    String?
   logChannelChannels    String?
   logChannelRoles       String?
@@ -53,6 +64,19 @@ model Guild {
   logChannelModeration  String?
   logChannelSecurity    String?
   logChannelVoice       String?
+  logChannelAutomod     String?
+  logChannelBot         String?
+  logChannelInvites     String?
+  logChannelEmoji       String?
+  logChannelSticker     String?
+  logChannelEvents      String?
+  logChannelStage       String?
+  logChannelServer      String?
+  logChannelThreads     String?
+  logChannelVanity      String?
+  logChannelWebhooks    String?
+  logMode               String            @default("CORE")
+  logCategoryId         String?
   music_language        String?           @default("en-US")
   defaultVolume         Int?              @default(100)
   djMode                Boolean?          @default(false)
@@ -107,6 +131,9 @@ model Guild {
   levelUpMessageEnabled Boolean           @default(true)
   levelUpMessage        String?           @default("GG {user.mention}, you just reached level **{user.level}**!")
   levelUpImageEnabled   Boolean           @default(false)
+  levelUpChannelId      String?
+  rankCardChannelId     String?
+  levelUpEmbedData      String?
   firstPlaceRoleId      String?
   stackRoleRewards      Boolean           @default(true)
   stackXpBoosters       Boolean           @default(true)
@@ -162,6 +189,7 @@ model Guild {
   voiceDailyActivities   VoiceDailyActivity[]
   streaksEnabled        Boolean           @default(true)
   streakChannelId       String?
+  streakMessageMode     String            @default("TEXT")
   autoReacts            AutoReact[]
   reactLocks            ReactLock[]
   uwuLocks              UwuLock[]
@@ -677,6 +705,9 @@ model StreakTier {
   guildId   String
   name      String
   threshold Int      // Messages needed per day
+  message   String?  // Custom streak message template
+  embedData String?  // JSON embed data for streak notifications
+  imageUrl  String?  // Custom image card URL
   guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
   userStreaks UserStreak[]
 
