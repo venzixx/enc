@@ -51,12 +51,13 @@ export class Appeals {
             hmac.update(data);
             const signature = hmac.digest('hex');
 
-            const webUrl = `https://bot.encl.asia/dashboard/appeal?g=${guild.id}&u=${user.id}&t=${type}&tag=${encodeURIComponent(user.tag)}&r=${encodeURIComponent(safeReason)}&s=${signature}`;
+            const webUrl = `https://bot.encl.asia/appeal?g=${guild.id}&u=${user.id}&t=${type}&tag=${encodeURIComponent(user.tag)}&r=${encodeURIComponent(safeReason)}&s=${signature}`;
 
             buttons.push(
                 new ButtonBuilder()
                     .setLabel("Appeal via Web")
                     .setURL(webUrl)
+                    .setEmoji(client.emoji.link.match(/\d+/)?.[0] || "🌐")
                     .setStyle(ButtonStyle.Link)
             );
 

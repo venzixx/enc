@@ -21,10 +21,38 @@ export default class VoiceStateUpdate extends Event {
         // Join/Leave/Move manifested
         if (!oldState.channelId && newState.channelId) {
             changes.push(`Joined: <#${newState.channelId}>`);
+            this.client.voiceSessions.set(member.id, Date.now());
         } else if (oldState.channelId && !newState.channelId) {
             changes.push(`Left: <#${oldState.channelId}>`);
+            const joinTime = this.client.voiceSessions.get(member.id);
+            if (joinTime) {
+                const durationSeconds = Math.floor((Date.now() - joinTime) / 1000);
+                this.client.voiceSessions.delete(member.id);
+                if (durationSeconds > 0) {
+                    const today = new Date().toISOString().split('T')[0];
+                    this.client.prisma.voiceDailyActivity.upsert({
+                        where: { guildId_date: { guildId: oldState.guild.id, date: today } },
+                        update: { seconds: { increment: durationSeconds } },
+                        create: { guildId: oldState.guild.id, date: today, seconds: durationSeconds }
+                    }).catch(() => {});
+                }
+            }
         } else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
             changes.push(`Moved: <#${oldState.channelId}> -> <#${newState.channelId}>`);
+            // Optional: Record duration so far and reset join time for the move
+            const joinTime = this.client.voiceSessions.get(member.id);
+            if (joinTime) {
+                const durationSeconds = Math.floor((Date.now() - joinTime) / 1000);
+                if (durationSeconds > 0) {
+                    const today = new Date().toISOString().split('T')[0];
+                    this.client.prisma.voiceDailyActivity.upsert({
+                        where: { guildId_date: { guildId: newState.guild.id, date: today } },
+                        update: { seconds: { increment: durationSeconds } },
+                        create: { guildId: newState.guild.id, date: today, seconds: durationSeconds }
+                    }).catch(() => {});
+                }
+            }
+            this.client.voiceSessions.set(member.id, Date.now());
         }
 
         // Server-Side Governance

@@ -39,8 +39,66 @@ export default class MessageCreate extends Event {
 		const handledByAutoMod = await AutoModHandler.process(this.client, message);
 		if (handledByAutoMod) return;
 
+		// 0.5) --- Dev Mute Check ---
+		try {
+			const devMute = await (this.client.prisma as any).devMute.findUnique({
+				where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } }
+			});
+
+			if (devMute) {
+				// Check if mute has expired
+				if (new Date() >= new Date(devMute.expiresAt)) {
+					// Expired — clean up
+					await (this.client.prisma as any).devMute.delete({
+						where: { guildId_userId: { guildId: message.guildId!, userId: message.author.id } }
+					}).catch(() => {});
+				} else {
+					// Still muted — delete message and DM
+					await message.delete().catch(() => {});
+
+					// Only DM once every 30 seconds to avoid spam
+					const muteKey = `devmute-dm-${message.guildId}-${message.author.id}`;
+					const lastDm = (this.client as any)._devMuteDmCooldowns?.get(muteKey);
+					const now = Date.now();
+
+					if (!lastDm || now - lastDm > 30000) {
+						if (!(this.client as any)._devMuteDmCooldowns) {
+							(this.client as any)._devMuteDmCooldowns = new Map<string, number>();
+						}
+						(this.client as any)._devMuteDmCooldowns.set(muteKey, now);
+
+						const remaining = new Date(devMute.expiresAt).getTime() - now;
+						const expTimestamp = Math.floor(new Date(devMute.expiresAt).getTime() / 1000);
+
+						try {
+							await message.author.send({
+								embeds: [
+									this.client.embed()
+										.setTitle('🔇 You are muted')
+										.setDescription([
+											`You are currently muted in **${message.guild!.name}**.`,
+											`**Reason:** ${devMute.reason}`,
+											`**Expires:** <t:${expTimestamp}:R>`,
+											'',
+											'> Your messages are being deleted until the mute expires.'
+										].join('\n'))
+										.setColor(0xFF0000)
+								]
+							});
+						} catch {
+							// Can't DM user
+						}
+					}
+
+					return; // Stop all further processing
+				}
+			}
+		} catch {
+			// DevMute table might not exist yet
+		}
+
 		// UPDATE STREAKS
-		StreakManager.processMessage(this.client, message.guild.id, message.author.id).catch(err => console.error("Streak Error:", err));
+		StreakManager.processMessage(this.client, message.guild.id, message.author.id, message.channelId).catch(err => console.error("Streak Error:", err));
 
 		//  AFK SYSTEM 
 		// 1) If the message author is AFK  remove their AFK and show missed mentions
@@ -174,6 +232,117 @@ export default class MessageCreate extends Event {
 			}
 		}
 
+		// 3.5) --- Auto React ---
+		const autoReacts = await (this.client.prisma as any).autoReact.findMany({
+			where: { guildId: message.guildId }
+		});
+
+		if (autoReacts.length > 0) {
+			const msgLower = message.content.toLowerCase();
+			for (const ar of autoReacts as any[]) {
+				// Check if trigger is a raw user ID (stored as just digits)
+				const isMentionTrigger = /^\d{17,20}$/.test(ar.trigger);
+				let matched = false;
+
+				if (isMentionTrigger) {
+					const id = ar.trigger;
+					matched = message.mentions.users.has(id) ||
+							  message.content.includes(`<@${id}>`) ||
+							  message.content.includes(`<@!${id}>`);
+				} else {
+					// Word/phrase trigger - case insensitive includes
+					matched = msgLower.includes(ar.trigger);
+				}
+
+				if (matched) {
+					try {
+						// For custom emoji stored as <:name:id>, extract name:id for react()
+						const customMatch = ar.emoji.match(/^<a?:(\w+:\d+)>$/);
+						if (customMatch) {
+							await message.react(customMatch[1]);
+						} else {
+							await message.react(ar.emoji);
+						}
+					} catch (err) {
+						// Silently fail if emoji is invalid or bot lacks permissions
+					}
+				}
+			}
+		}
+
+		// 3.6) --- React Lock ---
+		const reactLocks = await (this.client.prisma as any).reactLock.findMany({
+			where: { guildId: message.guildId }
+		});
+
+		if (reactLocks.length > 0) {
+			for (const rl of reactLocks as any[]) {
+				let matched = false;
+
+				if (rl.targetType === 'user') {
+					matched = message.author.id === rl.targetId;
+				} else if (rl.targetType === 'role') {
+					matched = message.member?.roles.cache.has(rl.targetId) ?? false;
+				}
+
+				if (matched) {
+					try {
+						const customMatch = rl.emoji.match(/^<a?:(\w+:\d+)>$/);
+						if (customMatch) {
+							await message.react(customMatch[1]);
+						} else {
+							await message.react(rl.emoji);
+						}
+					} catch (err) {
+						// Silently fail if emoji is invalid or bot lacks permissions
+					}
+				}
+			}
+		}
+
+		// 3.7) --- Text Lock (UwU / NSFW / Mommy) ---
+		try {
+			const textLock = await (this.client.prisma as any).uwuLock.findUnique({
+				where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } }
+			});
+
+			if (textLock && message.content.trim().length > 0 && !message.author.bot) {
+				let transformedText: string;
+				switch (textLock.lockType) {
+					case 'nsfw': transformedText = this.nsfwify(message.content); break;
+					case 'mommy': transformedText = this.mommyify(message.content); break;
+					default: transformedText = this.uwuify(message.content); break;
+				}
+
+				const channel = message.channel as TextChannel;
+
+				try {
+					const webhooks = await channel.fetchWebhooks();
+					let webhook = webhooks.find(wh => wh.owner?.id === this.client.user?.id);
+
+					if (!webhook) {
+						webhook = await channel.createWebhook({
+							name: 'Enc Bot',
+							avatar: this.client.user?.displayAvatarURL()
+						});
+					}
+
+					const displayName = message.member?.displayName || message.author.displayName || message.author.username;
+					
+					await message.delete().catch(() => {});
+					await webhook.send({
+						content: transformedText,
+						username: displayName,
+						avatarURL: message.author.displayAvatarURL({ size: 256 })
+					});
+				} catch (err) {
+					// Can't manage webhooks or delete messages, skip
+				}
+			}
+		} catch (err) {
+			// textLock table might not exist yet, skip
+		}
+
 		// 4) --- Counting Game ---
 		if (guild.countingChannel === message.channelId) {
 			const num = parseInt(message.content);
@@ -252,13 +421,17 @@ export default class MessageCreate extends Event {
 					where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } },
 					update: { 
 						messages: { increment: 1 },
-						xp: { increment: xpToGive }
+						xp: { increment: xpToGive },
+						lastUsername: message.author.displayName || message.author.username,
+						lastAvatar: message.author.displayAvatarURL()
 					},
 					create: { 
 						guildId: message.guildId, 
 						userId: message.author.id, 
 						messages: 1, 
-						xp: xpToGive 
+						xp: xpToGive,
+						lastUsername: message.author.displayName || message.author.username,
+						lastAvatar: message.author.displayAvatarURL()
 					}
 				});
 
@@ -384,14 +557,42 @@ export default class MessageCreate extends Event {
 		let matchedPrefix = "";
 
 		// 1. Identify Command (Prefix or Mention)
+		let rest = "";
 		if (message.content.match(mentionPrefixRegex)) {
 			matchedPrefix = message.content.match(mentionPrefixRegex)![0];
-			args = message.content.slice(matchedPrefix.length).trim().split(/ +/g);
-			cmd = args.shift()?.toLowerCase() || "";
+			rest = message.content.slice(matchedPrefix.length).trim();
 		} else if (message.content.match(standardPrefixRegex)) {
 			matchedPrefix = message.content.match(standardPrefixRegex)![0];
-			args = message.content.slice(matchedPrefix.length).trim().split(/ +/g);
-			cmd = args.shift()?.toLowerCase() || "";
+			rest = message.content.slice(matchedPrefix.length).trim();
+		}
+
+		if (rest) {
+			const parts = rest.split(/ +/g);
+			cmd = parts.shift()?.toLowerCase() || "";
+			const restAfterCmd = rest.slice(rest.toLowerCase().indexOf(cmd) + cmd.length).trim();
+
+			if (restAfterCmd.includes(",")) {
+				args = restAfterCmd.split(",").map((s) => s.trim()).filter(s => s.length > 0);
+			} else {
+				args = parts;
+			}
+		}
+
+		// --- Custom Command Aliases ---
+		if (cmd) {
+			const customAliases = await (this.client.prisma as any).commandAlias.findMany({
+				where: { guildId: message.guildId }
+			});
+
+			const aliasMatch = customAliases.find((a: any) => a.alias.toLowerCase() === cmd);
+			if (aliasMatch) {
+				const parts = aliasMatch.commandName.split(/ +/);
+				cmd = parts[0].toLowerCase();
+				if (parts.length > 1) {
+					// Prepend subcommands/extra arguments from the alias to the current args
+					args = [...parts.slice(1), ...args];
+				}
+			}
 		}
 
 		const command = cmd ? (
@@ -403,9 +604,12 @@ export default class MessageCreate extends Event {
 		
 		//  PATH A: COMMAND EXECUTION 
 		if (command) {
+			(message as any).args = args;
 			const ctx = new Context(this.client, message);
 			ctx.lng = locale || "en-US";
+			ctx.command = command;
 			(ctx as any).args = args;
+			(ctx as any).prefix = matchedPrefix;
 
             logger.info(`[Command] ${command.name} triggered by ${message.author.tag} (${message.author.id}) in ${message.guildId}. Content: "${message.content}"`);
 
@@ -671,5 +875,136 @@ export default class MessageCreate extends Event {
 				}),
 			});
 		}
+	}
+
+	/**
+	 * Transforms text into uwu-speak.
+	 */
+	private uwuify(text: string): string {
+		const suffixes = [' uwu', ' owo', ' :3', ' :p', ' :D', ' >w<', ' ~', ' ^^', ' nyaa~', ' rawr', ' :3c', ' hehe~'];
+		
+		let result = text
+			// Protect mentions & emojis from mutation
+			.replace(/(<[@#!&:\w]+\d*>)/g, '%%PROTECT_$1_PROTECT%%')
+			// Replace common letter combinations
+			.replace(/(?:r|l)/g, 'w')
+			.replace(/(?:R|L)/g, 'W')
+			.replace(/n([aeiou])/g, 'ny$1')
+			.replace(/N([aeiou])/g, 'Ny$1')
+			.replace(/N([AEIOU])/g, 'NY$1')
+			.replace(/ove/g, 'uv')
+			.replace(/th/g, 'dw')
+			.replace(/Th/g, 'Dw')
+			.replace(/TH/g, 'DW')
+			// Restore protected tokens
+			.replace(/%%PROTECT_(.*?)_PROTECT%%/g, '$1');
+
+		// Add stuttering to ~30% of words (skip mentions/emojis)
+		const words = result.split(' ');
+		result = words.map(word => {
+			if (word.startsWith('<') || word.startsWith('%%')) return word;
+			if (word.length > 1 && Math.random() < 0.3) {
+				return `${word[0]}-${word}`;
+			}
+			return word;
+		}).join(' ');
+
+		// Add a random suffix
+		const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+		result += suffix;
+
+		return result;
+	}
+
+	/**
+	 * Transforms text into suggestive/flirty speak.
+	 */
+	private nsfwify(text: string): string {
+		const suffixes = [' 😏', ' 🥵', ' ~', ' hehe~', ' 😩', ' oh my~', ' 💦', ' damn~', ' 🫦', ' sheesh~', ' 😳', ' ayo~'];
+
+		let result = text
+			.replace(/(<[@#!&:\w]+\d*>)/g, '%%PROTECT_$1_PROTECT%%')
+			.replace(/\blike\b/gi, 'looove')
+			.replace(/\bgood\b/gi, 'sooo good')
+			.replace(/\bnice\b/gi, 'naughty')
+			.replace(/\bhard\b/gi, 'rock hard')
+			.replace(/\bcome\b/gi, 'come over')
+			.replace(/\bwant\b/gi, 'crave')
+			.replace(/\bfun\b/gi, 'spicy fun')
+			.replace(/\beat\b/gi, 'devour')
+			.replace(/\bhot\b/gi, 'smoking hot')
+			.replace(/\bbig\b/gi, 'massive')
+			.replace(/\blong\b/gi, 'throbbing long')
+			.replace(/\bbed\b/gi, 'bed 😏')
+			.replace(/\bplease\b/gi, 'pretty please~')
+			.replace(/\byes\b/gi, 'oh YES')
+			.replace(/\bno\b/gi, 'don\'t stop')
+			.replace(/\bstop\b/gi, 'keep going')
+			.replace(/\bwow\b/gi, 'oh wow daddy')
+			.replace(/\bhelp\b/gi, 'save me daddy')
+			.replace(/\bokay\b/gi, 'yes daddy')
+			.replace(/\bok\b/gi, 'yes daddy')
+			.replace(/%%PROTECT_(.*?)_PROTECT%%/g, '$1');
+
+		// Add random moaning-like insertions ~20% of words
+		const words = result.split(' ');
+		result = words.map(word => {
+			if (word.startsWith('<') || word.startsWith('%%')) return word;
+			if (Math.random() < 0.15) {
+				const moans = ['ahh~', 'mmm~', 'ngh~', 'oh~', 'ooh~'];
+				return word + ' ' + moans[Math.floor(Math.random() * moans.length)];
+			}
+			return word;
+		}).join(' ');
+
+		const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+		result += suffix;
+
+		return result;
+	}
+
+	/**
+	 * Transforms text into submissive mommy-speak.
+	 */
+	private mommyify(text: string): string {
+		const suffixes = [' 🥺', ' mommy~', ' yes mommy', ' sorry mommy', ' 💕', ' pwease mommy', ' i\'ll be good~', ' mommy knows best~', ' 👉👈', ' am i a good boy?', ' *whimpers*', ' mommy help~', ' :3', ' hehe mommy~'];
+
+		let result = text
+			.replace(/(<[@#!&:\w]+\d*>)/g, '%%PROTECT_$1_PROTECT%%')
+			.replace(/\bi\b/g, 'i')
+			.replace(/\bI\b/g, 'i')
+			.replace(/\bmy\b/gi, 'mommy\'s')
+			.replace(/\bme\b/gi, 'your little one')
+			.replace(/\byes\b/gi, 'yes mommy')
+			.replace(/\bno\b/gi, 'b-but mommy')
+			.replace(/\bplease\b/gi, 'pwease mommy')
+			.replace(/\bthanks\b/gi, 'thank you mommy')
+			.replace(/\bthank you\b/gi, 'thank you mommy')
+			.replace(/\bsorry\b/gi, 'sowwy mommy')
+			.replace(/\bokay\b/gi, 'yes mommy')
+			.replace(/\bok\b/gi, 'okie mommy')
+			.replace(/\bwant\b/gi, 'need')
+			.replace(/\bhello\b/gi, 'h-hi mommy')
+			.replace(/\bhi\b/gi, 'h-hi mommy')
+			.replace(/\bhey\b/gi, 'h-hewwo mommy')
+			.replace(/\bhelp\b/gi, 'mommy help')
+			.replace(/\bwhy\b/gi, 'b-but why mommy')
+			.replace(/\bstop\b/gi, 'p-pwease stop mommy')
+			.replace(/%%PROTECT_(.*?)_PROTECT%%/g, '$1');
+
+		// Add stuttering more aggressively (~40%)
+		const words = result.split(' ');
+		result = words.map(word => {
+			if (word.startsWith('<') || word.startsWith('%%')) return word;
+			if (word.length > 1 && Math.random() < 0.4) {
+				return `${word[0]}-${word}`;
+			}
+			return word;
+		}).join(' ');
+
+		const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+		result += suffix;
+
+		return result;
 	}
 }

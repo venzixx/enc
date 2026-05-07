@@ -1,4 +1,4 @@
-import { Events, Role } from 'discord.js';
+import { Events, Role, AuditLogEvent } from 'discord.js';
 import { Event } from '../structures';
 import { LavamusicEventType } from '../types/events';
 import { ExtendedClient } from '../client';
@@ -20,10 +20,15 @@ export default class RoleUpdate extends Event {
 
         if (changes.length === 0) return;
 
+        const auditLog = await newRole.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.RoleUpdate }).then(logs => logs.entries.first()).catch(() => null);
+        const executor = auditLog?.executor;
+
         await AuditLogger.log(this.client, newRole.guild, {
             type: AuditLogType.ROLES,
             event: 'Role Updated',
             status: AuditLogStatus.INFO,
+            executorId: executor?.id,
+            executorTag: executor?.tag,
             targetId: newRole.id,
             targetName: newRole.name,
             details: changes.join('\n'),

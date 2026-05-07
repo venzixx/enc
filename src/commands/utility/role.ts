@@ -43,27 +43,70 @@ export default class RoleCommand extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-		await ctx.deferReply();
-		const sub = ctx.options.getSubcommand();
-		
-		const target = await Resolver.resolveMember(ctx);
-		const roleId = ctx.options.getRole('role') as string || args[1]?.replace(/[<@&>]/g, '');
-		const role = roleId ? (ctx.guild.roles.cache.get(roleId) || await ctx.guild.roles.fetch(roleId).catch(() => null)) : null;
+		let sub: string | null = null;
+		let target: GuildMember | null = null;
+		let role: Role | null = null;
+
+		if (ctx.interaction) {
+			await ctx.deferReply();
+			sub = ctx.options.getSubcommand();
+			target = ctx.options.getMember('user') as GuildMember;
+			role = ctx.options.getRole('role') as Role;
+		} else {
+			// Prefix command logic: ,role <add/remove> <user> <role name>
+			sub = args[0]?.toLowerCase();
+			if (!sub || !['add', 'remove'].includes(sub)) {
+				const usageEmbed = new EmbedBuilder()
+					.setTitle('Role Command Usage')
+					.setDescription(`\`${ctx.prefix}role add <user> <role name>\`\n\`${ctx.prefix}role remove <user> <role name>\``)
+					.setColor(client.color.main);
+				return await ctx.reply({ embeds: [usageEmbed] });
+			}
+
+			if (!args[1]) {
+				return await ctx.reply({ content: 'Please provide a member.' });
+			}
+
+			// Resolve member
+			target = await Resolver.resolveMember(ctx, args[1]);
+			
+			if (!args[2]) {
+				return await ctx.reply({ content: 'Please provide a role name or mention.' });
+			}
+
+			// Resolve role: check mention/ID first, then search by name
+			const roleQuery = args.slice(2).join(' ');
+			const roleId = roleQuery.replace(/[<@&>]/g, '');
+			role = ctx.guild.roles.cache.get(roleId) || 
+				   ctx.guild.roles.cache.find(r => r.name.toLowerCase() === roleQuery.toLowerCase()) ||
+				   ctx.guild.roles.cache.find(r => r.name.toLowerCase().includes(roleQuery.toLowerCase()));
+		}
+
+		// @ts-ignore
+        const prefix = ctx.prefix || client.config.prefix;
+        if (!client.db || !ctx.guildId) {
+            const errorEmbed = new EmbedBuilder()
+                .setTitle(`${client.emoji.cross} Not Found`)
+                .setDescription(`Could not find that ${!target ? 'member' : 'role'}.`)
+                .setColor(client.color.red);
+			return await ctx.reply({ embeds: [errorEmbed] });
+		}
 
 		if (!target || !role) {
             const errorEmbed = new EmbedBuilder()
                 .setTitle(`${client.emoji.cross} Not Found`)
-                .setDescription('Could not find that member or role.')
+                .setDescription(`Could not find that ${!target ? 'member' : 'role'}.`)
                 .setColor(client.color.red);
-			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
+			return await ctx.reply({ embeds: [errorEmbed] });
 		}
 
+		// Permission and hierarchy checks
 		if (role.position >= (ctx.member as GuildMember).roles.highest.position && ctx.guild.ownerId !== ctx.author.id) {
             const errorEmbed = new EmbedBuilder()
                 .setTitle(`${client.emoji.cross} Permission Denied`)
                 .setDescription('You cannot manage a role higher than or equal to your own.')
                 .setColor(client.color.red);
-			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
+			return await ctx.reply({ embeds: [errorEmbed] });
 		}
 
 		if (role.position >= (ctx.guild.members.me as GuildMember).roles.highest.position) {
@@ -71,7 +114,7 @@ export default class RoleCommand extends Command {
                 .setTitle(`${client.emoji.cross} Hierarchy Error`)
                 .setDescription('I cannot manage this role. Check my role position and ensure it is below mine.')
                 .setColor(client.color.red);
-			return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
+			return await ctx.reply({ embeds: [errorEmbed] });
 		}
 
 		try {
@@ -81,7 +124,7 @@ export default class RoleCommand extends Command {
                         .setTitle(`${client.emoji.cross} Already Has Role`)
                         .setDescription(`**${target.user.tag}** already has the ${role} role.`)
                         .setColor(client.color.red);
-					return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
+					return await ctx.reply({ embeds: [errorEmbed] });
 				}
 				await target.roles.add(role);
                 const successEmbed = new EmbedBuilder()
@@ -96,7 +139,7 @@ export default class RoleCommand extends Command {
                         .setTitle(`${client.emoji.cross} Missing Role`)
                         .setDescription(`**${target.user.tag}** does not have the ${role} role.`)
                         .setColor(client.color.red);
-					return await ctx.reply({ embeds: [errorEmbed], flags: [64] });
+					return await ctx.reply({ embeds: [errorEmbed] });
 				}
 				await target.roles.remove(role);
                 const successEmbed = new EmbedBuilder()
@@ -111,7 +154,7 @@ export default class RoleCommand extends Command {
                 .setTitle(`${client.emoji.cross} Execution Error`)
                 .setDescription(`An error occurred: ${e.message}`)
                 .setColor(client.color.red);
-			await ctx.reply({ embeds: [errorEmbed], flags: [64] });
+			await ctx.reply({ embeds: [errorEmbed] });
 		}
 	}
 }

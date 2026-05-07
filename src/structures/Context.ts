@@ -44,6 +44,7 @@ export default class Context {
 	public deferred = false;
 	public replied = false;
 	public lng = "en-US";
+	public command: any = null;
 
     public t(key: any, options?: any): string {
         return t(key, { ...options, lng: this.lng });
@@ -63,18 +64,66 @@ export default class Context {
         }
         // Mock options for prefix commands with improved argument indexing
         const args = (this.ctx as any).args || [];
+        const commandOptions = this.command?.options || [];
+        const hasSubcommands = commandOptions.some((o: any) => o.type === 1 || o.type === 2);
+        const offset = hasSubcommands ? 1 : 0;
+
+        const getOptionIndex = (name: string, providedIndex?: number) => {
+            if (providedIndex !== undefined && providedIndex !== 0) return providedIndex + offset;
+            const foundIndex = commandOptions.findIndex((o: any) => o.name === name);
+            return (foundIndex !== -1 ? foundIndex : 0) + offset;
+        };
+
         return {
-            getString: (name: string, index = 0) => args[index] || null,
-            getInteger: (name: string, index = 0) => parseInt(args[index]) || null,
-            getBoolean: (name: string, index = 0) => args[index] === 'true',
-            getUser: (name: string, index = 0) => args[index]?.replace(/[<@!>]/g, '') || null,
-            getMember: (name: string, index = 0) => args[index]?.replace(/[<@!>]/g, '') || null,
-            getChannel: (name: string, index = 0) => args[index]?.replace(/[<#>]/g, '') || null,
-            getRole: (name: string, index = 0) => args[index]?.replace(/[<@&>]/g, '') || null,
-            getMentionable: (name: string, index = 0) => args[index] || null,
-            getNumber: (name: string, index = 0) => parseFloat(args[index]) || null,
+            getString: (name: string, index?: number) => {
+                const idx = getOptionIndex(name, index);
+                if (!args[idx]) return null;
+                
+                // If it's the last option in the command definition, join the rest of the arguments
+                const optIndexInDef = commandOptions.findIndex((o: any) => o.name === name);
+                if (optIndexInDef !== -1 && optIndexInDef === commandOptions.length - 1) {
+                    return args.slice(idx).join(' ');
+                }
+                return args[idx];
+            },
+            getInteger: (name: string, index?: number) => {
+                const idx = getOptionIndex(name, index);
+                return args[idx] ? parseInt(args[idx]) : null;
+            },
+            getBoolean: (name: string, index?: number) => {
+                const idx = getOptionIndex(name, index);
+                return args[idx] === 'true';
+            },
+            getUser: (name: string, index?: number) => {
+                const idx = getOptionIndex(name, index);
+                const id = args[idx]?.replace(/[<@!>]/g, '');
+                return id ? this.client.users.cache.get(id) || null : null;
+            },
+            getMember: (name: string, index?: number) => {
+                const idx = getOptionIndex(name, index);
+                const id = args[idx]?.replace(/[<@!>]/g, '');
+                return id ? this.guild?.members.cache.get(id) || null : null;
+            },
+            getChannel: (name: string, index?: number) => {
+                const idx = getOptionIndex(name, index);
+                const id = args[idx]?.replace(/[<#>]/g, '');
+                return id ? this.guild?.channels.cache.get(id) || null : null;
+            },
+            getRole: (name: string, index?: number) => {
+                const idx = getOptionIndex(name, index);
+                const id = args[idx]?.replace(/[<@&>]/g, '');
+                return id ? this.guild?.roles.cache.get(id) || null : null;
+            },
+            getMentionable: (name: string, index?: number) => {
+                const idx = getOptionIndex(name, index);
+                return args[idx] || null;
+            },
+            getNumber: (name: string, index?: number) => {
+                const idx = getOptionIndex(name, index);
+                return args[idx] ? parseFloat(args[idx]) : null;
+            },
             getAttachment: (name: string) => null,
-            getSubcommand: () => args[0] || null,
+            getSubcommand: () => hasSubcommands ? args[0] || null : null,
             getSubcommandGroup: () => null,
         };
     }

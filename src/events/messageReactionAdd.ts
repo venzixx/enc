@@ -13,6 +13,16 @@ export default class MessageReactionAdd extends Event {
 
     public async run(reaction: MessageReaction, user: User): Promise<void> {
         if (user.bot) return;
+        const guild = reaction.message.guild;
+        if (!guild) return;
+
+        // TRACK ACTIVITY
+        const today = new Date().toISOString().split('T')[0];
+        this.client.prisma.reactionDailyActivity.upsert({
+            where: { guildId_date: { guildId: guild.id, date: today } },
+            update: { reactionCount: { increment: 1 } },
+            create: { guildId: guild.id, date: today, reactionCount: 1 }
+        }).catch(() => {});
 
         // Fetch partials if needed
         try {
@@ -34,9 +44,6 @@ export default class MessageReactionAdd extends Event {
         });
 
         if (!rrs.length) return;
-
-        const guild = reaction.message.guild;
-        if (!guild) return;
 
         try {
             // Ensure member is fetched properly

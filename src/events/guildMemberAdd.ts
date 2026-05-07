@@ -3,6 +3,7 @@ import { Event } from '../structures';
 import { LavamusicEventType } from '../types/events';
 import { ExtendedClient } from '../client';
 import { AuditLogger, AuditLogType, AuditLogStatus } from '../utils/AuditLogger';
+import { PlaceholderManager } from '../utils/PlaceholderManager';
 
 export default class GuildMemberAdd extends Event {
     constructor(client: ExtendedClient, file: string) {
@@ -15,6 +16,17 @@ export default class GuildMemberAdd extends Event {
     public async run(member: GuildMember): Promise<void> {
         const guild = member.guild;
         
+        // Log to Audit Manifest
+        await AuditLogger.log(this.client, guild, {
+            type: AuditLogType.MEMBERS,
+            event: 'Member Joined',
+            status: AuditLogStatus.INFO,
+            targetId: member.id,
+            targetName: member.user.tag,
+            details: `Account Created: <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`,
+            color: this.client.color.main
+        });
+
         try {
             // Fetch current invites
             const newInvites = await guild.invites.fetch();
@@ -51,10 +63,12 @@ export default class GuildMemberAdd extends Event {
             // --- Join DM ---
             if (guildData?.joinDmMessage) {
                 try {
-                    const parsedDm = guildData.joinDmMessage
-                        .replace('{user}', member.user.username)
-                        .replace('{server}', guild.name);
-                    await member.send(`**A message from ${guild.name}:**\n\n${parsedDm}`);
+                    const resolved = await PlaceholderManager.resolve(this.client, guildData.joinDmMessage, member, guild);
+                    await member.send({
+                        content: resolved.content || undefined,
+                        embeds: resolved.embeds,
+                        components: resolved.components
+                    });
                 } catch (error) {
                     // Ignored (User DMs off)
                 }
@@ -64,10 +78,13 @@ export default class GuildMemberAdd extends Event {
             if (guildData?.greeterChannelId) {
                 const greeterChannel = guild.channels.cache.get(guildData.greeterChannelId) as any;
                 if (greeterChannel && greeterChannel.isTextBased()) {
-                    let greetMsg = guildData.greeterMessage || "Welcome {user}!";
-                    greetMsg = greetMsg.replace(/{user}/g, member.toString()).replace(/{server}/g, guild.name).replace(/{mentionID}/g, `<@${member.id}>`);
+                    const resolved = await PlaceholderManager.resolve(this.client, guildData.greeterMessage || "Welcome {user}!", member, guild);
                     
-                    greeterChannel.send(greetMsg).then((sentMsg: any) => {
+                    greeterChannel.send({
+                        content: resolved.content || undefined,
+                        embeds: resolved.embeds,
+                        components: resolved.components
+                    }).then((sentMsg: any) => {
                         if (guildData.greeterTime && guildData.greeterTime > 0) {
                             setTimeout(() => {
                                 sentMsg.delete().catch(() => {});
@@ -77,7 +94,7 @@ export default class GuildMemberAdd extends Event {
                 }
             }
 
-            // --- Welcome Image ---
+            // --- Welcome Image / Message ---
             if (guildData?.welcomeChannelId) {
                 const welcomeChannel = guild.channels.cache.get(guildData.welcomeChannelId) as any;
                 if (welcomeChannel && welcomeChannel.isTextBased()) {
@@ -88,21 +105,27 @@ export default class GuildMemberAdd extends Event {
                     
                     const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome.png' });
                     
-                    let welcomeDesc = guildData.welcomeMessage || `Welcome to the server, {user}! You were invited by **{inviter}** using code \`${usedInvite?.code || 'Direct Join'}\`.`;
-                    welcomeDesc = welcomeDesc
-                        .replace(/{user}/g, member.toString())
-                        .replace(/{server}/g, guild.name)
-                        .replace(/{inviter}/g, usedInvite?.inviter?.tag || 'Unknown')
-                        .replace(/{mentionID}/g, `<@${member.id}>`);
+                    const welcomeRaw = guildData.welcomeMessage || `Welcome to the server, {user}! You were invited by **{inviter}** using code \`${usedInvite?.code || 'Direct Join'}\`.`;
+                    // Pre-replace {inviter} as PlaceholderManager doesn't handle it currently
+                    const welcomePreProcessed = welcomeRaw.replace(/{inviter}/g, usedInvite?.inviter?.tag || 'Unknown');
+                    
+                    const resolved = await PlaceholderManager.resolve(this.client, welcomePreProcessed, member, guild);
 
                     const embed = new EmbedBuilder()
                         .setTitle(' Welcome!')
-                        .setDescription(welcomeDesc)
+                        .setDescription(resolved.content || null)
                         .setImage('attachment://welcome.png')
                         .setColor(this.client.color.main)
                         .setTimestamp();
                     
-                    await welcomeChannel.send({ embeds: [embed], files: [attachment] });
+                    // Add any resolved embeds from tags as well
+                    const finalEmbeds = [embed, ...resolved.embeds];
+                    
+                    await welcomeChannel.send({ 
+                        embeds: finalEmbeds, 
+                        components: resolved.components,
+                        files: [attachment] 
+                    });
                 }
             }
         } catch (e) {

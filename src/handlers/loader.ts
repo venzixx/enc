@@ -35,10 +35,12 @@ export async function loadCommands(client: ExtendedClient) {
             }
             commandNames.add(command.name);
             
-            // Set category from folder name
-            const relativePath = path.relative(path.join(process.cwd(), 'src', 'commands'), filePath);
-            const category = path.dirname(relativePath).split(path.sep)[0];
-            command.category = category || 'general';
+            // Set category from folder name if not already explicitly set in the command
+            if (!command.category || command.category === 'general') {
+                const relativePath = path.relative(path.join(process.cwd(), 'src', 'commands'), filePath);
+                const category = path.dirname(relativePath).split(path.sep)[0];
+                command.category = category || 'general';
+            }
 
             client.commands.set(command.name, command);
             for (const alias of command.aliases) {
@@ -72,6 +74,8 @@ export async function loadCommands(client: ExtendedClient) {
                         type: command.type,
                         options: sanitizedOptions,
                         default_member_permissions: defaultMemberPermissions,
+                        integration_types: command.integration_types,
+                        contexts: command.contexts,
                     });
                 } else {
                     // Context Menu (Message/User) - No description or options allowed
@@ -79,6 +83,8 @@ export async function loadCommands(client: ExtendedClient) {
                         name: command.name,
                         type: command.type,
                         default_member_permissions: defaultMemberPermissions,
+                        integration_types: command.integration_types,
+                        contexts: command.contexts,
                     });
                 }
             }

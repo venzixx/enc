@@ -2,13 +2,19 @@ import {
     PermissionFlagsBits, 
     EmbedBuilder, 
     GuildMember, 
-    ApplicationCommandOptionType 
+    ApplicationCommandOptionType,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ComponentType,
+    ButtonInteraction
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
 import { Appeals } from '../../utils/Appeals';
+import { V2Helper } from '../../utils/V2Helper';
 import ms from 'ms';
 
 export default class Mute extends Command {
@@ -58,27 +64,34 @@ export default class Mute extends Command {
 		const reason = ctx.options.getString('reason') || args.slice(2).join(' ') || 'No reason provided';
 
 		if (!target) {
-			return await ctx.reply({ content: `${client.emoji.cross} Could not find that member.`, flags: [64] });
+			return await ctx.replyV2({ description: 'Could not find that member in this server.', color: client.color.red, isAlert: true });
 		}
 
 		if (target.id === ctx.author.id) {
-			return await ctx.reply({ content: `${client.emoji.cross} You cannot mute yourself.`, flags: [64] });
+			return await ctx.replyV2({ description: 'Self-harm is not permitted. You cannot mute yourself.', color: client.color.red, isAlert: true });
 		}
 
 		if (ctx.author.id !== ctx.guild.ownerId && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
-			return await ctx.reply({ content: `${client.emoji.cross} You cannot mute someone with a higher or equal role.`, flags: [64] });
+			return await ctx.replyV2({ description: 'Hierarchy Violation: You cannot mute someone with a higher or equal role.', color: client.color.red, isAlert: true });
 		}
 
 		if (!target.manageable) {
-			return await ctx.reply({ content: `${client.emoji.cross} I cannot mute this user. Check my role position.`, flags: [64] });
+            if (ctx.author.id === ctx.guild.ownerId) {
+                return await this.askForceMute(client, ctx, target, null, reason, durationStr);
+            }
+			return await ctx.replyV2({ description: 'Hierarchy Block: My role position is below this user. Move me higher to enable moderation.', color: client.color.red, isAlert: true });
 		}
 
 		const time = durationStr ? ms(durationStr) : null;
 		if (!time || (time as any) < 10000 || (time as any) > 2419200000) {
-			return await ctx.reply({ content: `${client.emoji.cross} Invalid duration. Must be between 10s and 28 days.`, flags: [64] });
+			return await ctx.replyV2({ description: 'Invalid Duration: Must be between 10 seconds and 28 days (e.g., 10m, 1h, 1d).', color: client.color.red, isAlert: true });
 		}
 
 		try {
+            if (target.permissions.has(PermissionFlagsBits.Administrator) && ctx.author.id === ctx.guild.ownerId) {
+                 return await this.askForceMute(client, ctx, target, time, reason, durationStr);
+            }
+
             // Send DM before muting
             await Appeals.sendAppealDM(client, target.user, ctx.guild!, 'MUTE', reason);
             
@@ -95,7 +108,76 @@ export default class Mute extends Command {
 
             await logModerationAction(client, ctx.guild, 'MUTE', ctx.author, target.user, reason, durationStr);
 		} catch (error: any) {
-			await ctx.reply({ content: `${client.emoji.cross} Failed to mute: ${error.message}`, flags: [64] });
+            if (ctx.author.id === ctx.guild.ownerId && (error.message.includes('Permissions') || error.code === 50013)) {
+                return await this.askForceMute(client, ctx, target, time, reason, durationStr);
+            }
+			await ctx.replyV2({ title: 'Execution Error', description: `Failed to execute mute: ${error.message}`, color: client.color.red, isAlert: true });
 		}
 	}
+
+    private async askForceMute(client: ExtendedClient, ctx: Context, target: GuildMember, time: any, reason: string, durationStr: string) {
+        const confirmBtn = new ButtonBuilder()
+            .setCustomId('confirm_force_mute')
+            .setLabel('Confirm Force Mute')
+            .setStyle(ButtonStyle.Danger);
+
+        const cancelBtn = new ButtonBuilder()
+            .setCustomId('cancel_force_mute')
+            .setLabel('Cancel')
+            .setStyle(ButtonStyle.Secondary);
+
+        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(confirmBtn, cancelBtn);
+
+        const response = await ctx.replyV2({
+            title: ' Force Mute Required',
+            description: `The user ${target} has administrative permissions or a role structure that prevents a direct timeout. \n\n**Force Mute will:**\n1. Strip all manageable roles from the user.\n2. Apply the **${durationStr}** timeout.\n\nDo you wish to proceed?`,
+            color: client.color.orange,
+            buttons: [confirmBtn, cancelBtn]
+        }) as any;
+
+        const collector = response.createMessageComponentCollector({
+            componentType: ComponentType.Button,
+            time: 30000
+        });
+
+        collector.on('collect', async (i: ButtonInteraction) => {
+            if (i.user.id !== ctx.author.id) {
+                return i.reply({ content: 'Only the server owner can confirm this.', ephemeral: true });
+            }
+
+            if (i.customId === 'cancel_force_mute') {
+                await i.update({ 
+                    ...V2Helper.createLayout({ title: 'Operation Cancelled', description: 'Force mute was aborted by the owner.', color: client.color.main }) 
+                } as any);
+                return collector.stop();
+            }
+
+            await i.deferUpdate();
+
+            try {
+                // 1. Strip Roles
+                const rolesToKeep = target.roles.cache.filter(r => !r.editable || r.name === '@everyone');
+                await target.roles.set(rolesToKeep).catch(() => {});
+
+                // 2. Timeout
+                const finalTime = time || ms(durationStr as any);
+                await target.timeout(finalTime as number, `FORCE MUTE by Owner: ${reason}`);
+
+                await i.editReply({
+                    ...V2Helper.createLayout({ 
+                        title: `${client.emoji.success} Force Mute Executed`, 
+                        description: `Successfully stripped roles and timed out ${target} for **${durationStr}**.`, 
+                        color: client.color.main 
+                    })
+                } as any);
+
+                await logModerationAction(client, ctx.guild, 'FORCE_MUTE', ctx.author, target.user, reason, durationStr);
+            } catch (err: any) {
+                await i.editReply({
+                    ...V2Helper.createLayout({ title: 'Force Mute Failed', description: `Critical failure during role stripping or timeout: ${err.message}`, color: client.color.red, isAlert: true })
+                } as any);
+            }
+            collector.stop();
+        });
+    }
 }

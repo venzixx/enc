@@ -50,19 +50,19 @@ export default class Kick extends Command {
 		const reason = ctx.options.getString('reason') || args.slice(1).join(' ') || 'No reason provided';
 
 		if (!target) {
-			return await ctx.reply({ content: `${client.emoji.cross} Could not find that member.`, flags: [64] });
+			return await ctx.replyV2({ description: 'Could not find that member in this server.', color: client.color.red, isAlert: true });
 		}
 
 		if (target.id === ctx.author.id) {
-			return await ctx.reply({ content: `${client.emoji.cross} You cannot kick yourself.`, flags: [64] });
+			return await ctx.replyV2({ description: 'You cannot kick yourself.', color: client.color.red, isAlert: true });
 		}
 
 		if (ctx.author.id !== ctx.guild.ownerId && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
-			return await ctx.reply({ content: `${client.emoji.cross} You cannot kick someone with a higher or equal role.`, flags: [64] });
+			return await ctx.replyV2({ description: 'Hierarchy Violation: You cannot kick someone with a higher or equal role.', color: client.color.red, isAlert: true });
 		}
 
 		if (!target.kickable) {
-			return await ctx.reply({ content: `${client.emoji.cross} I cannot kick this user. Check my role position.`, flags: [64] });
+			return await ctx.replyV2({ description: 'Hierarchy Block: My role position is below this user. Move me higher to enable moderation.', color: client.color.red, isAlert: true });
 		}
 
 		try {
@@ -82,7 +82,7 @@ export default class Kick extends Command {
 
             await logModerationAction(client, ctx.guild, 'KICK', ctx.author, target.user, reason);
 		} catch (error: any) {
-			await ctx.reply({ content: `${client.emoji.cross} Failed to kick: ${error.message}`, flags: [64] });
+			await ctx.replyV2({ title: 'Execution Error', description: `Failed to execute kick: ${error.message}`, color: client.color.red, isAlert: true });
 		}
 	}
 }

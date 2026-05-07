@@ -1,7 +1,9 @@
 import { 
     ApplicationCommandType, 
     MessageContextMenuCommandInteraction, 
-    AttachmentBuilder 
+    AttachmentBuilder,
+    ApplicationIntegrationType,
+    InteractionContextType
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
@@ -19,7 +21,11 @@ export default class QuoteCommand extends Command {
 			category: 'general',
 			cooldown: 10,
 			slashCommand: true,
-			type: ApplicationCommandType.Message // Enable Context Menu
+			type: ApplicationCommandType.Message, // Enable Context Menu
+            // @ts-ignore - Support User Installable Apps
+            integration_types: [0, 1], // Guild & User
+            // @ts-ignore
+            contexts: [0, 1, 2] // Guild, BotDM, PrivateChannel
 		});
 	}
 
@@ -78,7 +84,7 @@ export default class QuoteCommand extends Command {
 
 			const attachment = new AttachmentBuilder(buffer, { name: 'quote.png' });
 
-            // 3. Send
+			// 3. Send
 			return await ctx.sendMessage({ 
                 files: [attachment] 
             });

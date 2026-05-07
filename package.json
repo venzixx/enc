@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "ts-node --files src/index.ts",
+    "dev": "ts-node --files --transpile-only src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node --max-old-space-size=2048 dist/index.js",
+    "shards": "node --max-old-space-size=2048 dist/shards.js",
     "postinstall": "prisma generate"
   },
   "keywords": [],
@@ -40,6 +41,7 @@
     "shoukaku": "^4.3.0",
     "signale": "^1.4.0",
     "undici": "^7.25.0",
+    "youtube-po-token-generator": "^0.3.0",
     "zod": "^4.3.6"
   }
 }

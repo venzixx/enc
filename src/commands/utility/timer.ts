@@ -8,7 +8,7 @@ export default class Timer extends Command {
             name: 'timer',
             aliases: ['cd', 'countdown'],
             description: {
-                content: 'Start a synchronized channel-wide countdown timer.',
+                content: 'Start a countdown timer.',
                 usage: 'timer <duration>',
                 examples: ['timer 10m', 'timer 1h']
             },
@@ -23,7 +23,11 @@ export default class Timer extends Command {
                     required: true
                 }
             ],
-            args: true
+            args: true,
+            // @ts-ignore - Support User Installable Apps with numeric fallbacks
+            integration_types: [0, 1], // Guild & User
+            // @ts-ignore
+            contexts: [0, 1, 2], // Guild, BotDM, PrivateChannel
         });
     }
 
@@ -44,32 +48,22 @@ export default class Timer extends Command {
 
         const endTime = Math.floor((Date.now() + duration) / 1000);
 
-        const embed = client.embed({
-            title: `⏳ Timer Initialized`,
-            description: `A synchronized countdown has been established by ${ctx.author}.\n\n**Duration:** \`${durationStr}\`\n**Remaining:** <t:${endTime}:R>`,
-            color: client.color.main,
-            footer: 'This timer is visible to all users in this channel.'
-        }, ctx);
+        // Start with a V2 Card showing the live countdown
+        await ctx.replyV2({
+            title: 'Timer Started',
+            description: `⏱️ Your **${durationStr}** timer will end <t:${endTime}:R>.`,
+            color: client.color.main
+        });
 
-        const msg = await ctx.reply({ embeds: [embed] });
-
-        // Wait for timer completion
+        // Set the timer
         setTimeout(async () => {
             try {
-                const finishEmbed = client.embed({
-                    title: `⏰ Timer Expired`,
-                    description: `The **${durationStr}** timer set by ${ctx.author} has concluded.`,
-                    color: client.color.yellow,
-                    footer: `Finality reached at <t:${endTime}:f>`
-                }, ctx);
-
-                // Send a new message to ping the user
-                await ctx.channel.send({
-                    content: `${client.emoji.clock} ${ctx.author}, your countdown is complete!`,
-                    embeds: [finishEmbed]
+                // For User Apps, we follow up with a notification
+                await ctx.followUp({
+                    content: `🔔 ${ctx.author}, your **${durationStr}** timer has ended!`,
                 });
             } catch (e) {
-                // Channel might be deleted or bot lost perms
+                // Silently fail if channel is inaccessible
             }
         }, duration);
     }

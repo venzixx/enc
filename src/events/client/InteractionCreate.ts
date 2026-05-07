@@ -36,16 +36,21 @@ export default class InteractionCreate extends Event {
 			interaction.type === InteractionType.ApplicationCommand &&
 			(interaction.isChatInputCommand() || interaction.isMessageContextMenuCommand())
 		) {
-			if (!interaction.guildId) return;
+			let locale = "en-US";
+			let setup = null;
 
-			const [setup, locale] = await Promise.all([
-				this.client.db.getSetup(interaction.guildId),
-				this.client.db.getLanguage(interaction.guildId),
-			]);
+			if (interaction.guildId) {
+				[setup, locale] = await Promise.all([
+					this.client.db.getSetup(interaction.guildId),
+					this.client.db.getLanguage(interaction.guildId),
+				]);
+			}
+
 			const allowedCategories = ["filters", "music", "playlist"];
 			const commandInSetup = this.client.commands.get(interaction.commandName);
 
 			if (
+				interaction.guildId &&
 				setup &&
 				interaction.channelId === setup.textId &&
 				!(commandInSetup && allowedCategories.includes(commandInSetup.category))
@@ -62,14 +67,12 @@ export default class InteractionCreate extends Event {
 
 			const ctx = new Context(this.client, interaction);
 			ctx.lng = locale || "en-US";
+			
 			const clientMember = interaction.guild ? interaction.guild.members.resolve(this.client.user!) : null;
 			
-			if (interaction.inGuild()) {
-				if (
-					!clientMember ||
-					!interaction.channel?.permissionsFor(clientMember)?.has(PermissionFlagsBits.ViewChannel)
-				)
-					return;
+			if (interaction.guild) {
+				const permissions = (ctx.channel as any).permissionsFor ? (ctx.channel as any).permissionsFor(ctx.client.user!) : null;
+				if (permissions && !permissions.has(['SendMessages', 'ViewChannel', 'EmbedLinks'])) return;
 			}
 
 			if (interaction.inGuild() && clientMember) {
@@ -89,8 +92,8 @@ export default class InteractionCreate extends Event {
 				}
 			}
 
-			if (command.permissions) {
-				if (command.permissions?.client) {
+			if (interaction.guild && command.permissions) {
+				if (command.permissions?.client && clientMember) {
 					const clientRequiredPermissions = Array.isArray(command.permissions.client)
 						? command.permissions.client
 						: [command.permissions.client];
@@ -119,7 +122,7 @@ export default class InteractionCreate extends Event {
 					!(interaction.member as GuildMember).permissions.has(command.permissions.user as any)
 				) {
 					await ctx.replyV2({
-						description: t(I18N.events.interaction.no_user_permission, { lng: locale }),
+						description: t(I18N.events.interaction.no_user_permission, { lng: locale, }),
 						isAlert: true,
 						color: this.client.color.red,
 						ephemeral: true,
@@ -133,7 +136,7 @@ export default class InteractionCreate extends Event {
 				}
 			}
 
-			if (command.player) {
+			if (interaction.guild && command.player) {
 				if (command.player.voice) {
 					if (!(interaction.member as GuildMember).voice.channel) {
 						return await ctx.replyV2({
@@ -185,7 +188,7 @@ export default class InteractionCreate extends Event {
 				}
 
 				if (command.player.active) {
-					const queue = this.client.lavalink.getPlayer(interaction.guildId);
+					const queue = this.client.lavalink.getPlayer(interaction.guildId!);
 					if (!queue?.queue.current) {
 						return await ctx.replyV2({
 							description: t(I18N.events.interaction.no_music_playing, { lng: locale }),
@@ -196,9 +199,9 @@ export default class InteractionCreate extends Event {
 				}
 
 				if (command.player.dj) {
-					const dj = await this.client.db.getDj(interaction.guildId);
+					const dj = await this.client.db.getDj(interaction.guildId!);
 					if (dj?.mode) {
-						const djRole = await this.client.db.getRoles(interaction.guildId);
+						const djRole = await this.client.db.getRoles(interaction.guildId!);
 						if (!djRole) {
 							return await ctx.replyV2({ 
 								description: t(I18N.events.interaction.no_dj_role, { lng: locale }),
@@ -260,7 +263,7 @@ export default class InteractionCreate extends Event {
 				const args = (interaction as any).options.data.map((opt: any) => opt.value?.toString()).filter(Boolean);
 				
 				// Audit Moderation Commands (Non-blocking)
-				if (command.category === 'moderation') {
+				if (interaction.guild && command.category === 'moderation') {
 					AuditLogger.log(this.client, interaction.guild!, {
 						type: AuditLogType.MODERATION,
 						event: `Command Executed: /${interaction.commandName}`,
@@ -317,7 +320,32 @@ export default class InteractionCreate extends Event {
                     if (error.code === 10062) return; // Interaction expired, ignore
 					logger.error(error);
 				}
-			}
+			} else if (interaction.guildId) {
+                // @ts-ignore
+                const prefix = ctx.prefix || client.config.prefix;
+                if (!client.db || !ctx.guildId) {
+                // Check database for interactive actions
+                try {
+                    // @ts-ignore
+                    const forcedData = await this.client.prisma.forcedNickname.findUnique({
+                        where: {
+                            guildId_customId: {
+                                guildId: interaction.guildId,
+                                customId: customId
+                            }
+                        }
+                    });
+
+                    if (dbAction) {
+                        const logic = JSON.parse(dbAction.logic);
+                        // Execute Action Flow
+                        const { ActionFlowExecutor } = await import('../../utils/ActionFlowExecutor');
+                        await ActionFlowExecutor.execute(this.client, interaction as any, logic);
+                    }
+                } catch (error) {
+                    logger.error(`[ACTION_FLOW_ERROR] ${error}`);
+                }
+            }
 
 		} else if (interaction.type === InteractionType.ApplicationCommandAutocomplete) {
 			const command = this.client.commands.get(interaction.commandName);

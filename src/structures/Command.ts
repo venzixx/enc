@@ -2,7 +2,9 @@ import {
 	type APIApplicationCommandOption,
 	type AutocompleteInteraction,
 	type PermissionResolvable,
-	ApplicationCommandType
+	ApplicationCommandType,
+	ApplicationIntegrationType,
+	InteractionContextType
 } from "discord.js";
 import { PermissionFlagsBits } from "discord.js";
 import type { ExtendedClient } from "../client";
@@ -42,6 +44,8 @@ interface CommandOptions {
 	options?: APIApplicationCommandOption[];
 	category?: string;
 	hidden?: boolean;
+	integration_types?: ApplicationIntegrationType[];
+	contexts?: InteractionContextType[];
 }
 
 export default class Command {
@@ -61,6 +65,8 @@ export default class Command {
 	public options: APIApplicationCommandOption[];
 	public category: string;
 	public hidden: boolean;
+	public integration_types: ApplicationIntegrationType[];
+	public contexts: InteractionContextType[];
 
 	constructor(client: ExtendedClient, options: CommandOptions) {
 		this.client = client;
@@ -96,6 +102,8 @@ export default class Command {
 		this.options = options.options ?? [];
 		this.category = options.category ?? "general";
 		this.hidden = options.hidden ?? false;
+		this.integration_types = options.integration_types ?? [ApplicationIntegrationType.GuildInstall];
+		this.contexts = options.contexts ?? [InteractionContextType.Guild];
 	}
 
 	public async run(_client: ExtendedClient, _message: any, _args: string[]): Promise<any> {

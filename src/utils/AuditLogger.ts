@@ -28,11 +28,11 @@ export class AuditLogger {
             type: AuditLogType;
             event: string;
             status?: AuditLogStatus;
-            executorId?: string;
-            executorTag?: string;
-            targetId?: string;
-            targetName?: string;
-            details?: string;
+            executorId?: string | null;
+            executorTag?: string | null;
+            targetId?: string | null;
+            targetName?: string | null;
+            details?: string | null;
             color?: ColorResolvable;
             transcript?: string;
             files?: any[];
@@ -91,10 +91,19 @@ export class AuditLogger {
             }
 
             if (specificChannelId) {
-                const logChannel = guild.channels.cache.get(specificChannelId) as TextChannel;
+                let logChannel = guild.channels.cache.get(specificChannelId) as TextChannel;
+                if (!logChannel) {
+                    try {
+                        logChannel = await guild.channels.fetch(specificChannelId) as TextChannel;
+                    } catch {
+                        // Channel might have been deleted or bot lacks access
+                        return;
+                    }
+                }
+
                 if (logChannel && logChannel.isTextBased()) {
                     const embed = new EmbedBuilder()
-                        .setTitle(`Audit Log // ${data.event}`)
+                        .setTitle(` Audit Log // ${data.event}`)
                         .setColor(data.color || client.color.main)
                         .addFields(
                             { name: 'Category', value: `\`${data.type}\``, inline: true },

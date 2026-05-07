@@ -1,194 +1,120 @@
-import { ChannelType, OverwriteType, PermissionFlagsBits } from "discord.js";
-import { I18N } from "../../structures/I18n";
+import { 
+    ActionRowBuilder, 
+    StringSelectMenuBuilder, 
+    PermissionFlagsBits,
+    ApplicationCommandOptionType 
+} from "discord.js";
 import { Command, Context } from "../../structures";
-import { getButtons } from "../../utils/Buttons";
-import {
-	EmbedLinks,
-	ManageChannels,
-	ManageGuild,
-	ReadMessageHistory,
-	SendMessages,
-	ViewChannel,
-} from "../../utils/Permissions";
 import { ExtendedClient } from "../../client";
+import { V2Helper } from "../../utils/V2Helper";
 
 export default class Setup extends Command {
-	constructor(client: ExtendedClient) {
-		super(client, {
-			name: "setup",
-			description: {
-				content: I18N.commands.setup.description,
-				examples: ["setup create", "setup delete", "setup info"],
-				usage: "setup",
-			},
-			category: "config",
-			aliases: ["set"],
-			cooldown: 3,
-			args: true,
-			vote: true,
-			player: {
-				voice: false,
-				dj: false,
-				active: false,
-				djPerm: null,
-			},
-			permissions: {
-				dev: false,
-				client: [SendMessages, ReadMessageHistory, ViewChannel, EmbedLinks, ManageChannels],
-				user: [ManageGuild],
-			},
-			slashCommand: false,
-			hidden: true,
-			options: [
-				{
-					name: "create",
-					description: I18N.commands.setup.options.create,
-					type: 1,
-				},
-				{
-					name: "delete",
-					description: I18N.commands.setup.options.delete,
-					type: 1,
-				},
-				{
-					name: "info",
-					description: I18N.commands.setup.options.info,
-					type: 1,
-				},
-			],
-		} as any);
-	}
+    constructor(client: ExtendedClient) {
+        super(client, {
+            name: "setup",
+            description: {
+                content: "Central configuration hub for all bot modules.",
+                examples: ["setup", "setup music"],
+                usage: "setup",
+            },
+            category: "config",
+            aliases: ["config", "dashboard"],
+            cooldown: 5,
+            permissions: {
+                user: [PermissionFlagsBits.ManageGuild],
+            },
+            slashCommand: true,
+            options: [
+                {
+                    name: "music",
+                    description: "Set up the music song-request channel.",
+                    type: ApplicationCommandOptionType.Subcommand,
+                    options: [
+                        {
+                            name: "action",
+                            description: "Create or delete the music channel",
+                            type: ApplicationCommandOptionType.String,
+                            required: true,
+                            choices: [
+                                { name: "Create", value: "create" },
+                                { name: "Delete", value: "delete" }
+                            ]
+                        }
+                    ]
+                }
+            ],
+        });
+    }
 
-	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-		const subCommand = ctx.isInteraction ? ctx.options.getSubCommand() : args[0];
-		const embed = client.embed().setColor(this.client.config.color.main);
-		switch (subCommand) {
-			case "create": {
-				const data = await client.db.getSetup(ctx.guild.id);
-				if (data?.textId && data.messageId) {
-					return await ctx.sendMessage({
-						embeds: [
-							{
-								description: ctx.locale(I18N.commands.setup.errors.channel_exists),
-								color: client.config.color.red,
-							},
-						],
-					});
-				}
-				const textChannel = await ctx.guild.channels.create({
-					name: `${client.user?.username}-song-requests`,
-					type: ChannelType.GuildText,
-					topic: "Song requests for the music bot.",
-					permissionOverwrites: [
-						{
-							type: OverwriteType.Member,
-							id: client.user?.id ?? "",
-							allow: [
-								PermissionFlagsBits.ViewChannel,
-								PermissionFlagsBits.SendMessages,
-								PermissionFlagsBits.EmbedLinks,
-								PermissionFlagsBits.ReadMessageHistory,
-							],
-						},
-						{
-							type: OverwriteType.Role,
-							id: ctx.guild.roles.everyone.id,
-							allow: [
-								PermissionFlagsBits.ViewChannel,
-								PermissionFlagsBits.SendMessages,
-								PermissionFlagsBits.ReadMessageHistory,
-							],
-						},
-					],
-				});
-				const player = this.client.lavalink.getPlayer(ctx.guild.id);
-				const image = this.client.config.links.img;
-				const desc = player?.queue.current
-					? `[${player.queue.current.info.title}](${player.queue.current.info.uri})`
-					: ctx.locale(I18N.player.setupStart.nothing_playing);
-				embed.setDescription(desc).setImage(image);
-				await textChannel
-					.send({
-						embeds: [embed],
-						components: getButtons(player as any),
-					})
-					.then((msg: any) => {
-						client.db.setSetup(ctx.guild.id, textChannel.id, msg.id);
-					});
-				await ctx.sendMessage({
-					embeds: [
-						{
-							description: ctx.locale(I18N.commands.setup.messages.channel_created, {
-								channelId: textChannel.id,
-							}),
-							color: this.client.config.color.main,
-						},
-					],
-				});
-				break;
-			}
-			case "delete": {
-				const data2 = await client.db.getSetup(ctx.guild.id);
-				if (!data2) {
-					return await ctx.sendMessage({
-						embeds: [
-							{
-								description: ctx.locale(I18N.commands.setup.errors.channel_not_exists),
-								color: client.config.color.red,
-							},
-						],
-					});
-				}
-				client.db.deleteSetup(ctx.guild.id);
-				const textChannel = ctx.guild.channels.cache.get(data2.textId);
-				if (textChannel)
-					await textChannel.delete().catch(() => {
-						null;
-					});
-				await ctx.sendMessage({
-					embeds: [
-						{
-							description: ctx.locale(I18N.commands.setup.messages.channel_deleted),
-							color: this.client.config.color.main,
-						},
-					],
-				});
-				break;
-			}
-			case "info": {
-				const data3 = await client.db.getSetup(ctx.guild.id);
-				if (!data3) {
-					return await ctx.sendMessage({
-						embeds: [
-							{
-								description: ctx.locale(I18N.commands.setup.errors.channel_not_exists),
-								color: client.config.color.red,
-							},
-						],
-					});
-				}
-				const channel = ctx.guild.channels.cache.get(data3.textId);
-				if (channel) {
-					embed.setDescription(
-						ctx.locale(I18N.commands.setup.messages.channel_info, {
-							channelId: channel.id,
-						}),
-					);
-					await ctx.sendMessage({ embeds: [embed] });
-				} else {
-					await ctx.sendMessage({
-						embeds: [
-							{
-								description: ctx.locale(I18N.commands.setup.errors.channel_not_exists),
-								color: client.config.color.red,
-							},
-						],
-					});
-				}
-				break;
-			}
-			default:
-				break;
-		}
-	}
+    public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+        const subCommand = ctx.options.getSubcommand();
+
+        if (subCommand === 'music') {
+            const action = ctx.options.getString('action');
+            // Handle legacy music setup logic if needed, or just redirect
+            return await ctx.replyV2({
+                title: "Music Setup Redirect",
+                description: `Use the setup dashboard to manage music and all other modules!`,
+                isAlert: true
+            });
+        }
+
+        return await ctx.replyV2(this.getDashboardLayout());
+    }
+
+    private getDashboardLayout() {
+        const menu = new StringSelectMenuBuilder()
+            .setCustomId("setup_category")
+            .setPlaceholder("Select a category to configure...")
+            .addOptions([
+                {
+                    label: "General Settings",
+                    description: "Prefix, Welcomer, and Basic Info",
+                    value: "setup_general",
+                    emoji: "⚙️"
+                },
+                {
+                    label: "Moderation & Safety",
+                    description: "Auto-Mod, Anti-Nuke, and Logging",
+                    value: "setup_mod",
+                    emoji: "🛡️"
+                },
+                {
+                    label: "Social & Expressions",
+                    description: "Reactions, Counting, and Story",
+                    value: "setup_social",
+                    emoji: "🎭"
+                },
+                {
+                    label: "Utility & Engagement",
+                    description: "Starboard, Suggestions, and Leveling",
+                    value: "setup_utility",
+                    emoji: "🛠️"
+                },
+                {
+                    label: "Music & Multimedia",
+                    description: "Song Requests and Player Config",
+                    value: "setup_music",
+                    emoji: "🎵"
+                }
+            ]);
+
+        return {
+            title: "Server Setup Dashboard",
+            description: [
+                "Welcome to the **Enc Control Panel**. Use the menu below to configure each module of the bot for your server.",
+                "",
+                "### 🚀 Getting Started",
+                "• **General**: Set your custom prefix and welcome messages.",
+                "• **Moderation**: Enable powerful protection for your server.",
+                "• **Social**: Configure the anime reaction system and games.",
+                "",
+                "> Select a category below to see detailed setup commands."
+            ].join("\n"),
+            color: this.client.color.main,
+            thumbnail: this.client.user?.displayAvatarURL(),
+            selectMenu: menu,
+            footer: "Enc Management Suite • Monochromatic V2"
+        };
+    }
 }

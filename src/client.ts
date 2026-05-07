@@ -28,6 +28,7 @@ export class ExtendedClient extends Client {
     public invites: Map<string, Collection<string, number>> = new Map();
     public captchaCodes: Map<string, string> = new Map();
     public embedDrafts: Map<string, any> = new Map();
+    public voiceSessions: Map<string, number> = new Map(); // key: userId, value: joinTimestamp
 
     constructor(options: ClientOptions) {
         super(options);

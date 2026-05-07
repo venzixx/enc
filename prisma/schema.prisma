@@ -156,6 +156,26 @@ model Guild {
   streakTiers           StreakTier[]
   userStreaks           UserStreak[]
   userDailyActivities   UserDailyActivity[]
+  commandAliases        CommandAlias[]
+  channelDailyActivities ChannelDailyActivity[]
+  reactionDailyActivities ReactionDailyActivity[]
+  voiceDailyActivities   VoiceDailyActivity[]
+  streaksEnabled        Boolean           @default(true)
+  streakChannelId       String?
+  autoReacts            AutoReact[]
+  reactLocks            ReactLock[]
+  uwuLocks              UwuLock[]
+  forcedNicknames       ForcedNickname[]
+}
+
+model CommandAlias {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  alias       String
+  commandName String
+  guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, alias])
 }
 
 model Appeal {
@@ -261,15 +281,23 @@ model Story {
 }
 
 model Member {
-  id       Int    @id @default(autoincrement())
-  guildId  String
-  userId   String
-  xp       Int    @default(0)
-  level    Int    @default(0)
-  messages Int    @default(0)
-  invites  Int    @default(0)
+  id           Int    @id @default(autoincrement())
+  guildId      String
+  userId       String
+  xp           Int    @default(0)
+  level        Int    @default(0)
+  messages     Int    @default(0)
+  invites      Int    @default(0)
+  lastUsername String?
+  lastAvatar   String?
 
   @@unique([guildId, userId])
+}
+
+model Channel {
+  id      String @id
+  guildId String
+  name    String
 }
 
 model IgnoredChannel {
@@ -678,4 +706,103 @@ model UserDailyActivity {
   guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@unique([guildId, userId, date])
+}
+
+model ChannelDailyActivity {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  channelId   String
+  date        String   // YYYY-MM-DD
+  messageCount Int     @default(0)
+  guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, channelId, date])
+}
+
+model ReactionDailyActivity {
+  id            Int      @id @default(autoincrement())
+  guildId       String
+  date          String   // YYYY-MM-DD
+  reactionCount Int      @default(0)
+  guild         Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, date])
+}
+
+model VoiceDailyActivity {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  date        String   // YYYY-MM-DD
+  seconds     Int      @default(0)
+  guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, date])
+}
+
+model AutoReact {
+  id        Int    @id @default(autoincrement())
+  guildId   String
+  trigger   String
+  emoji     String
+  guild     Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, trigger, emoji])
+}
+
+model ReactLock {
+  id         Int    @id @default(autoincrement())
+  guildId    String
+  targetId   String
+  targetType String // "user" or "role"
+  emoji      String
+  guild      Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, targetId, emoji])
+}
+
+model UwuLock {
+  id       Int    @id @default(autoincrement())
+  guildId  String
+  userId   String
+  lockType String @default("uwu") // "uwu", "nsfw", "mommy"
+  guild    Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, userId])
+}
+
+model DevUser {
+  id     Int    @id @default(autoincrement())
+  userId String @unique
+}
+
+model DevMute {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  userId    String
+  reason    String   @default("No reason provided")
+  expiresAt DateTime
+  mutedBy   String
+
+  @@unique([guildId, userId])
+}
+
+model ForcedNickname {
+  id        Int    @id @default(autoincrement())
+  guildId   String
+  userId    String
+  nickname  String
+  guild     Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, userId])
+}
+
+model SocialAction {
+  id        Int    @id @default(autoincrement())
+  userId    String // Target user ID
+  fromId    String // Sender user ID
+  action    String // hug, kiss, etc.
+  count     Int    @default(0)
+
+  @@unique([userId, fromId, action])
+  @@index([userId, action])
 }

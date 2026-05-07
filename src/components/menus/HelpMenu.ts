@@ -24,8 +24,14 @@ export default class HelpMenu extends Component {
 
         const commandsList = commands.map(c => {
             let text = `**\`/${c.name}\`** \u2022 ${c.description.content}`;
+
+            // Special handling for the 'do' command to show reactions as prefix commands
+            if (c.name === 'do') {
+                const reactions = c.aliases.map(r => `\`${r}\``).join(', ');
+                text += `\n\u3000\u2514 **Prefix Reactions**: ${reactions}`;
+            }
             
-            if (c.options && c.options.length > 0) {
+            if (c.options && c.options.length > 0 && c.name !== 'do') { // Skip listing 25 subcommands for 'do' to keep it clean
                 const subItems = c.options.filter(opt => 
                     opt.type === ApplicationCommandOptionType.Subcommand || 
                     opt.type === ApplicationCommandOptionType.SubcommandGroup

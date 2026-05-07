@@ -1,9 +1,9 @@
-import { MessageReaction, TextChannel, EmbedBuilder } from 'discord.js';
+import { MessageReaction, TextChannel, EmbedBuilder, Message } from 'discord.js';
 import { ExtendedClient } from '../client';
 
 export class StarboardManager {
     public static async handle(reaction: MessageReaction, client: ExtendedClient): Promise<void> {
-        if (reaction.emoji.name !== '⭐') return;
+        // Listen to ALL emojis — no filter
         
         try {
             if (reaction.partial) await reaction.fetch();
@@ -12,29 +12,69 @@ export class StarboardManager {
             return;
         }
 
-        const message = reaction.message;
+        const message = reaction.message as Message;
         const guild = message.guild;
         if (!guild || !message.author) return;
-
-        // Skip self-stars maybe? The user didn't mention it, but generally handled loosely or let happen.
-        // if (reaction.users.cache.has(message.author.id)) ...
 
         const guildConf = await client.prisma.guild.findUnique({ where: { id: guild.id } });
         if (!guildConf || !guildConf.starboardChannelId || !guildConf.starboardCount) return;
 
-        const count = reaction.count || 0;
-        if (count < guildConf.starboardCount && count > 0) {
-            // Might need to update star count if it already exists, decreasing.
-            await this.updateStarboardMessage(client, guild.id, guildConf.starboardChannelId, message as any, count);
+        // Don't track messages in the starboard channel itself
+        if (message.channelId === guildConf.starboardChannelId) return;
+
+        // Count ALL reactions on this message (total across all emojis)
+        let totalReactions = 0;
+        let topEmoji = '⭐';
+        let topCount = 0;
+
+        for (const [, r] of message.reactions.cache) {
+            const count = r.count || 0;
+            totalReactions += count;
+            if (count > topCount) {
+                topCount = count;
+                topEmoji = r.emoji.toString();
+            }
+        }
+
+        const threshold = guildConf.starboardCount;
+
+        // Build all emoji counts for display
+        const emojiBreakdown = message.reactions.cache
+            .filter(r => (r.count || 0) > 0)
+            .sort((a, b) => (b.count || 0) - (a.count || 0))
+            .map(r => `${r.emoji.toString()} **${r.count}**`)
+            .slice(0, 5) // Show top 5 emojis
+            .join('  ');
+
+        if (totalReactions === 0) {
+            // All reactions removed — delete starboard post if exists
+            const starRecord = await client.prisma.starboardMessage.findUnique({
+                where: { originalMessageId: message.id }
+            });
+            if (starRecord) {
+                await client.prisma.starboardMessage.delete({ where: { originalMessageId: message.id } });
+                const starboardChannel = client.channels.cache.get(guildConf.starboardChannelId) as TextChannel;
+                if (starboardChannel) {
+                    const oldMsg = await starboardChannel.messages.fetch(starRecord.starboardMessageId).catch(() => null);
+                    if (oldMsg) await oldMsg.delete().catch(() => null);
+                }
+            }
             return;
         }
 
-        if (count >= guildConf.starboardCount) {
-            await this.updateStarboardMessage(client, guild.id, guildConf.starboardChannelId, message as any, count);
-        }
+        await this.updateStarboardMessage(client, guild.id, guildConf.starboardChannelId, message, totalReactions, threshold, topEmoji, emojiBreakdown);
     }
 
-    private static async updateStarboardMessage(client: ExtendedClient, guildId: string, starboardChannelId: string, message: any, count: number): Promise<void> {
+    private static async updateStarboardMessage(
+        client: ExtendedClient,
+        guildId: string,
+        starboardChannelId: string,
+        message: Message,
+        totalCount: number,
+        threshold: number,
+        topEmoji: string,
+        emojiBreakdown: string
+    ): Promise<void> {
         const starboardChannel = client.channels.cache.get(starboardChannelId) as TextChannel;
         if (!starboardChannel) return;
 
@@ -42,60 +82,58 @@ export class StarboardManager {
             where: { originalMessageId: message.id }
         });
 
-        // 0 stars, delete
-        if (count === 0 && starRecord) {
-            await client.prisma.starboardMessage.delete({ where: { originalMessageId: message.id } });
-            const oldMsg = await starboardChannel.messages.fetch(starRecord.starboardMessageId).catch(() => null);
-            if (oldMsg) await oldMsg.delete().catch(() => null);
-            return;
-        }
-
+        // Build the embed
         const embed = new EmbedBuilder()
             .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL() })
             .setDescription(message.content || '*No text content*')
             .addFields(
-                { name: 'Original', value: `[Jump to message](${message.url})`, inline: true }
+                { name: 'Original', value: `[Jump to message](${message.url})`, inline: true },
+                { name: 'Reactions', value: emojiBreakdown || 'None', inline: true }
             )
             .setColor('#ffd700')
-            .setFooter({ text: message.id })
+            .setFooter({ text: `${message.id} • Total: ${totalCount} reactions` })
             .setTimestamp(message.createdAt);
-        
+
         const attachment = message.attachments.first();
         if (attachment) {
-            embed.setImage(attachment.url);
+            if (attachment.contentType?.startsWith('image/')) {
+                embed.setImage(attachment.url);
+            } else {
+                embed.addFields({ name: 'Attachment', value: `[${attachment.name}](${attachment.url})`, inline: false });
+            }
         }
 
-        const content = `⭐ **${count}** <#${message.channelId}>`;
+        const headerContent = `${topEmoji} **${totalCount}** <#${message.channelId}>`;
 
-        if (!starRecord && count >= (await this.getRequiredStars(client, guildId))) {
-            const sent = await starboardChannel.send({ content, embeds: [embed] });
+        if (!starRecord && totalCount >= threshold) {
+            // First time hitting threshold — create starboard post
+            const sent = await starboardChannel.send({ content: headerContent, embeds: [embed] });
             await client.prisma.starboardMessage.create({
                 data: {
                     guildId,
                     originalMessageId: message.id,
                     starboardMessageId: sent.id,
-                    starCount: count
+                    starCount: totalCount
                 }
             });
         } else if (starRecord) {
-            const oldMsg = await starboardChannel.messages.fetch(starRecord.starboardMessageId).catch(() => null);
-            if (oldMsg) {
-                await oldMsg.edit({ content, embeds: [embed] }).catch(() => null);
-            }
-            await client.prisma.starboardMessage.update({
-                where: { originalMessageId: message.id },
-                data: { starCount: count }
-            });
-            // If count falls below threshold? Keep it or delete it? We updated the count and edited. The user might want it deleted.
-            const req = await this.getRequiredStars(client, guildId);
-            if (count < req && count > 0) {
-                // Dimscord starboard logic - usually if it drops below, sometimes we delete or leave untouched. Leaving it but updating count is fine.
+            // Already on starboard — update it
+            if (totalCount < threshold) {
+                // Dropped below threshold — remove from starboard
+                await client.prisma.starboardMessage.delete({ where: { originalMessageId: message.id } });
+                const oldMsg = await starboardChannel.messages.fetch(starRecord.starboardMessageId).catch(() => null);
+                if (oldMsg) await oldMsg.delete().catch(() => null);
+            } else {
+                // Update the count
+                const oldMsg = await starboardChannel.messages.fetch(starRecord.starboardMessageId).catch(() => null);
+                if (oldMsg) {
+                    await oldMsg.edit({ content: headerContent, embeds: [embed] }).catch(() => null);
+                }
+                await client.prisma.starboardMessage.update({
+                    where: { originalMessageId: message.id },
+                    data: { starCount: totalCount }
+                });
             }
         }
-    }
-
-    private static async getRequiredStars(client: ExtendedClient, guildId: string): Promise<number> {
-        const conf = await client.prisma.guild.findUnique({ where: { id: guildId } });
-        return conf?.starboardCount || 10;
     }
 }
