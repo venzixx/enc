@@ -841,9 +841,21 @@ model SocialAction {
 model SavedEmbed {
   id        Int      @id @default(autoincrement())
   guildId   String
+  name      String
   tag       String
   data      String   // JSON string of embed data
   createdAt DateTime @default(now())
 
   @@unique([guildId, tag])
+}
+
+model ComponentAction {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  customId  String
+  logic     String   // JSON string of action logic
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, customId])
 }
