@@ -20,20 +20,30 @@ export default class Tree extends Command {
         const user = ctx.options.getUser('user', 0);
         
         let page = 1;
-        // Find if page index was specified as the second parameter or the only parameter if no user is mentioned
-        if (args.length > 0) {
-            // Check if first arg is number
-            const firstArgAsNum = parseInt(args[0], 10);
-            if (!isNaN(firstArgAsNum) && firstArgAsNum > 0) {
-                page = firstArgAsNum;
-            } else if (args.length > 1) {
-                const secondArgAsNum = parseInt(args[1], 10);
-                if (!isNaN(secondArgAsNum) && secondArgAsNum > 0) {
-                    page = secondArgAsNum;
-                }
-            }
+        let font = 'Inter';
+        const subArgs = [...args];
+
+        const fontIndex = subArgs.findIndex(arg => arg.toLowerCase().startsWith('font=') || arg.toLowerCase().startsWith('font="'));
+        if (fontIndex !== -1) {
+            const fontArg = subArgs.splice(fontIndex, 1)[0];
+            const match = fontArg.match(/font=["']?([^"']+)["']?/i);
+            if (match) font = match[1].trim();
+        }
+
+        const pageIndex = subArgs.findIndex(arg => !isNaN(parseInt(arg, 10)) && !arg.includes('<@') && !arg.includes('@'));
+        if (pageIndex !== -1) {
+            page = parseInt(subArgs.splice(pageIndex, 1)[0], 10);
+        }
+
+        const userIndex = subArgs.findIndex(arg => arg.startsWith('<@') || /^\d{17,19}$/.test(arg));
+        if (userIndex !== -1) {
+            subArgs.splice(userIndex, 1);
+        }
+
+        if (font === 'Inter' && subArgs.length > 0) {
+            font = subArgs.join(' ').trim();
         }
         
-        return await marriageHelper.drawTree(client, ctx, user, page);
+        return await marriageHelper.drawTree(client, ctx, user, page, font);
     }
 }
