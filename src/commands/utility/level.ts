@@ -71,7 +71,8 @@ export default class Level extends Command {
             }
         }) + 1;
 
-		const nextLevelXP = (data.level + 1) * (data.level + 1) * 100;
+		const calcLevelXP = (lvl: number) => Math.floor(18 * Math.pow(lvl, 2) + 200 * lvl);
+		const nextLevelXP = calcLevelXP(data.level + 1);
 
         // 3. Manifest the Card
         try {

@@ -7,19 +7,20 @@ import {
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
+import SocialUtils from '../../utils/SocialUtils';
 
 const TARGETED_REACTIONS = [
-    'airkiss', 'bite', 'brofist', 'cuddle', 'handhold', 'hug', 'kiss', 'lick', 
-    'love', 'nom', 'nuzzle', 'pat', 'pinch', 'poke', 'punch', 'slap', 'smack', 'tickle'
+    'airkiss', 'baka', 'bite', 'bonk', 'brofist', 'cuddle', 'feed', 'handhold', 'highfive', 'hug', 'kick', 'kill', 'kiss', 'lick', 
+    'love', 'nom', 'nuzzle', 'pat', 'pinch', 'poke', 'punch', 'slap', 'smack', 'spank', 'tickle', 'yeet'
 ];
 
 const SELF_REACTIONS = [
-    'angrystare', 'bleh', 'blush', 'celebrate', 'cheers', 'clap', 'confused', 'cool', 
+    'angrystare', 'bleh', 'blush', 'bored', 'celebrate', 'cheers', 'clap', 'confused', 'cool', 
     'cry', 'dance', 'drool', 'evillaugh', 'facepalm', 'happy', 'headbang', 'huh', 
-    'laugh', 'mad', 'nervous', 'no', 'nosebleed', 'nyah', 'peek', 'pout', 'roll', 
+    'laugh', 'mad', 'nervous', 'no', 'nod', 'nope', 'nosebleed', 'nyah', 'peek', 'pout', 'roll', 
     'run', 'sad', 'scared', 'shout', 'shrug', 'shy', 'sigh', 'sing', 'sip', 'sleep', 
     'slowclap', 'smile', 'smug', 'sneeze', 'sorry', 'stare', 'stop', 'surprised', 
-    'sweat', 'thumbsup', 'tired', 'wave', 'wink', 'woah', 'yawn', 'yay', 'yes'
+    'sweat', 'think', 'thumbsup', 'tired', 'wave', 'wink', 'woah', 'yawn', 'yay', 'yes', 'suicide'
 ];
 
 const TOP_25_REACTIONS = [
@@ -99,15 +100,9 @@ export default class Do extends Command {
 
         try {
             // 2. Fetch GIF
-            let gifUrl = '';
-            try {
-                const res = await fetch(`https://api.otakugifs.xyz/gif?reaction=${action}`);
-                const data = await res.json() as any;
-                gifUrl = data.url;
-            } catch {
-                const res = await fetch(`https://nekos.best/api/v2/${action === 'hug' ? 'hug' : action}`);
-                const data = await res.json() as any;
-                gifUrl = data.results[0].url;
+            const gifUrl = await SocialUtils.fetchGif(client, action);
+            if (!gifUrl) {
+                return ctx.replyV2({ description: `Could not find a GIF for **${action}**.`, isAlert: true });
             }
 
             // 3. Database Tracking
@@ -167,8 +162,9 @@ export default class Do extends Command {
                     }
 
                     await i.deferUpdate();
-                    const resBack = await fetch(`https://api.otakugifs.xyz/gif?reaction=${action}`);
-                    const dataBack = await resBack.json() as any;
+                    
+                    const gifUrlBack = await SocialUtils.fetchGif(client, action);
+                    if (!gifUrlBack) return; // Should rarely happen if it worked once
                     
                     const pairBack = await (client.prisma as any).socialAction.upsert({
                         where: { userId_fromId_action: { userId: ctx.author.id, fromId: targetUser!.id, action } },
@@ -181,7 +177,7 @@ export default class Do extends Command {
                         embeds: [
                             client.embed()
                                 .setDescription(`💞 **${targetUser!.username}** ${action}ed **${ctx.author.username}** back!\n\n*They've ${action}ed you **${pairBack.count}** times now!*`)
-                                .setImage(dataBack.url)
+                                .setImage(gifUrlBack)
                                 .setColor(client.color.main)
                         ]
                     });

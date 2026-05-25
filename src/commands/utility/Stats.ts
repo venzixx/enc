@@ -1,5 +1,5 @@
-import { 
-    EmbedBuilder, 
+import {
+    EmbedBuilder,
     ApplicationCommandOptionType,
     AttachmentBuilder
 } from 'discord.js';
@@ -99,9 +99,12 @@ export default class Stats extends Command {
         const member = await Resolver.resolveMember(ctx, ctx.options.getMember('target') || args[1]) || ctx.member!;
         const user = member.user;
 
-        const data = await client.prisma.member.findUnique({
-            where: { guildId_userId: { guildId: ctx.guild.id, userId: user.id } }
-        });
+        const [data, guild] = await Promise.all([
+            client.prisma.member.findUnique({
+                where: { guildId_userId: { guildId: ctx.guild.id, userId: user.id } }
+            }),
+            client.db.getLevelConfig(ctx.guild.id)
+        ]);
 
         if (!data) {
             return await ctx.replyV2({ description: `**${user.tag}** has no leveling records.`, color: client.color.red });
@@ -111,7 +114,8 @@ export default class Stats extends Command {
             where: { guildId: ctx.guild.id, xp: { gt: data.xp } }
         }) + 1;
 
-        const nextLevelXP = (data.level + 1) * (data.level + 1) * 100;
+        const calcLevelXP = (lvl: number) => Math.floor((18 * Math.pow(lvl, 2) + 200 * lvl) * (guild?.xpFormulaMultiplier ?? 1.0));
+        const nextLevelXP = calcLevelXP(data.level + 1);
 
         try {
             const cardBuffer = await RankCardGenerator.generate({
@@ -120,7 +124,8 @@ export default class Stats extends Command {
                 level: data.level,
                 rank: rank,
                 currentXp: data.xp,
-                requiredXp: nextLevelXP
+                requiredXp: nextLevelXP,
+                color: guild?.rankCardProgressColor || undefined,
             });
 
             const attachment = new AttachmentBuilder(cardBuffer, { name: `rank-${user.id}.png` });
@@ -136,11 +141,11 @@ export default class Stats extends Command {
 
     private async handleLeaderboard(client: ExtendedClient, ctx: Context) {
         const type = ctx.options.getString('category') || 'messages';
-        
+
         let title = '';
         let description = '';
 
-        switch(type) {
+        switch (type) {
             case 'invite':
                 title = 'Invite Leaderboard';
                 const topInvites = await client.prisma.member.findMany({
@@ -151,13 +156,28 @@ export default class Stats extends Command {
                 description = topInvites.map((m, i) => `**#${i + 1}** <@${m.userId}> \u2022 \`${m.invites}\` joins`).join('\n');
                 break;
             case 'level':
-                title = 'Rank Leaderboard';
+                title = 'Global Rank Leaderboard';
                 const topLevels = await client.prisma.member.findMany({
-                    where: { guildId: ctx.guild.id, level: { gt: 0 } },
-                    orderBy: [{ level: 'desc' }, { xp: 'desc' }],
+                    where: { guildId: ctx.guild.id, xp: { gt: 0 } },
+                    orderBy: { xp: 'desc' },
                     take: 10
                 });
-                description = topLevels.map((m, i) => `**#${i + 1}** <@${m.userId}> \u2022 Level \`${m.level}\` (\`${m.xp}\` XP)`).join('\n');
+
+                const userLevelData = await client.prisma.member.findUnique({
+                    where: { guildId_userId: { guildId: ctx.guild.id, userId: ctx.author.id } }
+                });
+
+                const userRank = userLevelData ? (await client.prisma.member.count({
+                    where: { guildId: ctx.guild.id, xp: { gt: userLevelData.xp } }
+                }) + 1) : 0;
+
+                description = topLevels.length > 0
+                    ? topLevels.map((m, i) => `**#${i + 1}** <@${m.userId}> \u2022 Level \`${m.level}\` (\`${m.xp}\` XP)`).join('\n')
+                    : 'No leveling data available yet.';
+
+                if (userLevelData && userLevelData.xp > 0) {
+                    description += `\n\n**Your Rank**\n**#${userRank}** <@${ctx.author.id}> \u2022 Level \`${userLevelData.level}\` (\`${userLevelData.xp}\` XP)`;
+                }
                 break;
             case 'messages':
             default:

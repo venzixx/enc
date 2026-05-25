@@ -13,9 +13,9 @@ export class StreakManager {
                 where: { id: guildId }
             });
 
-            if (!guild || !guild.streaksEnabled) return;
+            if (!guild) return;
 
-            // 1. Update daily activities
+            // 1. Update daily activities (unconditional for stats/leaderboard)
             const [activity] = await Promise.all([
                 client.prisma.userDailyActivity.upsert({
                     where: { guildId_userId_date: { guildId, userId, date: today } },
@@ -33,6 +33,8 @@ export class StreakManager {
                     create: { id: channelId, guildId, name: (client.channels.cache.get(channelId) as any)?.name || "unknown-channel" }
                 })
             ]);
+
+            if (!guild.streaksEnabled) return;
 
             // 2. Fetch configured streak tiers — SORTED BY THRESHOLD (ascending)
             // This ensures Bronze (5) → Silver (15) → Gold (30) fires in correct order

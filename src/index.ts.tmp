@@ -1,0 +1,40 @@
+import { GatewayIntentBits, Partials } from 'discord.js';
+import { ExtendedClient } from './client';
+import { loadCommands, loadEvents, loadComponents } from './handlers/loader';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+console.log("Bot Startup DATABASE_URL:", process.env.DATABASE_URL);
+
+const client = new ExtendedClient({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildInvites,
+        GatewayIntentBits.GuildBans,
+        GatewayIntentBits.GuildWebhooks,
+        GatewayIntentBits.DirectMessages,
+    ],
+    partials: [
+        Partials.Message,
+        Partials.Reaction,
+        Partials.User,
+        Partials.Channel,
+    ],
+});
+
+async function main() {
+    await loadCommands(client);
+    await loadEvents(client);
+    await loadComponents(client);
+
+    await client.start();
+}
+
+main().catch(console.error);
+
+export { client };

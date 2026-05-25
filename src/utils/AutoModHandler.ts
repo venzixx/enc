@@ -67,13 +67,14 @@ export class AutoModHandler {
 
     private static readonly SAFE_DOMAINS = [
         // GIF / Media hosts
-        'tenor.com', 'giphy.com', 'imgur.com', 'gfycat.com',
-        'media.tenor.com', 'media.giphy.com', 'i.imgur.com',
+        'tenor.com', 'giphy.com', 'imgur.com', 'gfycat.com', 'giphy.org',
+        'media.tenor.com', 'media.giphy.com', 'i.imgur.com', 'media1.tenor.com',
+        'media.tenor.co', 'tenor.co',
         // Discord CDN
         'cdn.discordapp.com', 'media.discordapp.net', 'images-ext-1.discordapp.net',
-        'images-ext-2.discordapp.net',
+        'images-ext-2.discordapp.net', 'discord.com', 'discordapp.com',
         // Social / Video
-        'youtube.com', 'youtu.be', 'www.youtube.com',
+        'youtube.com', 'youtu.be', 'www.youtube.com', 'm.youtube.com',
         'twitter.com', 'x.com', 'reddit.com', 'www.reddit.com',
         'twitch.tv', 'www.twitch.tv', 'clips.twitch.tv',
         'tiktok.com', 'www.tiktok.com', 'vm.tiktok.com',
@@ -82,12 +83,12 @@ export class AutoModHandler {
         'pinterest.com', 'www.pinterest.com',
         // Music
         'spotify.com', 'open.spotify.com',
-        'soundcloud.com',
+        'soundcloud.com', 'snd.sc',
         'music.apple.com',
         // Dev / Code
-        'github.com', 'gitlab.com', 'stackoverflow.com',
+        'github.com', 'gitlab.com', 'stackoverflow.com', 'npmjs.com',
         // Media / Image hosting
-        'prnt.sc', 'prntscr.com', 'gyazo.com',
+        'prnt.sc', 'prntscr.com', 'gyazo.com', 'lightshot.com',
         'steamuserimages-a.akamaihd.net', 'steamcommunity.com',
         'i.redd.it', 'v.redd.it', 'preview.redd.it',
     ];

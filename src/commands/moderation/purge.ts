@@ -1,4 +1,4 @@
-import { PermissionFlagsBits, TextChannel, Message, Collection, AttachmentBuilder } from 'discord.js';
+import { PermissionFlagsBits, TextChannel, Message, Collection, AttachmentBuilder, User } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { AuditLogger, AuditLogType, AuditLogStatus } from '../../utils/AuditLogger';
@@ -51,16 +51,34 @@ export default class Purge extends Command {
     }
 
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-        await ctx.deferReply(true);
+        let progressMessage: Message | null = null;
+        if (!ctx.interaction) {
+            // Send an immediate progress reply for prefix commands so the user knows it has started
+            progressMessage = await ctx.sendMessage({ 
+                embeds: [client.embed({ 
+                    title: '🧹 Purging...', 
+                    description: 'Scanning and deleting messages, please wait...', 
+                    color: client.color.yellow 
+                }, ctx)] 
+            }) as Message;
+        } else {
+            await ctx.deferReply(true);
+        }
 
         // 1. Parse Arguments (Hybrid Slash/Prefix)
-        let amountInput = ctx.options.getString('amount') || '';
-        let filterInput = ctx.options.getString('filter') || 'all';
-        let targetUser = ctx.options.getUser('user');
+        let amountInput = '';
+        let filterInput = 'all';
+        let targetUser: User | null = null;
 
-        // Prefix Command Fallback logic
-        if (!amountInput && !targetUser && args.length > 0) {
+        if (ctx.interaction) {
+            amountInput = ctx.options.getString('amount') || '';
+            filterInput = ctx.options.getString('filter') || 'all';
+            targetUser = ctx.options.getUser('user');
+        } else {
+            // Robust prefix arguments parsing
             for (const arg of args) {
+                const lowerArg = arg.toLowerCase();
+
                 // Check for user mention/ID
                 const userId = arg.replace(/[<@!>]/g, '');
                 if (/^\d{17,19}$/.test(userId)) {
@@ -68,16 +86,26 @@ export default class Purge extends Command {
                     continue;
                 }
 
-                // Check for filter keywords
-                const filters = ['humans', 'bots', 'images', 'embeds', 'links', 'all'];
-                if (filters.includes(arg.toLowerCase())) {
-                    filterInput = arg.toLowerCase();
+                // Check for filter keywords (excluding 'all' to avoid overlap with amount)
+                const filters = ['humans', 'bots', 'images', 'embeds', 'links'];
+                if (filters.includes(lowerArg)) {
+                    filterInput = lowerArg;
                     continue;
                 }
 
-                // Check for amount
-                if (/^\d+$/.test(arg) || arg.toLowerCase() === 'all') {
+                // Check for amount (numbers)
+                if (/^\d+$/.test(arg)) {
                     amountInput = arg;
+                    continue;
+                }
+
+                // Check for 'all' keyword
+                if (lowerArg === 'all') {
+                    if (!amountInput) {
+                        amountInput = 'all';
+                    } else {
+                        filterInput = 'all';
+                    }
                     continue;
                 }
             }
@@ -86,28 +114,51 @@ export default class Purge extends Command {
         // Final normalization
         if (!amountInput) amountInput = '100';
         const isAll = amountInput.toLowerCase() === 'all';
-        const targetDeleteCount = isAll ? 1000 : parseInt(amountInput);
+        const targetDeleteCount = isAll ? 10000 : parseInt(amountInput);
         
         if (isNaN(targetDeleteCount) || targetDeleteCount <= 0) {
-            return ctx.editReply({ embeds: [client.embed({ title: 'Invalid Amount', description: 'Please provide a valid number of messages to delete.', color: client.color.red }, ctx)] });
+            const errEmbed = client.embed({ 
+                title: 'Invalid Amount', 
+                description: 'Please provide a valid number of messages to delete.', 
+                color: client.color.red 
+            }, ctx);
+            if (ctx.interaction) {
+                return ctx.editReply({ embeds: [errEmbed] });
+            } else if (progressMessage) {
+                return progressMessage.edit({ embeds: [errEmbed] }).catch(() => null);
+            } else {
+                return ctx.sendMessage({ embeds: [errEmbed] });
+            }
         }
 
         const channel = ctx.channel as TextChannel;
-        let toDelete: Collection<string, Message> = new Collection();
-        let scannedCount = 0;
-        const scanMax = 1000;
+        let toDelete: Message[] = [];
+        let deletedMessages: any[] = [];
         let lastId: string | undefined;
         const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+        let scanned = 0;
+        const maxCollect = targetDeleteCount;
+        
+        // Limit scanning to avoid heavy rate limits on sequential fetching.
+        // For 'all' we scan up to 10000 messages (the max target).
+        const maxScanned = isAll ? 10000 : Math.max(targetDeleteCount * 3, 2000);
+        let fetchError: any = null;
+        const deletePromises: Promise<any>[] = [];
 
-        // 2. Deep Scan Loop
-        while (toDelete.size < targetDeleteCount && scannedCount < scanMax) {
-            const fetchLimit = Math.min(100, scanMax - scannedCount);
-            const messages: Collection<string, Message> | null = await channel.messages.fetch({ limit: fetchLimit, before: lastId }).catch(() => null);
+        // 2. Fetch and Pipelined Delete Loop
+        while (scanned < maxScanned && deletedMessages.length + toDelete.length < maxCollect) {
+            const fetchLimit = Math.min(100, maxScanned - scanned, maxCollect - (deletedMessages.length + toDelete.length));
+            if (fetchLimit <= 0) break;
+
+            const messages: Collection<string, Message> | null = await channel.messages.fetch({ limit: fetchLimit, before: lastId }).catch(err => {
+                fetchError = err;
+                return null;
+            });
             
             if (!messages || messages.size === 0) break;
             
-            scannedCount += messages.size;
             lastId = messages.last()?.id;
+            scanned += messages.size;
 
             const filtered = messages.filter(msg => {
                 // Safety: Discord Bulk Delete Limit (14 days)
@@ -127,40 +178,98 @@ export default class Purge extends Command {
                 }
             });
 
-            // Add to deletion pool
-            for (const [id, msg] of filtered) {
-                if (toDelete.size >= targetDeleteCount) break;
-                toDelete.set(id, msg);
+            // Add filtered messages to toDelete queue
+            for (const msg of filtered.values()) {
+                toDelete.push(msg);
+            }
+
+            // Pipelining: Whenever we have accumulated 100 messages, bulk delete them in the background
+            while (toDelete.length >= 100) {
+                const chunk = toDelete.splice(0, 100);
+                const chunkCollection = new Collection<string, Message>();
+                for (const m of chunk) {
+                    chunkCollection.set(m.id, m);
+                }
+
+                // Launch bulkDelete in the background (discord.js handles queueing, so we don't block fetching)
+                const p = channel.bulkDelete(chunkCollection, true)
+                    .then(deleted => {
+                        deletedMessages.push(...deleted.values());
+                    })
+                    .catch(err => {
+                        console.error('[Purge Background Bulk Delete Error]', err);
+                    });
+                deletePromises.push(p);
             }
 
             // Optimization: If the last message in this batch is older than 14 days, stop scanning
             if (messages.last() && messages.last()!.createdTimestamp < twoWeeksAgo) break;
+            
+            // If we fetched less than 100, we've reached the end of the channel
+            if (messages.size < 100) break;
         }
 
-        // 3. Execution
-        if (toDelete.size === 0) {
-            return ctx.editReply({ 
-                embeds: [client.embed({ 
-                    title: ' No Messages Found', 
-                    description: `No eligible messages found matching your criteria in the last **${scannedCount}** messages scanned.\n(Note: Messages must be under 14 days old).`, 
-                    color: client.color.yellow 
-                }, ctx)]
-            });
+        // Handle leftovers in toDelete
+        if (toDelete.length > 0) {
+            if (toDelete.length === 1) {
+                const msg = toDelete[0];
+                const p = msg.delete()
+                    .then(() => {
+                        deletedMessages.push(msg);
+                    })
+                    .catch(err => {
+                        console.error('[Purge Background Single Delete Error]', err);
+                    });
+                deletePromises.push(p);
+            } else {
+                const chunkCollection = new Collection<string, Message>();
+                for (const m of toDelete) {
+                    chunkCollection.set(m.id, m);
+                }
+                const p = channel.bulkDelete(chunkCollection, true)
+                    .then(deleted => {
+                        deletedMessages.push(...deleted.values());
+                    })
+                    .catch(err => {
+                        console.error('[Purge Background Bulk Delete Error]', err);
+                    });
+                deletePromises.push(p);
+            }
+            toDelete = [];
         }
 
-        const deleted = await channel.bulkDelete(toDelete, true).catch(err => {
-            console.error('[Purge Error]', err);
-            return null;
-        });
+        // Wait for all background deletions to complete
+        await Promise.all(deletePromises);
 
-        if (!deleted) {
-             return ctx.editReply({ 
-                embeds: [client.embed({ title: ' Purge Failed', description: 'Failed to delete messages. They might be too old (> 14 days) or already deleted.', color: client.color.red }, ctx)]
-            });
+        // 3. Response Generation
+        if (deletedMessages.length === 0) {
+            let description = 'No eligible messages found matching your criteria.\n(Note: Messages must be under 14 days old).';
+            if (fetchError) {
+                if (fetchError.code === 50013) {
+                    description = 'Failed to fetch messages: Missing "Read Message History" or "View Channel" permissions.';
+                } else {
+                    description = `Failed to fetch messages: ${fetchError.message || fetchError}`;
+                }
+            }
+            const noMsgEmbed = client.embed({ 
+                title: ' No Messages Found', 
+                description: description, 
+                color: client.color.yellow 
+            }, ctx);
+            if (ctx.interaction) {
+                return ctx.editReply({ embeds: [noMsgEmbed] });
+            } else if (progressMessage) {
+                return progressMessage.edit({ embeds: [noMsgEmbed] }).catch(() => null);
+            } else {
+                return ctx.sendMessage({ embeds: [noMsgEmbed] });
+            }
         }
+
+        // Sort messages to preserve chronological order for the transcript
+        deletedMessages.sort((a, b) => b.createdTimestamp - a.createdTimestamp);
 
         // Generate Transcript
-        const transcript = deleted.map(m => {
+        const transcript = deletedMessages.map(m => {
             if (!m) return '[Unknown Message]';
             const time = new Date(m.createdTimestamp).toISOString().replace(/T/, ' ').replace(/\..+/, '');
             return `[${time}] [${m.author?.tag || 'Unknown'}] (${m.author?.id || 'Unknown'}): ${m.content || (m.attachments.size > 0 ? '[Attachment]' : '[No Content]')}`;
@@ -175,24 +284,31 @@ export default class Purge extends Command {
             executorTag: ctx.author.tag,
             targetId: channel.id,
             targetName: channel.name,
-            details: `Purged ${deleted.size} messages.\nTarget: ${targetUser ? targetUser.tag : filterInput}\nScanned: ${scannedCount} messages.`,
+            details: `Purged ${deletedMessages.length} messages.\nTarget: ${targetUser ? targetUser.tag : filterInput}`,
             color: client.color.red,
             transcript: transcript,
             files: [attachment]
         });
 
-        const replyMessage = await ctx.editReply({ 
-            embeds: [client.embed({ 
-                title: `${client.emoji.success} Purge Complete`, 
-                description: `Successfully wiped **${deleted.size}** messages after scanning **${scannedCount}** messages.`, 
-                color: client.color.main 
-            }, ctx)]
-        });
+        const replyEmbed = client.embed({ 
+            title: `${client.emoji.success} Purge Complete`, 
+            description: `deleted **${deletedMessages.length}** messages`, 
+            color: client.color.main 
+        }, ctx);
+
+        let finalReply: any;
+        if (ctx.interaction) {
+            finalReply = await ctx.editReply({ embeds: [replyEmbed] });
+        } else if (progressMessage) {
+            finalReply = await progressMessage.edit({ embeds: [replyEmbed] }).catch(() => null);
+        } else {
+            finalReply = await ctx.sendMessage({ embeds: [replyEmbed] });
+        }
 
         // Optional: Auto-delete the success message after 5 seconds
         setTimeout(() => {
             if (ctx.interaction) ctx.interaction.deleteReply().catch(() => null);
-            else if (replyMessage instanceof Message) replyMessage.delete().catch(() => null);
+            else if (finalReply instanceof Message) finalReply.delete().catch(() => null);
         }, 5000);
     }
 }

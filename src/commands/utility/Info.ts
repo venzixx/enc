@@ -51,14 +51,20 @@ export default class Info extends Command {
 
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
         await ctx.deferReply();
-        const sub = ctx.options.getSubcommand() || args[0];
+        const sub = (ctx.options.getSubcommand() || args[0] || 'bot').toLowerCase();
 
         switch (sub) {
             case 'user':
+            case 'u':
+            case 'member':
                 return this.handleUser(client, ctx, args);
             case 'server':
+            case 's':
+            case 'guild':
                 return this.handleServer(client, ctx);
             case 'bot':
+            case 'b':
+            case 'stats':
                 return this.handleBot(client, ctx);
             case 'ping':
                 return this.handlePing(client, ctx);
@@ -68,7 +74,7 @@ export default class Info extends Command {
     }
 
     public async handleUser(client: ExtendedClient, ctx: Context, args: string[]) {
-        const member = await Resolver.resolveMember(ctx, ctx.options.getMember('target') || args[1]);
+        const member = await Resolver.resolveMember(ctx, ctx.options.getMember('target') || args[1]) || ctx.member;
         if (!member) {
             return await ctx.replyV2({ description: 'Could not find that member.', isAlert: true });
         }

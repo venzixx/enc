@@ -11,6 +11,7 @@ export default class GiveHug extends Command {
             name: 'Give Hug',
             type: ApplicationCommandType.User, // Right-click a user
             category: 'utility',
+            slashCommand: true,
             // @ts-ignore
             integration_types: [0, 1],
             // @ts-ignore

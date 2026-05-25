@@ -156,34 +156,34 @@ export default class VoiceCommand extends Command {
 
 			// Premium VoiceMaster Control Panel
 			const { AttachmentBuilder } = await import('discord.js');
-			const bannerFile = new AttachmentBuilder('C:\\Users\\sidha\\.gemini\\antigravity\\brain\\fde5b7f1-eb52-4fbb-8216-ef68bdbaf3c7\\voicemaster_v2_banner_1778134274980.png', { name: 'voicemaster_banner.png' });
+			const bannerFile = new AttachmentBuilder('C:\\Users\\sidha\\.gemini\\antigravity\\brain\\ca3c4866-b5d2-4483-a74e-19930a3a350d\\voicemaster_premium_banner_1778150147326.png', { name: 'voicemaster_premium.png' });
 
 			const panelEmbed = new EmbedBuilder()
-				.setColor(0x000000) // Monochromatic Black
-				.setAuthor({ name: 'VOICEMASTER | PREMIUM CONTROL INTERFACE', iconURL: client.user?.displayAvatarURL() })
+				.setColor(0x000000)
+				.setAuthor({ name: 'VOICEMASTER // ELITE VOICE ECOSYSTEM', iconURL: client.user?.displayAvatarURL() })
 				.setDescription([
-					'### 🛠️ CHANNEL MANAGEMENT MATRIX',
-					'Execute administrative protocols on your temporary voice sanctuary using the neural-linked interface below.',
+					'### 🔒 SECURE NODE INTERFACE',
+					'Manage your temporary voice sanctuary with high-fidelity administrative protocols. Only the owner or authorized entities can interface with this node.',
 					'',
-					'**🔐 ACCESS & PRIVACY**',
-					'- `Lock` — Seal channel connectivity',
-					'- `Hide` — Toggle directory visibility',
-					'- `Permit` — Authorize specific user access',
+					'**PRIVACY & ACCESS**',
+					'- `Lock/Unlock` — Toggle public connection state.',
+					'- `Hide/Show` — Calibrate directory visibility.',
+					'- `Permit` — Explicitly authorize user entry.',
 					'',
-					'**⚙️ CONFIGURATION**',
-					'- `Rename` — Update channel designation',
-					'- `Limit` — Calibrate user capacity (+/-)',
-					'- `Claim` — Assume ownership of vacant nodes',
+					'**CONFIGURATION**',
+					'- `Rename` — Set custom node designation.',
+					'- `Limit` — Adjust entity capacity (+/-).',
+					'- `Claim` — Assume ownership of vacant nodes.',
 					'',
-					'**☣️ SECURITY & TERMINATION**',
-					'- `Kick` — Disconnect unauthorized entities',
-					'- `Info` — Retrieve telemetry data',
-					'- `Terminate` — Decommission current session'
+					'**OPERATIONS**',
+					'- `Kick` — Disconnect unauthorized entities.',
+					'- `Info` — Retrieve session telemetry.',
+					'- `Terminate` — Decommission current sanctuary.'
 				].join('\n'))
-				.setImage('attachment://voicemaster_banner.png')
-				.setFooter({ text: `SYSTEM STATUS: OPERATIONAL | DIMSCORD V2`, iconURL: guild?.iconURL() || undefined });
+				.setImage('attachment://voicemaster_premium.png')
+				.setFooter({ text: `VOICEMASTER V2 | STATUS: OPTIMAL`, iconURL: guild?.iconURL() || undefined });
 
-			// Row 1: Privacy & Visibility
+			// Row 1: Privacy (Monochromatic Secondary)
 			const row1Buttons = [
 				new ButtonBuilder().setCustomId('vc_lock').setLabel('Lock').setEmoji('🔒').setStyle(ButtonStyle.Secondary),
 				new ButtonBuilder().setCustomId('vc_unlock').setLabel('Unlock').setEmoji('🔓').setStyle(ButtonStyle.Secondary),
@@ -191,7 +191,7 @@ export default class VoiceCommand extends Command {
 				new ButtonBuilder().setCustomId('vc_show').setLabel('Show').setEmoji('🌐').setStyle(ButtonStyle.Secondary),
 			];
 
-			// Row 2: Configuration
+			// Row 2: Config (Monochromatic Secondary + Primary for Claim)
 			const row2Buttons = [
 				new ButtonBuilder().setCustomId('vc_rename').setLabel('Rename').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
 				new ButtonBuilder().setCustomId('vc_limit_up').setLabel('Limit +').setEmoji('🔼').setStyle(ButtonStyle.Secondary),
@@ -199,7 +199,7 @@ export default class VoiceCommand extends Command {
 				new ButtonBuilder().setCustomId('vc_claim').setLabel('Claim').setEmoji('👑').setStyle(ButtonStyle.Primary),
 			];
 
-			// Row 3: Management
+			// Row 3: Management (Status Colors for Action)
 			const row3Buttons = [
 				new ButtonBuilder().setCustomId('vc_add').setLabel('Permit').setEmoji('👤').setStyle(ButtonStyle.Success),
 				new ButtonBuilder().setCustomId('vc_kick').setLabel('Kick').setEmoji('❌').setStyle(ButtonStyle.Danger),

@@ -1,4 +1,6 @@
-import { Client, ClientOptions, Collection, EmbedBuilder, REST, Routes } from 'discord.js';
+import { Client, ClientOptions, Collection, EmbedBuilder, REST, Routes, ActivityType, PresenceStatusData } from 'discord.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import { LavalinkClient, Command, Component } from './structures';
 import { initI18n } from './structures/I18n';
@@ -21,6 +23,7 @@ export class ExtendedClient extends Client {
     public rest: REST = new REST({ version: "10" }).setToken(process.env.TOKEN || "");
     
     public config = config;
+    public env = env;
     public readonly emoji = config.emoji;
     public readonly color = config.color;
 
@@ -29,6 +32,13 @@ export class ExtendedClient extends Client {
     public captchaCodes: Map<string, string> = new Map();
     public embedDrafts: Map<string, any> = new Map();
     public voiceSessions: Map<string, number> = new Map(); // key: userId, value: joinTimestamp
+    public maintenance: {
+        enabled: boolean;
+        eta: string | null;
+    } = {
+        enabled: false,
+        eta: null,
+    };
 
     constructor(options: ClientOptions) {
         super(options);
@@ -45,6 +55,7 @@ export class ExtendedClient extends Client {
 
     public async start(): Promise<void> {
         await initI18n();
+        this.loadMaintenance();
         
         try {
             await this.login(process.env.TOKEN);
@@ -52,6 +63,48 @@ export class ExtendedClient extends Client {
         } catch (error) {
             logger.error("Critical error during startup:", error);
             process.exit(1);
+        }
+    }
+
+    public loadMaintenance(): void {
+        const filePath = path.join(process.cwd(), 'maintenance.json');
+        if (fs.existsSync(filePath)) {
+            try {
+                const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+                this.maintenance = data;
+            } catch (err) {
+                logger.error("Failed to load maintenance state:", err);
+            }
+        }
+    }
+
+    public saveMaintenance(): void {
+        const filePath = path.join(process.cwd(), 'maintenance.json');
+        try {
+            fs.writeFileSync(filePath, JSON.stringify(this.maintenance, null, 2));
+        } catch (err) {
+            logger.error("Failed to save maintenance state:", err);
+        }
+    }
+
+    public async updateMaintenancePresence(): Promise<void> {
+        if (!this.user) return;
+
+        if (this.maintenance.enabled) {
+            const status = this.maintenance.eta ? `Maintenance: ${this.maintenance.eta}` : "Under Maintenance";
+            this.user.setPresence({
+                activities: [{ name: status, type: ActivityType.Custom }],
+                status: 'dnd' as PresenceStatusData
+            });
+        } else {
+            // Restore default presence from env or config
+            this.user.setPresence({
+                activities: [{ 
+                    name: this.env.BOT_ACTIVITY || "Lavamusic", 
+                    type: (this.env.BOT_ACTIVITY_TYPE as any) || ActivityType.Listening 
+                }],
+                status: (this.env.BOT_STATUS as any) || 'online'
+            });
         }
     }
 

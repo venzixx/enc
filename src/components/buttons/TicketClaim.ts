@@ -1,6 +1,7 @@
-import { type ButtonInteraction, PermissionFlagsBits, EmbedBuilder } from "discord.js";
+import { type ButtonInteraction, PermissionFlagsBits, EmbedBuilder, MessageFlags } from "discord.js";
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
+import { V2Helper } from "../../utils/V2Helper";
 
 export default class TicketClaim extends Component {
 	constructor(client: ExtendedClient) {
@@ -49,25 +50,8 @@ export default class TicketClaim extends Component {
             data: { claimantId: interaction.user.id }
         });
 
-        // Update the dashboard embed
-        const message = interaction.message;
-        const embed = EmbedBuilder.from(message.embeds[0]);
-        
-        // Find "Claimed By" field and update it
-        const fields = [...embed.data.fields!];
-        const claimedByIndex = fields.findIndex(f => f.name === 'Claimed By');
-        if (claimedByIndex !== -1) {
-            fields[claimedByIndex].value = interaction.user.toString();
-        }
-        embed.setFields(fields);
-
-        // Update interaction components (disable claim button)
-        const row = interaction.message.components[0].toJSON() as any;
-        row.components[0].disabled = true;
-        row.components[0].label = 'Claimed';
-
-        await interaction.update({ embeds: [embed], components: [row] });
-
-		await interaction.followUp({ content: `${this.client.emoji.success} Ticket claimed by ${interaction.user}!`, ephemeral: false });
+        // Instead of trying to edit the V2 message (which is complex), 
+        // just acknowledge and send a follow-up
+        await interaction.reply({ content: `${this.client.emoji.success} Ticket claimed by ${interaction.user}!` });
 	}
 }

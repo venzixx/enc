@@ -46,12 +46,20 @@ export default class RoleIcon extends Command {
         }
 
         try {
-            // Check if URL or Unicode
-            const isUrl = iconInput.startsWith('http');
-            await role.edit({
-                icon: isUrl ? iconInput : undefined,
-                unicodeEmoji: !isUrl ? iconInput : undefined
-            }, `Requested by ${ctx.author.tag}`);
+            // Check if it's a custom emoji like <:name:id> or <a:name:id>
+            const customEmojiMatch = iconInput.match(/^<(a?):(\w+):(\d+)>$/);
+            if (customEmojiMatch) {
+                const isAnimated = customEmojiMatch[1] === 'a';
+                const emojiId = customEmojiMatch[3];
+                const ext = isAnimated ? 'gif' : 'png';
+                const emojiUrl = `https://cdn.discordapp.com/emojis/${emojiId}.${ext}?size=128&quality=lossless`;
+                await role.edit({ icon: emojiUrl }, `Requested by ${ctx.author.tag}`);
+            } else if (iconInput.startsWith('http')) {
+                await role.edit({ icon: iconInput }, `Requested by ${ctx.author.tag}`);
+            } else {
+                // Treat as unicode emoji
+                await role.edit({ unicodeEmoji: iconInput }, `Requested by ${ctx.author.tag}`);
+            }
             
             return ctx.replyV2({ 
                 title: `${client.emoji.success} Role Icon Updated`, 

@@ -291,45 +291,169 @@ export default class Ticket extends Command {
         const ticket = await (client.prisma as any).ticket.findUnique({ where: { channelId: ctx.channel.id } });
         if (!ticket) return ctx.replyV2({ description: 'This channel is not a registered ticket.', isAlert: true });
 
-        // Logic from TicketClose.ts
-        const response = await ctx.reply({ 
-            ...V2Helper.createLayout({
+        // Fetch TicketConfig
+        let config = null;
+        if (ticket.panelId) {
+            config = await (client.prisma as any).ticketConfig.findUnique({
+                where: {
+                    guildId_panelId: {
+                        guildId: ticket.guildId,
+                        panelId: ticket.panelId
+                    }
+                }
+            });
+        }
+        if (!config) {
+            config = await (client.prisma as any).ticketConfig.findFirst({
+                where: { guildId: ticket.guildId }
+            });
+        }
+
+        const useV2 = config ? config.useV2 : false;
+        const transcriptEnabled = config ? config.transcriptEnabled : true;
+        const transcriptDM = config ? config.transcriptDM : true;
+        const transcriptChannelId = config ? config.transcriptChannelId : null;
+
+        // Deciding Close Confirmation Layout based on useV2
+        let closePayload: any = {};
+        if (useV2) {
+            closePayload = V2Helper.createLayout({
                 title: ' Close Confirmation',
-                description: 'Are you sure you want to close this ticket?',
+                description: `Are you sure you want to close this ticket?\n\n**Note:** Transcripts will be sent based on panel settings, and the channel will be deleted.\n\n<@${ticket.userId}>, please confirm if this ticket can be closed.`,
                 isAlert: true,
                 color: 0xFFA500,
                 buttons: [
                     new ButtonBuilder().setCustomId('confirm_close').setLabel('Confirm Close').setStyle(ButtonStyle.Danger),
                     new ButtonBuilder().setCustomId('cancel_close').setLabel('Cancel').setStyle(ButtonStyle.Secondary)
                 ]
-            }) as any,
+            }) as any;
+        } else {
+            const confirmEmbed = new EmbedBuilder()
+                .setTitle('Close Confirmation')
+                .setDescription(`Are you sure you want to close this ticket?\n\n**Note:** Transcripts will be sent based on panel settings, and the channel will be deleted.\n\n<@${ticket.userId}>, please confirm if this ticket can be closed.`)
+                .setColor(0xFFA500);
+
+            const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder().setCustomId('confirm_close').setLabel('Confirm Close').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId('cancel_close').setLabel('Cancel').setStyle(ButtonStyle.Secondary)
+            );
+
+            closePayload = {
+                embeds: [confirmEmbed],
+                components: [confirmRow]
+            };
+        }
+
+        const response = await ctx.reply({ 
+            ...closePayload,
             fetchReply: true
         });
 
-        const collector = (response as any).createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
+        const collector = (response as any).createMessageComponentCollector({ componentType: ComponentType.Button, time: 300000 });
 
         collector.on('collect', async (i: ButtonInteraction) => {
             if (i.customId === 'cancel_close') {
-                await i.update({ content: ' Closure cancelled.', embeds: [], components: [] });
+                if (i.user.id !== ticket.userId && !i.memberPermissions?.has('Administrator')) {
+                    return await i.reply({ content: `${client.emoji.cross} Only the ticket creator or an Admin can cancel the closure.`, ephemeral: true });
+                }
+                if (useV2) {
+                    await i.update({ 
+                        ...V2Helper.createLayout({
+                            title: 'Closure Cancelled',
+                            description: 'The ticket will remain open.',
+                            isAlert: false,
+                            color: 0x22c55e
+                        }) as any,
+                        components: [] 
+                    });
+                } else {
+                    await i.update({ 
+                        embeds: [new EmbedBuilder().setTitle('Closure Cancelled').setDescription('The ticket will remain open.').setColor(0x22c55e)],
+                        components: [] 
+                    });
+                }
                 return collector.stop('cancelled');
             }
             if (i.customId === 'confirm_close') {
-                await i.update({ content: ' Closing ticket...', embeds: [], components: [] });
-                
-                // Ported deletion & transcript logic
-                const messages = await ctx.channel.messages.fetch({ limit: 100 });
-                const transcriptContent = messages.reverse().map((m: any) => `[${m.createdAt.toLocaleString()}] ${m.author.tag}: ${m.content}`).join('\n');
-                const transcriptFile = new AttachmentBuilder(Buffer.from(transcriptContent), { name: `transcript-${ctx.channel.name}.txt` });
-
-                try {
-                    const creator = await ctx.guild.members.fetch(ticket.userId);
-                    await creator.send({ content: ` Ticket **#${ctx.channel.name}** closed. Transcript attached.`, files: [transcriptFile] });
-                } catch {}
-
-                await (client.prisma as any).ticket.update({ where: { id: ticket.id }, data: { status: 'CLOSED' } });
-                setTimeout(() => ctx.channel.delete().catch(() => {}), 5000);
+                if (useV2) {
+                    await i.update({ 
+                        ...V2Helper.createLayout({
+                            title: 'Closing Ticket',
+                            description: 'Generating transcript and closing...',
+                            isAlert: true,
+                            color: 0xFFA500
+                        }) as any,
+                        components: [] 
+                    });
+                } else {
+                    await i.update({ 
+                        embeds: [new EmbedBuilder().setTitle('Closing Ticket').setDescription('Generating transcript and closing...').setColor(0xFFA500)],
+                        components: [] 
+                    });
+                }
                 collector.stop('confirmed');
             }
+        });
+
+        collector.on('end', async (collected: any, reason: string) => {
+            if (reason === 'cancelled') return;
+
+            const channel = ctx.channel as any;
+            if (!channel) return;
+
+            // Generate Transcript
+            let transcriptFile: AttachmentBuilder | null = null;
+            if (transcriptEnabled) {
+                const messages = await channel.messages.fetch({ limit: 100 });
+                const transcriptContent = messages.reverse().map((m: any) => 
+                    `[${m.createdAt.toLocaleString()}] ${m.author.tag}: ${m.content || (m.embeds.length > 0 ? '[Embed]' : '[No Content]')}`
+                ).join('\n');
+
+                transcriptFile = new AttachmentBuilder(Buffer.from(transcriptContent), { name: `transcript-${channel.name}.txt` });
+            }
+
+            if (transcriptEnabled && transcriptFile) {
+                // DM Creator
+                if (transcriptDM) {
+                    try {
+                        const creator = await ctx.guild.members.fetch(ticket.userId);
+                        if (creator) {
+                            await creator.send({ 
+                                content: `Your ticket **#${channel.name}** in **${ctx.guild.name}** has been closed. Here is your transcript:`,
+                                files: [transcriptFile]
+                            });
+                        }
+                    } catch (err) {
+                        console.log('Failed to DM transcript to user:', err);
+                    }
+                }
+
+                // Send to log channel
+                if (transcriptChannelId) {
+                    try {
+                        const logChannel = await ctx.guild.channels.fetch(transcriptChannelId);
+                        if (logChannel && logChannel.isTextBased()) {
+                            await (logChannel as any).send({
+                                content: `Transcript for closed ticket **#${channel.name}** (Opened by <@${ticket.userId}>):`,
+                                files: [transcriptFile]
+                            });
+                        }
+                    } catch (err) {
+                        console.log('Failed to send transcript to log channel:', err);
+                    }
+                }
+            }
+
+            // Update DB
+            await (client.prisma as any).ticket.update({
+                where: { id: ticket.id },
+                data: { status: 'CLOSED' }
+            });
+
+            // Delete Channel after a short delay
+            setTimeout(async () => {
+                await channel.delete().catch(() => {});
+            }, 5000);
         });
     }
 

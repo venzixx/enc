@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -194,6 +194,7 @@ model Guild {
   reactLocks            ReactLock[]
   uwuLocks              UwuLock[]
   forcedNicknames       ForcedNickname[]
+  assets               Asset[]
 }
 
 model CommandAlias {
@@ -227,6 +228,14 @@ model Appeal {
 model UserConfig {
   userId      String  @id
   snipeOptOut Boolean @default(false)
+  timezone    String?
+}
+
+model TimezoneSession {
+  id        String   @id
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
 }
 
 model GiveawayBlacklist {
@@ -489,8 +498,12 @@ model TicketConfig {
   panelColor            String? @default("#9333ea")
   buttonColor           String? @default("PRIMARY")
   buttonText            String? @default("Create Ticket")
+  buttonEmoji           String? @default("🎫")
   largeImageUrl         String?
   smallImageUrl         String?
+  useV2                 Boolean @default(false)
+  transcriptEnabled     Boolean @default(true)
+  transcriptDM          Boolean @default(true)
   
   // Multi-panel specific
   useDropdown           Boolean @default(false)
@@ -536,6 +549,7 @@ model TicketPanelOption {
   
   // For multi-panels, this points to the target panelId string
   targetPanelId  String? 
+  buttonColor    String  @default("PRIMARY")
   
   panel          TicketConfig @relation(fields: [panelId], references: [id], onDelete: Cascade)
 
@@ -549,6 +563,7 @@ model Ticket {
   channelId  String   @unique
   userId     String
   claimantId String?
+  panelId    String?
   status     String   @default("OPEN")
   openedAt   DateTime @default(now())
   number     Int      @default(0)
@@ -859,3 +874,59 @@ model ComponentAction {
 
   @@unique([guildId, customId])
 }
+
+model Asset {
+  id        String   @id @default(cuid())
+  guildId   String
+  name      String
+  url       String
+  type      String   @default("IMAGE") // IMAGE, ICON, EMOJI
+  createdAt DateTime @default(now())
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId])
+}
+
+model Marriage {
+  id          Int      @id @default(autoincrement())
+  user1Id     String   @unique
+  user2Id     String   @unique
+  marriedAt   DateTime @default(now())
+  ring        String?
+  proposerId  String
+}
+
+model FamilyRelation {
+  id        Int      @id @default(autoincrement())
+  parentId  String
+  childId   String
+
+  @@unique([parentId, childId])
+  @@index([parentId])
+  @@index([childId])
+}
+
+model CustomReaction {
+  id        Int      @id @default(autoincrement())
+  action    String   // "suicide", "kill", etc.
+  url       String   @unique
+  createdAt DateTime @default(now())
+
+  @@index([action])
+}
+
+model UserMention {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  channelId String
+  messageId String
+  userId    String   // The user who WAS mentioned
+  authorId  String   // The user who sent the mention
+  authorTag String   // The tag of the user who sent the mention
+  content   String   // Snippet of the message content
+  isReply   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+

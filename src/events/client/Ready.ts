@@ -19,17 +19,7 @@ export default class Ready extends Event {
 		logger.success(`${this.client.user?.tag} is ready!`);
 		await startGiveawayScheduler(this.client);
 
-		this.client.user?.setPresence({
-			activities: [
-				{
-					name: env.BOT_ACTIVITY || "Music",
-					type: Number(env.BOT_ACTIVITY_TYPE) || 0,
-					url: env.STREAMING_URL || undefined,
-				},
-			],
-			status: (env.BOT_STATUS as any) || "online",
-
-		});
+		await this.client.updateMaintenancePresence();
 
 		await this.client.lavalink.init({ ...this.client.user!, shards: "auto" });
 

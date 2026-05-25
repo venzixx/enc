@@ -47,7 +47,8 @@ export default class Embed extends Command {
 			thumbnail: null as string | null,
 			fields: [] as any[],
 			footer: `Sent by ${ctx.author.tag}`,
-			timestamp: true
+			timestamp: true,
+            buttons: [] as any[] // New field for interactive buttons
 		};
 
 		const getPreview = () => {
@@ -58,7 +59,15 @@ export default class Embed extends Command {
                     color: embedData.color as any,
                     footer: embedData.footer,
                     thumbnail: embedData.thumbnail || undefined,
-                    fields: embedData.fields
+                    fields: embedData.fields,
+                    buttons: embedData.buttons.map((b: any) => {
+                        const btn = new ButtonBuilder()
+                            .setCustomId(b.id)
+                            .setLabel(b.label)
+                            .setStyle(b.style || ButtonStyle.Primary);
+                        if (b.emoji) btn.setEmoji(b.emoji);
+                        return btn;
+                    })
                 });
             } else {
                 const embed = new EmbedBuilder()
@@ -81,7 +90,8 @@ export default class Embed extends Command {
 				new ButtonBuilder().setCustomId('eb_basics').setLabel(' Text').setStyle(ButtonStyle.Primary),
 				new ButtonBuilder().setCustomId('eb_color').setLabel(' Color').setStyle(ButtonStyle.Secondary),
 				new ButtonBuilder().setCustomId('eb_media').setLabel(' Media').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('eb_fields').setLabel(' Fields').setStyle(ButtonStyle.Secondary)
+				new ButtonBuilder().setCustomId('eb_fields').setLabel(' Fields').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('eb_interact').setLabel(' Interact').setStyle(ButtonStyle.Secondary)
 			);
             const row2 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
                 new StringSelectMenuBuilder()
@@ -206,35 +216,59 @@ export default class Embed extends Command {
 				}
 			}
 
-            if (i.isButton() && i.customId === 'eb_fields') {
-				const modal = new ModalBuilder().setCustomId('eb_modal_fields').setTitle('Add Field');
-				const nameInput = new TextInputBuilder()
-					.setCustomId('name')
-					.setLabel('Field Name')
-					.setStyle(TextInputStyle.Short)
-					.setRequired(true);
-				const valInput = new TextInputBuilder()
-					.setCustomId('value')
-					.setLabel('Field Value')
-					.setStyle(TextInputStyle.Paragraph)
-					.setRequired(true);
+            if (i.isButton() && i.customId === 'eb_interact') {
+                const modal = new ModalBuilder().setCustomId('eb_modal_interact').setTitle('Add Interaction Button');
+                const labelInput = new TextInputBuilder()
+                    .setCustomId('label')
+                    .setLabel('Button Label')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+                const typeInput = new TextInputBuilder()
+                    .setCustomId('type')
+                    .setLabel('Type (SAY or SHOW)')
+                    .setPlaceholder('SAY to send message, SHOW for ephemeral embed')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true);
+                const contentInput = new TextInputBuilder()
+                    .setCustomId('content')
+                    .setLabel('Response Content / Embed JSON')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setRequired(true);
 
-				modal.addComponents(
-					new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
-					new ActionRowBuilder<TextInputBuilder>().addComponents(valInput)
-				);
+                modal.addComponents(
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(labelInput),
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(typeInput),
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(contentInput)
+                );
 
-				await i.showModal(modal);
-				const submitted = await i.awaitModalSubmit({ time: 60000 }).catch(() => null);
-				if (submitted) {
-					embedData.fields.push({
-                        name: submitted.fields.getTextInputValue('name'),
-                        value: submitted.fields.getTextInputValue('value'),
-                        inline: true
+                await i.showModal(modal);
+                const submitted = await i.awaitModalSubmit({ time: 120000 }).catch(() => null);
+                if (submitted) {
+                    const label = submitted.fields.getTextInputValue('label');
+                    const type = submitted.fields.getTextInputValue('type').toUpperCase();
+                    const content = submitted.fields.getTextInputValue('content');
+                    
+                    const btnId = `user_btn_${Date.now()}`;
+                    embedData.buttons.push({
+                        id: btnId,
+                        label,
+                        type,
+                        content,
+                        style: ButtonStyle.Primary
                     });
-					await (submitted as any).update(getBuilderOptions() as any);
-				}
-			}
+
+                    // Store action in DB for the bot to handle later
+                    await (client.prisma as any).componentAction.create({
+                        data: {
+                            guildId: ctx.guild.id,
+                            customId: btnId,
+                            logic: JSON.stringify({ type, content })
+                        }
+                    });
+
+                    await (submitted as any).update(getBuilderOptions() as any);
+                }
+            }
 
 			if (i.isButton() && i.customId === 'eb_send') {
 				await ctx.channel.send(getPreview() as any);

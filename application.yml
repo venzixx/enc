@@ -19,16 +19,13 @@ plugins:
       token: "MniXLg0xfLS9OpcSor_OVz7fF5uPrYs90Ak2uaPVgr7QCMe2xHbYODUnpR0_ffDFVYrJPwEmuunuybk5LmK9eU6zu7YtbyW4TiYmAcJoqI1Ch8SaieoC26fU9dUymPV3zNkMY7pMc8mqFQUJvZdXEnVupt9YOOrKv1w="
       visitorData: "CgtOb0haM3FWN0V2USj8oOHGBjIKCgJERRIEEgAgVw%3D%3D"
     clients:
-      - TV
-      - TVHTML5_SIMPLY
       - WEB
       - MUSIC
-      - IOS
-      - MWEB
-      - ANDROID
-      - ANDROID_MUSIC
       - ANDROID_VR
       - WEBEMBEDDED
+      - ANDROID_MUSIC
+      - TVHTML5_SIMPLY
+      - TV
   lavasrc:
     providers:
       - "dzisrc:%ISRC%"
@@ -66,9 +63,9 @@ plugins:
       mediaAPIToken: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6Ijk3RFFVOVFVRDYifQ.eyJpc3MiOiJNNjJZRDg1RlRRIiwiaWF0IjoxNzc0ODk2NTE3LCJleHAiOjE3ODIxNTQxMTcsIm9yaWdpbiI6IiouYXBwbGUuY29tIn0.neG2f5gMFnlvq4lnQEvBNt7xU-XKVyCxoU6gJjNNGjcfXPTGlXOM2opkJufBNpSV5-lqQceIfylrIqyLa70dFg"
 lavalink:
   plugins:
-    - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.0"
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.1"
       snapshot: false
-    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.1"
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.2"
       snapshot: false
     - dependency: "com.github.topi314.lavasearch:lavasearch-plugin:1.0.0"
       snapshot: false

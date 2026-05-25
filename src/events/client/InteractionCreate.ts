@@ -19,6 +19,7 @@ import logger from "../../structures/Logger";
 import { AuditLogger, AuditLogType, AuditLogStatus } from "../../utils/AuditLogger";
 import { LavamusicEventType } from "../../types/events";
 import { ExtendedClient } from "../../client";
+import { isDev } from "../../utils/devCheck";
 
 export default class InteractionCreate extends Event {
 	constructor(client: ExtendedClient, file: string) {
@@ -64,6 +65,21 @@ export default class InteractionCreate extends Event {
 			const { commandName } = interaction;
 			const command = this.client.commands.get(commandName);
 			if (!command) return;
+
+			// Maintenance Check
+			const isBotDev = await isDev(this.client, interaction.user.id);
+			if (this.client.maintenance.enabled && !isBotDev) {
+				return await interaction.reply({
+					embeds: [
+						new EmbedBuilder()
+							.setTitle("Under Maintenance")
+							.setDescription(`Dimscord is currently under maintenance${this.client.maintenance.eta ? ` until **${this.client.maintenance.eta}**` : ""}. Please try again later.`)
+							.setColor(this.client.color.yellow)
+							.setTimestamp()
+					],
+					flags: MessageFlags.Ephemeral,
+				});
+			}
 
 			const ctx = new Context(this.client, interaction);
 			ctx.lng = locale || "en-US";
@@ -132,8 +148,7 @@ export default class InteractionCreate extends Event {
 				}
 
 				if (command.permissions?.dev) {
-					const isDev = process.env.OWNER_ID === interaction.user.id;
-					if (!isDev) return;
+					if (!isBotDev) return;
 				}
 			}
 
@@ -322,6 +337,26 @@ export default class InteractionCreate extends Event {
 					logger.error(error);
 				}
 			} else if (interaction.guildId) {
+				try {
+					const dbAction = await (this.client.prisma as any).componentAction.findUnique({
+						where: { 
+							guildId_customId: { 
+								guildId: interaction.guildId, 
+								customId: customId 
+							} 
+						}
+					});
+
+					if (dbAction) {
+						const logic = JSON.parse(dbAction.logic);
+						const { ActionFlowExecutor } = await import('../../utils/ActionFlowExecutor');
+						await ActionFlowExecutor.execute(this.client, interaction as any, logic);
+						return;
+					}
+				} catch (error) {
+					logger.error(`[ACTION_FLOW_ERROR] ${error}`);
+				}
+
 				// Unhandled component interaction — log for debug
 				logger.info(`[COMPONENT] Unhandled component interaction: ${customId}`);
 			}

@@ -4,7 +4,7 @@ import path from 'path';
 import { Command, Event, Component } from '../structures';
 import { LavamusicEventType } from '../types/events';
 import logger from '../structures/Logger';
-import { Routes, ApplicationCommandType } from 'discord.js';
+import { Routes, ApplicationCommandType, PermissionsBitField } from 'discord.js';
 import { env } from '../env';
 
 export async function loadCommands(client: ExtendedClient) {
@@ -54,10 +54,11 @@ export async function loadCommands(client: ExtendedClient) {
                 // Calculate permission bitfield for slash commands
                 let defaultMemberPermissions = null;
                 if (command.permissions.user) {
-                    const perms = Array.isArray(command.permissions.user) ? command.permissions.user : [command.permissions.user];
-                    if (perms.length > 0) {
-                        const bitfield = perms.reduce((acc, perm) => acc | BigInt(perm), 0n);
+                    try {
+                        const bitfield = PermissionsBitField.resolve(command.permissions.user);
                         defaultMemberPermissions = bitfield.toString();
+                    } catch (err) {
+                        logger.error(`Failed to resolve permissions for command ${command.name}:`, err);
                     }
                 }
 

@@ -1,4 +1,4 @@
-import { type ButtonInteraction, ChannelType, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
+import { type ButtonInteraction, ChannelType, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, resolveColor } from "discord.js";
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
 import { V2Helper } from "../../utils/V2Helper";
@@ -14,6 +14,7 @@ export default class TicketOpen extends Component {
 		if (!interaction.guild) return;
 		const parts = interaction.customId.split('_');
 		const panelId = parts[2];
+		const optionId = parts[3];
 
         // Fetch config from DB
         const config = await (this.client.prisma as any).ticketConfig.findUnique({
@@ -29,6 +30,30 @@ export default class TicketOpen extends Component {
             return await interaction.reply({ content: `${this.client.emoji.cross} This ticket panel is no longer configured.`, ephemeral: true });
         }
 
+        // Fetch option config if multi-panel option button clicked
+        let optionInfo = null;
+        if (optionId) {
+            optionInfo = await (this.client.prisma as any).ticketPanelOption.findUnique({
+                where: {
+                    panelId_optionId: {
+                        panelId: config.id,
+                        optionId: optionId
+                    }
+                }
+            });
+        }
+
+        // Fetch target config if this option points to another panel
+        let targetConfig = config;
+        if (optionInfo && optionInfo.targetPanelId) {
+            const targetPanel = await (this.client.prisma as any).ticketConfig.findUnique({
+                where: { guildId_panelId: { guildId: interaction.guild.id, panelId: optionInfo.targetPanelId } }
+            });
+            if (targetPanel) {
+                targetConfig = targetPanel;
+            }
+        }
+
         // Increment Ticket Count & Fetch Next ID
         const updatedConfig = await (this.client.prisma as any).ticketConfig.update({
             where: { id: config.id },
@@ -36,28 +61,43 @@ export default class TicketOpen extends Component {
         });
 
         const ticketId = updatedConfig.ticketCount.toString().padStart(4, '0');
-        const channelName = config.ticketNameFormat
+        const nameFormat = targetConfig.ticketNameFormat || config.ticketNameFormat || 'ticket-{id}';
+        let channelName = nameFormat
             .replace('{id}', ticketId)
             .replace('{user}', interaction.user.username);
+        
+        if (optionInfo) {
+            channelName = channelName.replace('{panel}', optionInfo.label.toLowerCase().replace(/\s+/g, '-'));
+        } else {
+            channelName = channelName.replace('{panel}', config.name.toLowerCase().replace(/\s+/g, '-'));
+        }
 		
+		const categoryId = optionInfo ? (optionInfo.categoryId || targetConfig.categoryId || config.categoryId) : config.categoryId;
+		const supportRole = optionInfo ? (optionInfo.supportRoleId || targetConfig.supportRoleId || config.supportRoleId) : config.supportRoleId;
+
+		const permissionOverwrites: any[] = [
+			{
+				id: interaction.guild.id,
+				deny: [PermissionFlagsBits.ViewChannel],
+			},
+			{
+				id: interaction.user.id,
+				allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles],
+			}
+		];
+
+		if (supportRole) {
+			permissionOverwrites.push({
+				id: supportRole,
+				allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles],
+			});
+		}
+
 		const ticketChannel = await interaction.guild.channels.create({
 			name: channelName,
 			type: ChannelType.GuildText,
-			parent: config.categoryId,
-			permissionOverwrites: [
-				{
-					id: interaction.guild.id,
-					deny: [PermissionFlagsBits.ViewChannel],
-				},
-				{
-					id: interaction.user.id,
-					allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles],
-				},
-				{
-					id: config.supportRoleId,
-					allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles],
-				}
-			]
+			parent: categoryId || undefined,
+			permissionOverwrites: permissionOverwrites
 		});
 
         // Save Ticket to DB
@@ -67,38 +107,92 @@ export default class TicketOpen extends Component {
                 channelId: ticketChannel.id,
                 userId: interaction.user.id,
                 status: 'OPEN',
-                number: updatedConfig.ticketCount
+                number: updatedConfig.ticketCount,
+                panelId: optionInfo?.targetPanelId || panelId
             }
         });
 
         // Parse custom fields if any
         let customFields = [];
         try {
-            if (config.welcomeFields) {
-                customFields = JSON.parse(config.welcomeFields);
+            if (targetConfig.welcomeFields) {
+                customFields = JSON.parse(targetConfig.welcomeFields);
             }
         } catch (e) {
             console.error("Failed to parse welcomeFields", e);
         }
 
-		const ticketLayout = V2Helper.createLayout({
-			title: config.welcomeTitle || 'Ticket Dashboard',
-			description: (config.welcomeDescription || config.welcomeMessage || '').replace('{user}', interaction.user.toString()),
-            fields: [
-                { name: 'Creator', value: interaction.user.toString(), inline: true },
-                { name: 'Panel', value: config.name, inline: true },
-                { name: 'Claimed By', value: 'Unclaimed', inline: true },
-                ...customFields
-            ],
-			color: config.welcomeColor || this.client.color.main,
-            image: config.welcomeImage,
-            thumbnail: config.welcomeThumbnail,
-            footer: config.welcomeFooterText,
-            authorName: config.welcomeAuthorName,
-            authorIcon: config.welcomeAuthorIcon,
-            authorUrl: config.welcomeAuthorUrl,
-            timestamp: config.welcomeTimestamp,
-            buttons: [
+		let ticketLayout: any;
+        if (targetConfig.useV2) {
+            ticketLayout = V2Helper.createLayout({
+                title: targetConfig.welcomeTitle || 'Ticket Dashboard',
+                description: (targetConfig.welcomeDescription || targetConfig.welcomeMessage || '').replace('{user}', interaction.user.toString()),
+                fields: [
+                    { name: 'Creator', value: interaction.user.toString(), inline: true },
+                    { name: optionInfo ? 'Category' : 'Panel', value: optionInfo ? optionInfo.label : config.name, inline: true },
+                    { name: 'Claimed By', value: 'Unclaimed', inline: true },
+                    ...customFields
+                ],
+                color: targetConfig.welcomeColor || this.client.color.main,
+                image: targetConfig.welcomeImage,
+                thumbnail: targetConfig.welcomeThumbnail,
+                footer: targetConfig.welcomeFooterText,
+                authorName: targetConfig.welcomeAuthorName,
+                authorIcon: targetConfig.welcomeAuthorIcon,
+                authorUrl: targetConfig.welcomeAuthorUrl,
+                timestamp: targetConfig.welcomeTimestamp,
+                buttons: [
+                    new ButtonBuilder()
+                        .setCustomId(`ticket_claim_${ticket.id}`)
+                        .setLabel('Claim')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setCustomId(`ticket_close`)
+                        .setLabel('Close')
+                        .setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder()
+                        .setCustomId(`ticket_rename`)
+                        .setLabel('Rename')
+                        .setEmoji(this.client.emoji.edit)
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId(`ticket_add`)
+                        .setLabel('Add User')
+                        .setStyle(ButtonStyle.Secondary)
+                ]
+            });
+        } else {
+            const embed = new EmbedBuilder()
+                .setTitle(targetConfig.welcomeTitle || 'Ticket Dashboard')
+                .setDescription((targetConfig.welcomeDescription || targetConfig.welcomeMessage || '').replace('{user}', interaction.user.toString()))
+                .setColor(resolveColor(targetConfig.welcomeColor || this.client.color.main))
+                .addFields(
+                    { name: 'Creator', value: interaction.user.toString(), inline: true },
+                    { name: optionInfo ? 'Category' : 'Panel', value: optionInfo ? optionInfo.label : config.name, inline: true },
+                    { name: 'Claimed By', value: 'Unclaimed', inline: true }
+                );
+
+            if (targetConfig.welcomeImage) embed.setImage(targetConfig.welcomeImage);
+            if (targetConfig.welcomeThumbnail) embed.setThumbnail(targetConfig.welcomeThumbnail);
+            if (targetConfig.welcomeFooterText) {
+                embed.setFooter({ 
+                    text: targetConfig.welcomeFooterText, 
+                    iconURL: targetConfig.welcomeFooterIcon || undefined 
+                });
+            }
+            if (targetConfig.welcomeAuthorName) {
+                embed.setAuthor({ 
+                    name: targetConfig.welcomeAuthorName, 
+                    iconURL: targetConfig.welcomeAuthorIcon || undefined, 
+                    url: targetConfig.welcomeAuthorUrl || undefined 
+                });
+            }
+            if (targetConfig.welcomeTimestamp) embed.setTimestamp();
+            if (customFields && customFields.length > 0) {
+                embed.addFields(customFields);
+            }
+
+            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`ticket_claim_${ticket.id}`)
                     .setLabel('Claim')
@@ -116,13 +210,20 @@ export default class TicketOpen extends Component {
                     .setCustomId(`ticket_add`)
                     .setLabel('Add User')
                     .setStyle(ButtonStyle.Secondary)
-            ]
-		});
+            );
 
-		await ticketChannel.send({ 
-            content: `${interaction.user} | <@&${config.supportRoleId}>`, 
-            ...(ticketLayout as any)
-        });
+            ticketLayout = {
+                embeds: [embed],
+                components: [row]
+            };
+        }
+
+		// Send mention ping first (separate from V2 message)
+		const pingContent = supportRole ? `${interaction.user} | <@&${supportRole}>` : `${interaction.user}`;
+		await ticketChannel.send({ content: pingContent });
+
+		// Send ticket dashboard
+		await ticketChannel.send(ticketLayout as any);
 
 		await interaction.reply({ 
             ...V2Helper.createLayout({

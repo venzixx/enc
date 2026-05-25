@@ -70,7 +70,6 @@ export default class LevelupTest extends Command {
                     rank: 1, // Mock rank
                     currentXp: level * level * 100,
                     requiredXp: nextLevelXP,
-                    backgroundUrl: guildData.rankCardBackgroundUrl || undefined,
                     color: guildData.rankCardProgressColor || undefined,
                 });
                 attachment = new AttachmentBuilder(cardBuffer, { name: `levelup-test-${member.id}.png` });

@@ -2,6 +2,7 @@ import { PermissionFlagsBits, TextChannel, VoiceChannel } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { AuditLogger, AuditLogType } from '../../utils/AuditLogger';
+import { LockManager } from '../../utils/LockManager';
 
 export default class UnlockChannel extends Command {
     constructor(client: ExtendedClient) {
@@ -36,9 +37,36 @@ export default class UnlockChannel extends Command {
             return ctx.replyV2({ description: 'Invalid channel specified.', color: client.color.red, isAlert: true });
         }
 
-        await (targetChannel as TextChannel | VoiceChannel).permissionOverwrites.edit(ctx.guild.roles.everyone, {
-            SendMessages: null
-        });
+        const isVoice = targetChannel.isVoiceBased();
+        const permissionsToUnlock = isVoice
+            ? ['Connect', 'Speak', 'SendMessages']
+            : ['SendMessages', 'SendMessagesInThreads', 'CreatePublicThreads', 'CreatePrivateThreads'];
+
+        // Retrieve saved lock state
+        const savedState = await LockManager.getAndClearLockState(targetChannel.id);
+
+        // Restore role overrides
+        for (const [roleId, allowedPermissions] of Object.entries(savedState)) {
+            const role = ctx.guild.roles.cache.get(roleId);
+            if (!role) continue;
+
+            const restoreOverrides: Record<string, boolean | null> = {};
+            for (const perm of permissionsToUnlock) {
+                if (allowedPermissions.includes(perm)) {
+                    restoreOverrides[perm] = true; // Restore to allowed
+                } else {
+                    restoreOverrides[perm] = null; // Set to neutral/inherit
+                }
+            }
+            await targetChannel.permissionOverwrites.edit(roleId, restoreOverrides);
+        }
+
+        // Unlock @everyone
+        const everyoneOverrides: Record<string, null> = {};
+        for (const perm of permissionsToUnlock) {
+            everyoneOverrides[perm] = null;
+        }
+        await (targetChannel as TextChannel | VoiceChannel).permissionOverwrites.edit(ctx.guild.roles.everyone, everyoneOverrides);
 
         await AuditLogger.log(client, ctx.guild, {
             type: AuditLogType.MODERATION,
@@ -47,7 +75,7 @@ export default class UnlockChannel extends Command {
             executorTag: ctx.author.tag,
             targetId: targetChannel.id,
             targetName: (targetChannel as any).name,
-            details: `Unlocked channel #${(targetChannel as any).name} for @everyone`,
+            details: `Unlocked channel #${(targetChannel as any).name} for everyone`,
             color: client.color.green
         });
 

@@ -22,6 +22,7 @@ import { HeatManager } from "../../utils/HeatManager";
 import { ExtendedClient } from "../../client";
 import { getAIResponse } from "../../handlers/aiHandler";
 import { StreakManager } from "../../utils/StreakManager";
+import { isDev } from "../../utils/devCheck";
 
 export default class MessageCreate extends Event {
 	constructor(client: ExtendedClient, file: string) {
@@ -53,10 +54,10 @@ export default class MessageCreate extends Event {
 					// Expired — clean up
 					await (this.client.prisma as any).devMute.delete({
 						where: { guildId_userId: { guildId: message.guildId!, userId: message.author.id } }
-					}).catch(() => {});
+					}).catch(() => { });
 				} else {
 					// Still muted — delete message and DM
-					await message.delete().catch(() => {});
+					await message.delete().catch(() => { });
 
 					// Only DM once every 30 seconds to avoid spam
 					const muteKey = `devmute-dm-${message.guildId}-${message.author.id}`;
@@ -99,6 +100,61 @@ export default class MessageCreate extends Event {
 			// DevMute table might not exist yet
 		}
 
+		// --- MENTION TRACKING ---
+		try {
+			const repliedMessage = message.reference?.messageId ?
+				await message.channel.messages.fetch(message.reference.messageId).catch(() => null) : null;
+
+			const mentionedUsers = new Set<string>();
+
+			if (message.mentions.users.size > 0) {
+				for (const [id] of message.mentions.users) {
+					if (id !== message.author.id) {
+						mentionedUsers.add(id);
+					}
+				}
+			}
+
+			if (repliedMessage && repliedMessage.author.id !== message.author.id) {
+				mentionedUsers.add(repliedMessage.author.id);
+			}
+
+			for (const targetUserId of mentionedUsers) {
+				await (this.client.prisma as any).userMention.create({
+					data: {
+						guildId: message.guildId!,
+						channelId: message.channelId,
+						messageId: message.id,
+						userId: targetUserId,
+						authorId: message.author.id,
+						authorTag: message.author.tag,
+						content: message.content.substring(0, 200),
+						isReply: repliedMessage?.author.id === targetUserId
+					}
+				}).catch(() => {});
+
+				// Cleanup: Keep only latest 100
+				const oldestToKeep = await (this.client.prisma as any).userMention.findMany({
+					where: { userId: targetUserId },
+					orderBy: { createdAt: 'desc' },
+					skip: 99,
+					take: 1,
+					select: { id: true }
+				}).catch(() => []);
+
+				if (oldestToKeep.length > 0) {
+					await (this.client.prisma as any).userMention.deleteMany({
+						where: {
+							userId: targetUserId,
+							id: { lt: oldestToKeep[0].id }
+						}
+					}).catch(() => {});
+				}
+			}
+		} catch (err) {
+			console.error('[MentionTracking] Error:', err);
+		}
+
 		// UPDATE STREAKS
 		StreakManager.processMessage(this.client, message.guild.id, message.author.id, message.channelId).catch(err => console.error("Streak Error:", err));
 
@@ -134,7 +190,7 @@ export default class MessageCreate extends Event {
 					.setDescription(` Welcome back **${message.author.displayName || message.author.username}**! Your AFK has been removed.${mentionSummary}`)
 					.setTimestamp();
 
-				await message.reply({ embeds: [embed] }).catch(() => {});
+				await message.reply({ embeds: [embed] }).catch(() => { });
 			}
 		}
 
@@ -142,7 +198,7 @@ export default class MessageCreate extends Event {
 		if (message.mentions.users.size > 0) {
 			for (const [mentionedId] of message.mentions.users) {
 				if (mentionedId === message.author.id) continue; // Don't trigger on self-mention
-				
+
 				const mentionedAfk = await (this.client.prisma as any).afk.findUnique({
 					where: { userId: mentionedId }
 				});
@@ -160,10 +216,30 @@ export default class MessageCreate extends Event {
 						}
 					});
 
+					const mentionedUser = message.mentions.users.get(mentionedId);
+					const displayName = mentionedUser ? (mentionedUser.displayName || mentionedUser.username) : 'User';
+
 					const afkTimestamp = Math.floor(mentionedAfk.timestamp.getTime() / 1000);
-					await message.reply({
-						content: ` **<@${mentionedId}>** is AFK: **${mentionedAfk.reason}**  <t:${afkTimestamp}:R>`
-					}).catch(() => {});
+					const fullReason = mentionedAfk.reason;
+					const [displayReason, directUrl] = fullReason.includes('|') ? fullReason.split('|') : [fullReason, fullReason];
+					const isUrl = /^(https?:\/\/[^\s]+)$/.test(displayReason);
+					const isMediaReason = fullReason.includes('|') || (isUrl && (displayReason.includes('giphy.com') || displayReason.includes('tenor.com') || displayReason.match(/\.(gif|jpe?g|png|webp)$/i)));
+					
+					if (isMediaReason) {
+						const afkEmbed = new EmbedBuilder()
+							.setColor(this.client.color.main)
+							.setDescription(` **${displayName}** is AFK: [Media] <t:${afkTimestamp}:R>`)
+							.setImage(directUrl);
+						
+						await message.reply({ embeds: [afkEmbed], allowedMentions: { repliedUser: false } }).catch(() => { });
+					} else {
+						const finalReason = isUrl ? displayReason : `**${displayReason}**`;
+						await message.reply({
+							content: ` **${displayName}** is AFK: ${finalReason}  <t:${afkTimestamp}:R>`,
+							allowedMentions: { repliedUser: false }
+						}).catch(() => { });
+					}
+
 				}
 			}
 		}
@@ -184,9 +260,9 @@ export default class MessageCreate extends Event {
 		// 2) Check for Ignored Channels (Bypass for HELP command)
 		const prefix = setup?.prefix || guild?.prefix || process.env.PREFIX || "e!";
 		console.log(`[DEBUG] Message from ${message.author.tag}: "${message.content}". Prefix: "${prefix}"`);
-		const isHelp = message.content.toLowerCase().startsWith(prefix.toLowerCase() + "help") || 
-					   message.content.startsWith(`<@!${this.client.user?.id}> help`) || 
-					   message.content.startsWith(`<@${this.client.user?.id}> help`);
+		const isHelp = message.content.toLowerCase().startsWith(prefix.toLowerCase() + "help") ||
+			message.content.startsWith(`<@!${this.client.user?.id}> help`) ||
+			message.content.startsWith(`<@${this.client.user?.id}> help`);
 
 		const isIgnored = guild?.ignoredChannels?.some((ic: any) => ic.channelId === message.channelId);
 		if (isIgnored && !isHelp) return;
@@ -210,9 +286,9 @@ export default class MessageCreate extends Event {
 				matched = cleanContent.includes(trigger);
 			} else if (matchType === "MENTION") {
 				// Match if the trigger (user ID) is mentioned in the message
-				matched = message.mentions.users.has(ar.trigger) || 
-						  message.content.includes(`<@${ar.trigger}>`) || 
-						  message.content.includes(`<@!${ar.trigger}>`);
+				matched = message.mentions.users.has(ar.trigger) ||
+					message.content.includes(`<@${ar.trigger}>`) ||
+					message.content.includes(`<@!${ar.trigger}>`);
 			} else {
 				// EXACT match
 				matched = cleanContent === trigger;
@@ -221,7 +297,7 @@ export default class MessageCreate extends Event {
 			if (matched) {
 				// C) Response Handling (GIF/Image support)
 				const isImageUrl = ar.response.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/i);
-				
+
 				if (isImageUrl) {
 					const embed = new EmbedBuilder()
 						.setColor(this.client.color.main)
@@ -249,8 +325,8 @@ export default class MessageCreate extends Event {
 				if (isMentionTrigger) {
 					const id = ar.trigger;
 					matched = message.mentions.users.has(id) ||
-							  message.content.includes(`<@${id}>`) ||
-							  message.content.includes(`<@!${id}>`);
+						message.content.includes(`<@${id}>`) ||
+						message.content.includes(`<@!${id}>`);
 				} else {
 					// Word/phrase trigger - case insensitive includes
 					matched = msgLower.includes(ar.trigger);
@@ -304,11 +380,23 @@ export default class MessageCreate extends Event {
 
 		// 3.7) --- Text Lock (UwU / NSFW / Mommy) ---
 		try {
-			const textLock = await (this.client.prisma as any).uwuLock.findUnique({
+			let textLock = await (this.client.prisma as any).uwuLock.findUnique({
 				where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } }
 			});
 
-			if (textLock && message.content.trim().length > 0 && !message.author.bot) {
+			if (!textLock) {
+				textLock = await (this.client.prisma as any).uwuLock.findUnique({
+					where: { guildId_userId: { guildId: message.guildId, userId: message.channelId } }
+				});
+			}
+
+			const prefix = setup?.prefix || guild?.prefix || process.env.PREFIX || "e!";
+			const escapeRegex = (str: string): string => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+			const mentionPrefixRegex = new RegExp(`^<@!?${this.client.user?.id}>\\s*`);
+			const standardPrefixRegex = new RegExp(`^${escapeRegex(prefix)}\\s*`);
+			const isCommand = message.content.match(mentionPrefixRegex) || message.content.match(standardPrefixRegex);
+
+			if (textLock && message.content.trim().length > 0 && !message.author.bot && !isCommand) {
 				let transformedText: string;
 				switch (textLock.lockType) {
 					case 'nsfw': transformedText = this.nsfwify(message.content); break;
@@ -330,8 +418,8 @@ export default class MessageCreate extends Event {
 					}
 
 					const displayName = message.member?.displayName || message.author.displayName || message.author.username;
-					
-					await message.delete().catch(() => {});
+
+					await message.delete().catch(() => { });
 					await webhook.send({
 						content: transformedText,
 						username: displayName,
@@ -364,8 +452,8 @@ export default class MessageCreate extends Event {
 				await message.react(this.client.emoji.success);
 				await (this.client.prisma as any).guild.update({
 					where: { id: message.guildId },
-					data: { 
-						countingCurrent: num, 
+					data: {
+						countingCurrent: num,
 						countingLastUser: message.author.id,
 						countingHighScore: num > (guild.countingHighScore || 0) ? num : undefined
 					}
@@ -421,16 +509,16 @@ export default class MessageCreate extends Event {
 
 				const memberData = await (this.client.prisma as any).member.upsert({
 					where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } },
-					update: { 
+					update: {
 						messages: { increment: 1 },
 						xp: { increment: xpToGive },
 						lastUsername: message.author.displayName || message.author.username,
 						lastAvatar: message.author.displayAvatarURL()
 					},
-					create: { 
-						guildId: message.guildId, 
-						userId: message.author.id, 
-						messages: 1, 
+					create: {
+						guildId: message.guildId,
+						userId: message.author.id,
+						messages: 1,
 						xp: xpToGive,
 						lastUsername: message.author.displayName || message.author.username,
 						lastAvatar: message.author.displayAvatarURL()
@@ -441,7 +529,7 @@ export default class MessageCreate extends Event {
 				this.client.xpCooldowns.set(`${message.guildId}-${message.author.id}`, now);
 				setTimeout(() => this.client.xpCooldowns.delete(`${message.guildId}-${message.author.id}`), cooldownTime);
 
-				const calcLevelXP = (lvl: number) => Math.floor((5 * Math.pow(lvl, 2) + 50 * lvl + 100) * (guild.xpFormulaMultiplier ?? 1.0));
+				const calcLevelXP = (lvl: number) => Math.floor((18 * Math.pow(lvl, 2) + 200 * lvl) * (guild.xpFormulaMultiplier ?? 1.0));
 				const nextLevelXP = calcLevelXP(memberData.level + 1);
 
 				if (memberData.xp >= nextLevelXP) {
@@ -455,7 +543,7 @@ export default class MessageCreate extends Event {
 						const rolesToAdd = guild.levelRoles.filter((lr: any) => lr.level <= newLevel).map((lr: any) => lr.roleId);
 						if (rolesToAdd.length > 0) {
 							if (guild.stackRoleRewards) {
-								await message.member?.roles.add(rolesToAdd).catch(() => {});
+								await message.member?.roles.add(rolesToAdd).catch(() => { });
 							} else {
 								const allLevelRoles = guild.levelRoles.map((lr: any) => lr.roleId);
 								const highestRole = guild.levelRoles
@@ -463,8 +551,8 @@ export default class MessageCreate extends Event {
 									.sort((a: any, b: any) => b.level - a.level)[0]?.roleId;
 								if (highestRole) {
 									const rolesToRemove = allLevelRoles.filter((id: string) => id !== highestRole);
-									await message.member?.roles.remove(rolesToRemove).catch(() => {});
-									await message.member?.roles.add(highestRole).catch(() => {});
+									await message.member?.roles.remove(rolesToRemove).catch(() => { });
+									await message.member?.roles.add(highestRole).catch(() => { });
 								}
 							}
 						}
@@ -479,8 +567,8 @@ export default class MessageCreate extends Event {
 
 						// Resolve target channel: prefer levelUpChannelId > levelChannelId > current channel
 						const targetChannelId = guild.levelUpChannelId || guild.levelChannelId;
-						const targetChannel = targetChannelId ? 
-							(message.guild.channels.cache.get(targetChannelId) as TextChannel) : 
+						const targetChannel = targetChannelId ?
+							(message.guild.channels.cache.get(targetChannelId) as TextChannel) :
 							(message.channel as TextChannel);
 
 						if (!targetChannel) return;
@@ -492,22 +580,22 @@ export default class MessageCreate extends Event {
 								const rank = await this.client.prisma.member.count({
 									where: {
 										guildId: message.guildId!,
-										xp: { gt: data.xp + xpToAdd }
+										xp: { gt: memberData.xp }
 									}
 								}) + 1;
 
-								const nextLevelXP = (newLevel + 1) * (newLevel + 1) * 100;
+								const nextLevelXP = calcLevelXP(newLevel + 1);
 								const cardBuffer = await RankCardGenerator.generate({
 									username: message.author.username,
 									avatarUrl: message.author.displayAvatarURL({ extension: 'png', size: 256 }),
 									level: newLevel,
 									rank: rank,
-									currentXp: data.xp + xpToAdd,
+									currentXp: memberData.xp,
 									requiredXp: nextLevelXP,
-									backgroundUrl: guild.rankCardBackgroundUrl || undefined,
 									color: guild.rankCardProgressColor || undefined,
 								});
 								attachment = new AttachmentBuilder(cardBuffer, { name: `levelup-${message.author.id}.png` });
+
 							} catch (err) {
 								logger.error(`[LEVEL_UP_CARD_ERROR] ${err}`);
 							}
@@ -536,7 +624,7 @@ export default class MessageCreate extends Event {
 								if (embedData.thumbnail?.url) embed.setThumbnail(embedData.thumbnail.url);
 								if (embedData.image?.url) embed.setImage(embedData.image.url);
 								if (embedData.footer?.text) embed.setFooter({ text: resolveField(embedData.footer.text)!, iconURL: embedData.footer.icon_url });
-								
+
 								// If rank card is enabled, set it as the image if no custom image is set
 								if (attachment && !embedData.image?.url) {
 									embed.setImage(`attachment://${attachment.name}`);
@@ -544,23 +632,23 @@ export default class MessageCreate extends Event {
 
 								if (!embedData.title && !embedData.description) embed.setDescription(content);
 
-								await targetChannel.send({ 
+								await targetChannel.send({
 									embeds: [embed],
 									files: attachment ? [attachment] : []
-								}).catch(() => {});
+								}).catch(() => { });
 							} catch (e) {
 								// Fallback to standard embed on parse error
 								const embed = new EmbedBuilder()
 									.setColor(this.client.color.main)
 									.setDescription(content)
 									.setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() });
-								
+
 								if (attachment) embed.setImage(`attachment://${attachment.name}`);
 
-								await targetChannel.send({ 
+								await targetChannel.send({
 									embeds: [embed],
 									files: attachment ? [attachment] : []
-								}).catch(() => {});
+								}).catch(() => { });
 							}
 						} else {
 							// Standard text-based level-up embed
@@ -571,10 +659,10 @@ export default class MessageCreate extends Event {
 
 							if (attachment) embed.setImage(`attachment://${attachment.name}`);
 
-							await targetChannel.send({ 
+							await targetChannel.send({
 								embeds: [embed],
 								files: attachment ? [attachment] : []
-							}).catch(() => {});
+							}).catch(() => { });
 						}
 					}
 				}
@@ -582,7 +670,7 @@ export default class MessageCreate extends Event {
 				await (this.client.prisma as any).member.update({
 					where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } },
 					data: { messages: { increment: 1 } }
-				}).catch(() => {});
+				}).catch(() => { });
 			}
 		}
 
@@ -594,7 +682,7 @@ export default class MessageCreate extends Event {
 		if (stickyData) {
 			if (stickyData.lastMsgId) {
 				const lastMsg = await message.channel.messages.fetch(stickyData.lastMsgId).catch(() => null);
-				if (lastMsg) await lastMsg.delete().catch(() => {});
+				if (lastMsg) await lastMsg.delete().catch(() => { });
 			}
 			const newSticky = await (message.channel as TextChannel).send({
 				embeds: [new EmbedBuilder().setDescription(stickyData.content).setColor(0x000000).setFooter({ text: 'Sticky Message' })]
@@ -618,16 +706,16 @@ export default class MessageCreate extends Event {
 				// Not a story word, ignore (let it pass to commands/XP)
 			} else {
 				if (message.author.id === storyData.lastUser) {
-					await message.delete().catch(() => {});
+					await message.delete().catch(() => { });
 					if (message.channel.isTextBased() && 'send' in message.channel) {
-						await message.channel.send({ content: `${this.client.emoji.cross} ${message.author}, you cannot contribute twice in a row!` }).then((m: Message) => setTimeout(() => m.delete().catch(() => {}), 5000));
+						await message.channel.send({ content: `${this.client.emoji.cross} ${message.author}, you cannot contribute twice in a row!` }).then((m: Message) => setTimeout(() => m.delete().catch(() => { }), 5000));
 					}
 					return;
 				}
 
 				await (this.client.prisma as any).story.update({
 					where: { guildId_channelId: { guildId: message.guildId as string, channelId: message.channelId as string } },
-					data: { 
+					data: {
 						content: storyData.content + ' ' + words[0],
 						lastUser: message.author.id
 					}
@@ -669,6 +757,11 @@ export default class MessageCreate extends Event {
 			}
 		}
 
+		// If command contains no alphanumeric characters (e.g. "...", "!!!"), ignore it completely and do not trigger alerts
+		if (cmd && !/[a-zA-Z0-9]/.test(cmd)) {
+			return;
+		}
+
 		// --- Custom Command Aliases ---
 		if (cmd) {
 			const customAliases = await (this.client.prisma as any).commandAlias.findMany({
@@ -692,7 +785,7 @@ export default class MessageCreate extends Event {
 		) : null;
 
 		// 2. Response Logic (Exclusive Paths)
-		
+
 		//  PATH A: COMMAND EXECUTION 
 		if (command) {
 			(message as any).args = args;
@@ -703,7 +796,7 @@ export default class MessageCreate extends Event {
 			(ctx as any).args = args;
 			(ctx as any).prefix = matchedPrefix;
 
-            logger.info(`[Command] ${command.name} triggered by ${message.author.tag} (${message.author.id}) in ${message.guildId}. Content: "${message.content}"`);
+			logger.info(`[Command] ${command.name} triggered by ${message.author.tag} (${message.author.id}) in ${message.guildId}. Content: "${message.content}"`);
 
 			// ... (Rest of command validation and run)
 			return await this.handleCommand(command, ctx, args, locale, message);
@@ -713,45 +806,45 @@ export default class MessageCreate extends Event {
 				.setColor(this.client.color.red)
 				.setDescription(`${this.client.emoji.cross} Unknown command. Use \`${prefix}help\` for assistance.`)
 				.setTimestamp();
-			return await message.reply({ embeds: [embed] }).catch(() => {});
+			return await message.reply({ embeds: [embed] }).catch(() => { });
 		}
 
 		//  PATH B: AI RESPONSE 
-		const repliedMessage = message.reference?.messageId ? 
+		const repliedMessage = message.reference?.messageId ?
 			await message.channel.messages.fetch(message.reference.messageId).catch(() => null) : null;
 		const isReplyToBot = repliedMessage?.author.id === this.client.user!.id;
 		const isMentionOnly = message.content.match(mentionPrefixRegex) && !cmd;
 
 		if (isMentionOnly || isReplyToBot) {
 			try {
-                // Fetch Guild AI Settings
-                const guildData = await (this.client.prisma as any).guild.findUnique({
-                    where: { id: message.guildId! }
-                });
+				// Fetch Guild AI Settings
+				const guildData = await (this.client.prisma as any).guild.findUnique({
+					where: { id: message.guildId! }
+				});
 
-                // Check if AI is enabled
-                if (guildData && !guildData.aiEnabled) {
-                    if (isMentionOnly) {
-                        return await message.reply({
-                            content: t(I18N.events.message.prefix_mention, { lng: locale, prefix: prefix }),
-                        });
-                    }
-                    return;
-                }
+				// Check if AI is enabled
+				if (guildData && !guildData.aiEnabled) {
+					if (isMentionOnly) {
+						return await message.reply({
+							content: t(I18N.events.message.prefix_mention, { lng: locale, prefix: prefix }),
+						});
+					}
+					return;
+				}
 
-                if ('sendTyping' in message.channel) await message.channel.sendTyping();
-			
-                // Clean the content (remove bot mention)
-                const cleanContent = message.content.replace(new RegExp(`<@!?${this.client.user?.id}>`, 'g'), '').trim();
+				if ('sendTyping' in message.channel) await message.channel.sendTyping();
 
-                const aiResponse = await getAIResponse(
-                    `User says: "${cleanContent || "(Just a ping/reply)"}".`,
-                    {
-                        aiPersonality: guildData?.aiPersonality || 'CASUAL',
-                        aiCustomPrompt: guildData?.aiCustomPrompt || null,
-                        aiSearchEnabled: guildData?.aiSearchEnabled ?? true
-                    }
-                );
+				// Clean the content (remove bot mention)
+				const cleanContent = message.content.replace(new RegExp(`<@!?${this.client.user?.id}>`, 'g'), '').trim();
+
+				const aiResponse = await getAIResponse(
+					`User says: "${cleanContent || "(Just a ping/reply)"}".`,
+					{
+						aiPersonality: guildData?.aiPersonality || 'CASUAL',
+						aiCustomPrompt: guildData?.aiCustomPrompt || null,
+						aiSearchEnabled: guildData?.aiSearchEnabled ?? true
+					}
+				);
 				return await message.reply(aiResponse);
 			} catch (error) {
 				if (isMentionOnly) {
@@ -769,8 +862,21 @@ export default class MessageCreate extends Event {
 
 	private async handleCommand(command: any, ctx: Context, args: string[], locale: string, message: Message): Promise<any> {
 		const now = Date.now();
+		const isBotDev = await isDev(this.client, message.author.id);
 		const clientMember = message.guild!.members.resolve(this.client.user!)!;
-		const isDev = process.env.OWNER_ID === message.author.id;
+
+		// Maintenance Check
+		if (this.client.maintenance.enabled && !isBotDev) {
+			return await message.reply({
+				embeds: [
+					new EmbedBuilder()
+						.setTitle("Under Maintenance")
+						.setDescription(`Dimscord is currently under maintenance${this.client.maintenance.eta ? ` until **${this.client.maintenance.eta}**` : ""}. Please try again later.`)
+						.setColor(this.client.color.yellow)
+						.setTimestamp()
+				]
+			}).catch(() => { });
+		}
 
 		if (
 			!(
@@ -792,7 +898,7 @@ export default class MessageCreate extends Event {
 				.send({
 					content: t(I18N.events.message.no_send_message, { lng: locale }),
 				})
-				.catch(() => {});
+				.catch(() => { });
 		}
 
 		if (command.permissions) {
@@ -823,13 +929,15 @@ export default class MessageCreate extends Event {
 				// CHECK PERMITS FIRST (Overrides Discord Permissions)
 				// We map Discord permissions to our PermitPermission enum if applicable, or check specifically
 				const hasDiscordPerm = (message.member as GuildMember).permissions.has(userRequiredPermissions as any);
-				
+
 				// Permit check: We check if they have a permit that allows this specific command's type
 				// For simplicity, we check if they have the BAN/KICK permit for moderation commands
-                const cmdName = command.name.toUpperCase() as any;
+				const cmdName = command.name.toUpperCase() as any;
 				const hasPermit = await PermitManager.hasPermission(this.client, message.guildId!, message.member as GuildMember, cmdName);
 
-				if (!(isDev || hasDiscordPerm || hasPermit)) {
+				const isBotDevBypass = isBotDev && !this.isDangerousCommand(command);
+
+				if (!(isBotDevBypass || hasDiscordPerm || hasPermit)) {
 					return await message.reply({
 						content: t(I18N.events.message.no_user_permission, { lng: locale }),
 					});
@@ -837,7 +945,7 @@ export default class MessageCreate extends Event {
 			}
 
 			if (command.permissions?.dev) {
-				if (!isDev) return;
+				if (!isBotDev) return;
 			}
 		}
 
@@ -896,7 +1004,7 @@ export default class MessageCreate extends Event {
 			if (command.player.dj) {
 				const dj = await this.client.db.getDj(message.guildId!);
 				if (dj?.mode) {
-                    const djRole = await this.client.db.getRoles(message.guildId!);
+					const djRole = await this.client.db.getRoles(message.guildId!);
 					if (!djRole) {
 						return await message.reply({
 							content: t(I18N.events.message.no_dj_role, { lng: locale }),
@@ -906,7 +1014,7 @@ export default class MessageCreate extends Event {
 					const hasDJRole = (message.member as GuildMember).roles.cache.some((role) =>
 						djRole.map((r) => r.roleId).includes(role.id),
 					);
-					if (!(isDev || hasDJRole || (message.member as GuildMember).permissions.has(PermissionFlagsBits.ManageGuild))) {
+					if (!(isBotDev || hasDJRole || (message.member as GuildMember).permissions.has(PermissionFlagsBits.ManageGuild))) {
 						return await message.reply({
 							content: t(I18N.events.message.no_dj_permission, { lng: locale }),
 						});
@@ -974,34 +1082,37 @@ export default class MessageCreate extends Event {
 	 */
 	private uwuify(text: string): string {
 		const suffixes = [' uwu', ' owo', ' :3', ' :p', ' :D', ' >w<', ' ~', ' ^^', ' nyaa~', ' rawr', ' :3c', ' hehe~'];
-		
-		let result = text
-			// Protect mentions & emojis from mutation
-			.replace(/(<[@#!&:\w]+\d*>)/g, '%%PROTECT_$1_PROTECT%%')
-			// Replace common letter combinations
-			.replace(/(?:r|l)/g, 'w')
-			.replace(/(?:R|L)/g, 'W')
-			.replace(/n([aeiou])/g, 'ny$1')
-			.replace(/N([aeiou])/g, 'Ny$1')
-			.replace(/N([AEIOU])/g, 'NY$1')
-			.replace(/ove/g, 'uv')
-			.replace(/th/g, 'dw')
-			.replace(/Th/g, 'Dw')
-			.replace(/TH/g, 'DW')
-			// Restore protected tokens
-			.replace(/%%PROTECT_(.*?)_PROTECT%%/g, '$1');
 
-		// Add stuttering to ~30% of words (skip mentions/emojis)
-		const words = result.split(' ');
-		result = words.map(word => {
-			if (word.startsWith('<') || word.startsWith('%%')) return word;
-			if (word.length > 1 && Math.random() < 0.3) {
-				return `${word[0]}-${word}`;
+		const regex = /(https?:\/\/[^\s]+|www\.[^\s]+|<a?:\w+:\d+>|<@!?\d+>|<@&\d+>|<#\d+>)/gi;
+		const tokens = text.split(regex);
+
+		const transformedTokens = tokens.map((token, index) => {
+			if (index % 2 !== 0) {
+				return token;
 			}
-			return word;
-		}).join(' ');
+			let temp = token
+				.replace(/(?:r|l)/g, 'w')
+				.replace(/(?:R|L)/g, 'W')
+				.replace(/n([aeiou])/g, 'ny$1')
+				.replace(/N([aeiou])/g, 'Ny$1')
+				.replace(/N([AEIOU])/g, 'NY$1')
+				.replace(/ove/g, 'uv')
+				.replace(/th/g, 'dw')
+				.replace(/Th/g, 'Dw')
+				.replace(/TH/g, 'DW');
 
-		// Add a random suffix
+			const words = temp.split(' ');
+			const stutteredWords = words.map(word => {
+				if (word.length > 1 && Math.random() < 0.3) {
+					return `${word[0]}-${word}`;
+				}
+				return word;
+			});
+			return stutteredWords.join(' ');
+		});
+
+		let result = transformedTokens.join('');
+
 		const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
 		result += suffix;
 
@@ -1014,41 +1125,47 @@ export default class MessageCreate extends Event {
 	private nsfwify(text: string): string {
 		const suffixes = [' 😏', ' 🥵', ' ~', ' hehe~', ' 😩', ' oh my~', ' 💦', ' damn~', ' 🫦', ' sheesh~', ' 😳', ' ayo~'];
 
-		let result = text
-			.replace(/(<[@#!&:\w]+\d*>)/g, '%%PROTECT_$1_PROTECT%%')
-			.replace(/\blike\b/gi, 'looove')
-			.replace(/\bgood\b/gi, 'sooo good')
-			.replace(/\bnice\b/gi, 'naughty')
-			.replace(/\bhard\b/gi, 'rock hard')
-			.replace(/\bcome\b/gi, 'come over')
-			.replace(/\bwant\b/gi, 'crave')
-			.replace(/\bfun\b/gi, 'spicy fun')
-			.replace(/\beat\b/gi, 'devour')
-			.replace(/\bhot\b/gi, 'smoking hot')
-			.replace(/\bbig\b/gi, 'massive')
-			.replace(/\blong\b/gi, 'throbbing long')
-			.replace(/\bbed\b/gi, 'bed 😏')
-			.replace(/\bplease\b/gi, 'pretty please~')
-			.replace(/\byes\b/gi, 'oh YES')
-			.replace(/\bno\b/gi, 'don\'t stop')
-			.replace(/\bstop\b/gi, 'keep going')
-			.replace(/\bwow\b/gi, 'oh wow daddy')
-			.replace(/\bhelp\b/gi, 'save me daddy')
-			.replace(/\bokay\b/gi, 'yes daddy')
-			.replace(/\bok\b/gi, 'yes daddy')
-			.replace(/%%PROTECT_(.*?)_PROTECT%%/g, '$1');
+		const regex = /(https?:\/\/[^\s]+|www\.[^\s]+|<a?:\w+:\d+>|<@!?\d+>|<@&\d+>|<#\d+>)/gi;
+		const tokens = text.split(regex);
 
-		// Add random moaning-like insertions ~20% of words
-		const words = result.split(' ');
-		result = words.map(word => {
-			if (word.startsWith('<') || word.startsWith('%%')) return word;
-			if (Math.random() < 0.15) {
-				const moans = ['ahh~', 'mmm~', 'ngh~', 'oh~', 'ooh~'];
-				return word + ' ' + moans[Math.floor(Math.random() * moans.length)];
+		const transformedTokens = tokens.map((token, index) => {
+			if (index % 2 !== 0) {
+				return token;
 			}
-			return word;
-		}).join(' ');
+			let temp = token
+				.replace(/\blike\b/gi, 'looove')
+				.replace(/\bgood\b/gi, 'sooo good')
+				.replace(/\bnice\b/gi, 'naughty')
+				.replace(/\bhard\b/gi, 'rock hard')
+				.replace(/\bcome\b/gi, 'come over')
+				.replace(/\bwant\b/gi, 'crave')
+				.replace(/\bfun\b/gi, 'spicy fun')
+				.replace(/\beat\b/gi, 'devour')
+				.replace(/\bhot\b/gi, 'smoking hot')
+				.replace(/\bbig\b/gi, 'massive')
+				.replace(/\blong\b/gi, 'throbbing long')
+				.replace(/\bbed\b/gi, 'bed 😏')
+				.replace(/\bplease\b/gi, 'pretty please~')
+				.replace(/\byes\b/gi, 'oh YES')
+				.replace(/\bno\b/gi, 'don\'t stop')
+				.replace(/\bstop\b/gi, 'keep going')
+				.replace(/\bwow\b/gi, 'oh wow daddy')
+				.replace(/\bhelp\b/gi, 'save me daddy')
+				.replace(/\bokay\b/gi, 'yes daddy')
+				.replace(/\bok\b/gi, 'yes daddy');
 
+			const words = temp.split(' ');
+			const moanedWords = words.map(word => {
+				if (word.length > 0 && Math.random() < 0.15) {
+					const moans = ['ahh~', 'mmm~', 'ngh~', 'oh~', 'ooh~'];
+					return word + ' ' + moans[Math.floor(Math.random() * moans.length)];
+				}
+				return word;
+			});
+			return moanedWords.join(' ');
+		});
+
+		let result = transformedTokens.join('');
 		const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
 		result += suffix;
 
@@ -1061,42 +1178,81 @@ export default class MessageCreate extends Event {
 	private mommyify(text: string): string {
 		const suffixes = [' 🥺', ' mommy~', ' yes mommy', ' sorry mommy', ' 💕', ' pwease mommy', ' i\'ll be good~', ' mommy knows best~', ' 👉👈', ' am i a good boy?', ' *whimpers*', ' mommy help~', ' :3', ' hehe mommy~'];
 
-		let result = text
-			.replace(/(<[@#!&:\w]+\d*>)/g, '%%PROTECT_$1_PROTECT%%')
-			.replace(/\bi\b/g, 'i')
-			.replace(/\bI\b/g, 'i')
-			.replace(/\bmy\b/gi, 'mommy\'s')
-			.replace(/\bme\b/gi, 'your little one')
-			.replace(/\byes\b/gi, 'yes mommy')
-			.replace(/\bno\b/gi, 'b-but mommy')
-			.replace(/\bplease\b/gi, 'pwease mommy')
-			.replace(/\bthanks\b/gi, 'thank you mommy')
-			.replace(/\bthank you\b/gi, 'thank you mommy')
-			.replace(/\bsorry\b/gi, 'sowwy mommy')
-			.replace(/\bokay\b/gi, 'yes mommy')
-			.replace(/\bok\b/gi, 'okie mommy')
-			.replace(/\bwant\b/gi, 'need')
-			.replace(/\bhello\b/gi, 'h-hi mommy')
-			.replace(/\bhi\b/gi, 'h-hi mommy')
-			.replace(/\bhey\b/gi, 'h-hewwo mommy')
-			.replace(/\bhelp\b/gi, 'mommy help')
-			.replace(/\bwhy\b/gi, 'b-but why mommy')
-			.replace(/\bstop\b/gi, 'p-pwease stop mommy')
-			.replace(/%%PROTECT_(.*?)_PROTECT%%/g, '$1');
+		const regex = /(https?:\/\/[^\s]+|www\.[^\s]+|<a?:\w+:\d+>|<@!?\d+>|<@&\d+>|<#\d+>)/gi;
+		const tokens = text.split(regex);
 
-		// Add stuttering more aggressively (~40%)
-		const words = result.split(' ');
-		result = words.map(word => {
-			if (word.startsWith('<') || word.startsWith('%%')) return word;
-			if (word.length > 1 && Math.random() < 0.4) {
-				return `${word[0]}-${word}`;
+		const transformedTokens = tokens.map((token, index) => {
+			if (index % 2 !== 0) {
+				return token;
 			}
-			return word;
-		}).join(' ');
+			let temp = token
+				.replace(/\bi\b/g, 'i')
+				.replace(/\bI\b/g, 'i')
+				.replace(/\bmy\b/gi, 'mommy\'s')
+				.replace(/\bme\b/gi, 'your little one')
+				.replace(/\byes\b/gi, 'yes mommy')
+				.replace(/\bno\b/gi, 'b-but mommy')
+				.replace(/\bplease\b/gi, 'pwease mommy')
+				.replace(/\bthanks\b/gi, 'thank you mommy')
+				.replace(/\bthank you\b/gi, 'thank you mommy')
+				.replace(/\bsorry\b/gi, 'sowwy mommy')
+				.replace(/\bokay\b/gi, 'yes mommy')
+				.replace(/\bok\b/gi, 'okie mommy')
+				.replace(/\bwant\b/gi, 'need')
+				.replace(/\bhello\b/gi, 'h-hi mommy')
+				.replace(/\bhi\b/gi, 'h-hi mommy')
+				.replace(/\bhey\b/gi, 'h-hewwo mommy')
+				.replace(/\bhelp\b/gi, 'mommy help')
+				.replace(/\bwhy\b/gi, 'b-but why mommy')
+				.replace(/\bstop\b/gi, 'p-pwease stop mommy');
 
+			const words = temp.split(' ');
+			const stutteredWords = words.map(word => {
+				if (word.length > 1 && Math.random() < 0.4) {
+					return `${word[0]}-${word}`;
+				}
+				return word;
+			});
+			return stutteredWords.join(' ');
+		});
+
+		let result = transformedTokens.join('');
 		const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
 		result += suffix;
 
 		return result;
+	}
+
+	private isDangerousCommand(command: any): boolean {
+		if (!command) return false;
+
+		// Category check
+		if (command.category === "moderation" || command.category === "config") {
+			return true;
+		}
+
+		// Dangerous permissions check
+		const dangerousPerms = [
+			PermissionFlagsBits.BanMembers,
+			PermissionFlagsBits.KickMembers,
+			PermissionFlagsBits.ManageChannels,
+			PermissionFlagsBits.ManageGuild,
+			PermissionFlagsBits.Administrator,
+			PermissionFlagsBits.ModerateMembers,
+			PermissionFlagsBits.ManageRoles,
+			PermissionFlagsBits.ManageMessages,
+			PermissionFlagsBits.ManageWebhooks,
+		];
+
+		if (command.permissions?.user) {
+			const userRequired = Array.isArray(command.permissions.user)
+				? command.permissions.user
+				: [command.permissions.user];
+			if (userRequired.some((perm: any) => dangerousPerms.includes(perm))) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 }

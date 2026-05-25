@@ -38,13 +38,18 @@ export default class DevLock extends Command {
         const mode = match[1].toLowerCase();
         const rest = match[2].trim();
 
-        // Extract user mention
-        const mentionMatch = rest.match(/<@!?(\d{17,20})>/);
+        // Extract user or channel mention
+        const mentionMatch = rest.match(/<@!?(\d{17,20})>|<#(\d{17,20})>/);
         if (!mentionMatch) {
-            return ctx.replyV2({ description: 'Please mention a user.', isAlert: true });
+            return ctx.replyV2({ description: 'Please mention a user or channel.', isAlert: true });
         }
 
-        const targetId = mentionMatch[1];
+        const targetId = mentionMatch[1] || mentionMatch[2];
+        const isChannel = !!mentionMatch[2];
+
+        if (!isChannel && targetId === ctx.author.id) {
+            return ctx.replyV2({ description: 'You cannot use this command on yourself!', isAlert: true });
+        }
 
         if (mode === 'uwu' || mode === 'nsfw' || mode === 'mommy') {
             // Toggle text lock
@@ -66,7 +71,7 @@ export default class DevLock extends Command {
                 });
                 const embed = client.embed()
                     .setTitle(`${label.title} Lock Removed`)
-                    .setDescription(`<@${targetId}> has been freed from ${lockType}lock.`)
+                    .setDescription(`${isChannel ? `<#${targetId}>` : `<@${targetId}>`} has been freed from ${lockType}lock.`)
                     .setColor(client.color.main);
                 return ctx.reply({ embeds: [embed] });
             } else {
@@ -77,7 +82,7 @@ export default class DevLock extends Command {
                 });
                 const embed = client.embed()
                     .setTitle(`${label.title} Lock Applied`)
-                    .setDescription(`<@${targetId}> is now ${lockType}locked~ ${label.emoji}`)
+                    .setDescription(`${isChannel ? `<#${targetId}>` : `<@${targetId}>`} is now ${lockType}locked~ ${label.emoji}`)
                     .setColor(client.color.main);
                 return ctx.reply({ embeds: [embed] });
             }

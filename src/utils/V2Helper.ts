@@ -170,7 +170,7 @@ export class V2Helper {
         }
 
         return {
-            content: "", // Clear legacy fields
+            content: null as any,
             components: [container],
             flags: options.ephemeral ? (MessageFlags.Ephemeral | MessageFlags.IsComponentsV2) : MessageFlags.IsComponentsV2
         };
