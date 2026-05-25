@@ -53,7 +53,13 @@ export class PlaceholderManager {
                 content = content.replace(tag, '');
                 
                 try {
-                    const embedData = JSON.parse(savedEmbed.data);
+                    let embedData = JSON.parse(savedEmbed.data);
+                    if (typeof embedData === 'string') {
+                        embedData = JSON.parse(embedData);
+                    }
+                    if (Array.isArray(embedData)) {
+                        embedData = embedData[0];
+                    }
                     
                     // The dashboard sends a specific structure: { content, title, description, url, color, footer, thumbnail, image, author, fields, buttons, selectMenus, isV2, ephemeral }
                     // We need to transform this into Discord.js structure or use it as is if it's already compatible.
