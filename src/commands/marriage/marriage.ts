@@ -7,7 +7,7 @@ export default class Marriage extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'marriage',
-            aliases: ['m', 'marry'],
+            aliases: ['marry'],
             description: {
                 content: 'Global Marriage & Family system.',
                 usage: 'marriage <marry/divorce/partner/setring/adopt/disown/abandon/tree> [args]',

@@ -9,6 +9,7 @@ import { Resolver } from '../../utils/Resolver';
 import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
 import * as path from 'path';
 import { cleanFancyText } from '../../utils/Utils';
+import { QuoteGenerator } from '../../utils/QuoteGenerator';
 
 // Register Inter font
 try {
@@ -68,7 +69,25 @@ export default class Messages extends Command {
 
 	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
         await ctx.deferReply();
-		const sub = ctx.options.getSubcommand() || args[0];
+		
+		const subArgs = [...args];
+		let fontName = 'Inter';
+
+		// 1. Check for font pattern like font=Outfit or font="Dancing Script"
+		const fontEqualsIdx = subArgs.findIndex(arg => arg.toLowerCase().startsWith('font=') || arg.toLowerCase().startsWith('font="'));
+		if (fontEqualsIdx !== -1) {
+			const fontArg = subArgs.splice(fontEqualsIdx, 1)[0];
+			const match = fontArg.match(/font=["']?([^"']+)["']?/i);
+			if (match) fontName = match[1].trim();
+		}
+
+		// 2. Parse subcommand
+		let sub = ctx.options.getSubcommand();
+		const firstArg = subArgs[0]?.toLowerCase() || '';
+		if (firstArg === 'leaderboard') {
+			sub = 'leaderboard';
+			subArgs.shift();
+		}
 
 		if (sub === 'leaderboard') {
 			const topMembers = await client.prisma.member.findMany({
@@ -100,14 +119,32 @@ export default class Messages extends Command {
 			return await ctx.reply({ embeds: [embed] });
 
 		} else {
-            // Resolve target member: if args[0] is not 'leaderboard', it might be the target
-            const member = await Resolver.resolveMember(
-                ctx, 
-                ctx.options.getMember('target') || args[1] || (args[0] !== 'leaderboard' ? args[0] : undefined)
-            );
-            const targetMember = member || ctx.member;
-            const target = targetMember?.user || ctx.author;
-            const displayName = cleanFancyText(targetMember?.displayName || target.username);
+			// Resolve target member
+			let targetParam: string | undefined = subArgs[0];
+			if (targetParam && (targetParam.startsWith('<@') || /^\d{17,19}$/.test(targetParam))) {
+				subArgs.shift();
+			} else {
+				targetParam = undefined;
+			}
+
+			const member = await Resolver.resolveMember(
+				ctx, 
+				ctx.options.getMember('target') || targetParam
+			);
+
+			// Any remaining argument is treated as the fontName
+			if (fontName === 'Inter' && subArgs.length > 0) {
+				fontName = subArgs.join(' ').trim();
+			}
+
+			// Load custom font if requested
+			if (fontName && fontName.toLowerCase() !== 'inter' && fontName.toLowerCase() !== 'sans-serif') {
+				await QuoteGenerator.loadGoogleFont(fontName).catch(() => {});
+			}
+
+			const targetMember = member || ctx.member;
+			const target = targetMember?.user || ctx.author;
+			const displayName = cleanFancyText(targetMember?.displayName || target.username);
 
 			const data = await client.prisma.member.findUnique({
 				where: { guildId_userId: { guildId: ctx.guild.id, userId: target.id } }
@@ -213,7 +250,7 @@ export default class Messages extends Command {
 
 			// Username Text
 			ctx2d.fillStyle = '#ffffff';
-			ctx2d.font = 'bold 36px "Inter", sans-serif';
+			ctx2d.font = `bold 36px "${fontName}", sans-serif`;
 			ctx2d.textAlign = 'left';
 			ctx2d.textBaseline = 'top';
 			let nameText = displayName;
@@ -224,7 +261,7 @@ export default class Messages extends Command {
 
 			// Subtext: User ID
 			ctx2d.fillStyle = 'rgba(255, 255, 255, 0.4)';
-			ctx2d.font = '500 14px "Inter", sans-serif';
+			ctx2d.font = `500 14px "${fontName}", sans-serif`;
 			ctx2d.fillText(`ID: ${target.id}`, 230, 110);
 
 			// Premium Badge in top-right
@@ -241,7 +278,7 @@ export default class Messages extends Command {
 			ctx2d.stroke();
 
 			ctx2d.fillStyle = '#f472b6';
-			ctx2d.font = 'bold 9px "Inter", sans-serif';
+			ctx2d.font = `bold 9px "${fontName}", sans-serif`;
 			ctx2d.textAlign = 'center';
 			ctx2d.textBaseline = 'middle';
 			ctx2d.fillText('MESSAGES', badgeX + badgeW / 2, badgeY + badgeH / 2);
@@ -278,13 +315,13 @@ export default class Messages extends Command {
 				ctx2d.fill();
 
 				ctx2d.fillStyle = '#94a3b8';
-				ctx2d.font = 'bold 11px "Inter", sans-serif';
+				ctx2d.font = `bold 11px "${fontName}", sans-serif`;
 				ctx2d.textAlign = 'center';
 				ctx2d.textBaseline = 'top';
 				ctx2d.fillText(stat.label, x + cardWidth / 2, cardY + 22);
 
 				ctx2d.fillStyle = '#ffffff';
-				ctx2d.font = 'bold 24px "Inter", sans-serif';
+				ctx2d.font = `bold 24px "${fontName}", sans-serif`;
 				ctx2d.textAlign = 'center';
 				ctx2d.textBaseline = 'top';
 				ctx2d.fillText(stat.value.toLocaleString(), x + cardWidth / 2, cardY + 45);
