@@ -43,11 +43,136 @@ export default class Utils {
 export function cleanFancyText(text: string): string {
 	if (!text) return text;
 	
+	// Map common look-alike characters (Greek, Cyrillic, Letterlike symbols) to standard ASCII
+	const charMap: { [key: number]: string } = {
+		// Letterlike Symbols (0x2100 - 0x214F)
+		0x2102: 'C', // ℂ
+		0x2109: 'F', // ℉
+		0x210A: 'g', // ℊ
+		0x210B: 'H', // ℋ
+		0x210C: 'H', // ℌ
+		0x210D: 'H', // ℍ
+		0x210E: 'h', // ℎ
+		0x210F: 'h', // ℏ
+		0x2110: 'I', // ℐ
+		0x2111: 'I', // ℑ
+		0x2112: 'L', // ℒ
+		0x2113: 'l', // ℓ
+		0x2115: 'N', // ℕ
+		0x2118: 'p', // ℘
+		0x2119: 'P', // ℙ
+		0x211A: 'Q', // ℚ
+		0x211B: 'R', // ℛ
+		0x211C: 'R', // ℜ
+		0x211D: 'R', // ℝ
+		0x2124: 'Z', // ℤ
+		0x2128: 'Z', // ℨ
+		0x212C: 'B', // ℬ
+		0x212D: 'C', // ℭ
+		0x212F: 'e', // ℯ
+		0x2130: 'E', // ℰ
+		0x2131: 'F', // ℱ
+		0x2133: 'M', // ℳ
+		0x2134: 'o', // ℴ
+		0x2135: 'a', // ℵ (aleph)
+		0x2139: 'i', // ℹ
+		0x213C: 'pi', // ℼ
+		0x213D: 'g', // ℽ
+		0x213E: 'G', // ℾ
+		0x213F: 'P', // ℿ
+		0x2145: 'D', // ⅅ
+		0x2146: 'd', // ⅆ
+		0x2147: 'e', // ⅇ
+		0x2148: 'i', // ⅈ
+		0x2149: 'j', // ⅉ
+
+		// Greek Small Letters (0x03B1 - 0x03C9) that look like Latin letters
+		0x03B1: 'a', // α
+		0x03B2: 'b', // β
+		0x03B3: 'y', // γ
+		0x03B4: 'd', // δ
+		0x03B5: 'e', // ε
+		0x03B6: 'z', // ζ
+		0x03B7: 'n', // η
+		0x03B8: 'o', // θ
+		0x03B9: 'i', // ι
+		0x03BA: 'k', // κ
+		0x03BB: 'l', // λ
+		0x03BC: 'u', // μ
+		0x03BD: 'v', // ν
+		0x03BE: 'x', // ξ
+		0x03BF: 'o', // ο
+		0x03C0: 'p', // π
+		0x03C1: 'p', // ρ
+		0x03C2: 's', // ς
+		0x03C3: 's', // σ
+		0x03C4: 't', // τ
+		0x03C5: 'u', // υ
+		0x03C6: 'o', // φ
+		0x03C7: 'x', // χ
+		0x03C8: 'y', // ψ
+		0x03C9: 'w', // ω
+
+		// Greek Capital Letters (0x0391 - 0x03A9) that look like Latin letters
+		0x0391: 'A', // Α
+		0x0392: 'B', // Β
+		0x0395: 'E', // Ε
+		0x0396: 'Z', // Ζ
+		0x0397: 'H', // Η
+		0x0399: 'I', // Ι
+		0x039A: 'K', // Κ
+		0x039C: 'M', // Μ
+		0x039D: 'N', // Ν
+		0x039F: 'O', // Ο
+		0x03A1: 'P', // Ρ
+		0x03A4: 'T', // Τ
+		0x03A5: 'Y', // Υ
+		0x03A7: 'X', // Χ
+
+		// Cyrillic Small Letters (0x0430 - 0x044F) that look like Latin letters
+		0x0430: 'a', // а
+		0x0432: 'v', // в (looks like b/v)
+		0x0435: 'e', // е
+		0x043F: 'n', // п
+		0x0440: 'p', // р
+		0x0441: 'c', // с
+		0x0442: 't', // т
+		0x0443: 'y', // у
+		0x0445: 'x', // х
+		0x0455: 's', // ѕ
+		0x0456: 'i', // і
+		0x0458: 'j', // ј
+		0x048F: 'p', // ҏ
+		0x049B: 'k', // қ
+		0x04B3: 'x', // ҳ
+		0x04D5: 'ae', // ӕ
+
+		// Cyrillic Capital Letters (0x0410 - 0x042F) that look like Latin letters
+		0x0410: 'A', // А
+		0x0412: 'B', // В
+		0x0415: 'E', // Е
+		0x041A: 'K', // К
+		0x041C: 'M', // М
+		0x041D: 'H', // Н (looks like H)
+		0x041E: 'O', // О
+		0x0420: 'P', // Ρ
+		0x0421: 'C', // С
+		0x0422: 'T', // Т
+		0x0425: 'X', // Х
+		0x0423: 'Y', // У
+	};
+
 	let result = '';
 	for (const char of text) {
 		const code = char.codePointAt(0);
 		if (code === undefined) {
 			result += char;
+			continue;
+		}
+
+		// Check the custom charMap first for Letterlike / Greek / Cyrillic lookalikes
+		if (charMap[code] !== undefined) {
+			result += charMap[code];
 			continue;
 		}
 
