@@ -4,6 +4,7 @@ import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
 import * as path from 'path';
 import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
 import { cleanFancyText } from '../../utils/Utils';
+import { QuoteGenerator } from '../../utils/QuoteGenerator';
 
 // Register Inter font
 try {
@@ -65,29 +66,61 @@ export default class Leaderboard extends Command {
 	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
 		await ctx.deferReply();
 		
-		const input = (args[0] || ctx.options.getString('category') || 'all').toLowerCase();
-		
-		// Map shorthands
-		let type = 'all';
-		if (['lvl', 'level', 'xp', 'rank'].includes(input)) type = 'level';
-		else if (['m', 'msg', 'messages', 'msgs'].includes(input)) type = 'messages';
-		else if (['i', 'inv', 'invites'].includes(input)) type = 'invite';
-		else if (input === 'all') type = 'all';
-		else if (args.length > 0) type = 'level'; // Default to level if unknown arg
+		const subArgs = [...args];
+		let fontName = 'Inter';
 
-        // Parse timeframe flag for messages
-        let timeframe = 'lifetime';
-        if (type === 'messages') {
-            const flag = (args[1] || '').toLowerCase();
-            if (['-daily', 'daily', '-d', 'd'].includes(flag)) {
-                timeframe = 'daily';
-            } else if (['-weekly', 'weekly', '-w', 'w'].includes(flag)) {
-                timeframe = 'weekly';
-            }
-        }
+		// 1. Check for font pattern like font=Outfit or font="Dancing Script"
+		const fontEqualsIdx = subArgs.findIndex(arg => arg.toLowerCase().startsWith('font=') || arg.toLowerCase().startsWith('font="'));
+		if (fontEqualsIdx !== -1) {
+			const fontArg = subArgs.splice(fontEqualsIdx, 1)[0];
+			const match = fontArg.match(/font=["']?([^"']+)["']?/i);
+			if (match) fontName = match[1].trim();
+		}
+
+		// 2. Parse category
+		let type = 'all';
+		const firstArg = subArgs[0]?.toLowerCase() || '';
+		if (['lvl', 'level', 'xp', 'rank'].includes(firstArg)) {
+			type = 'level';
+			subArgs.shift();
+		} else if (['m', 'msg', 'messages', 'msgs'].includes(firstArg)) {
+			type = 'messages';
+			subArgs.shift();
+		} else if (['i', 'inv', 'invites'].includes(firstArg)) {
+			type = 'invite';
+			subArgs.shift();
+		} else if (firstArg === 'all') {
+			type = 'all';
+			subArgs.shift();
+		} else if (ctx.options.getString('category')) {
+			type = ctx.options.getString('category')!.toLowerCase();
+		}
+
+		// 3. Parse timeframe flag
+		let timeframe = 'lifetime';
+		if (type === 'messages') {
+			const nextArg = (subArgs[0] || '').toLowerCase();
+			if (['-daily', 'daily', '-d', 'd'].includes(nextArg)) {
+				timeframe = 'daily';
+				subArgs.shift();
+			} else if (['-weekly', 'weekly', '-w', 'w'].includes(nextArg)) {
+				timeframe = 'weekly';
+				subArgs.shift();
+			}
+		}
+
+		// 4. Any remaining non-empty argument is the fontName
+		if (fontName === 'Inter' && subArgs.length > 0) {
+			fontName = subArgs.join(' ').trim();
+		}
+
+		// Load custom font if requested
+		if (fontName && fontName.toLowerCase() !== 'inter' && fontName.toLowerCase() !== 'sans-serif') {
+			await QuoteGenerator.loadGoogleFont(fontName).catch(() => {});
+		}
 
 		if (type === 'all') {
-			return this.handleAll(client, ctx);
+			return this.handleAll(client, ctx, fontName);
 		}
 
         // Fetch top 10 data
@@ -220,13 +253,13 @@ export default class Leaderboard extends Command {
 
         // Draw Header
         ctx2d.fillStyle = '#ffffff';
-        ctx2d.font = 'bold 28px "Inter", sans-serif';
+        ctx2d.font = `bold 28px "${fontName}", sans-serif`;
         ctx2d.textAlign = 'left';
         ctx2d.textBaseline = 'top';
         ctx2d.fillText('LEADERBOARD', 50, 40);
 
         ctx2d.fillStyle = '#f472b6'; // Fuchsia accent
-        ctx2d.font = 'bold 11px "Inter", sans-serif';
+        ctx2d.font = `bold 11px "${fontName}", sans-serif`;
         const categoryTitle = timeframe !== 'lifetime' 
             ? `${type.toUpperCase()} • ${timeframe.toUpperCase()}`
             : type.toUpperCase();
@@ -305,21 +338,21 @@ export default class Leaderboard extends Command {
             ctx2d.fill();
             
             ctx2d.fillStyle = '#000000';
-            ctx2d.font = 'bold 9px "Inter", sans-serif';
+            ctx2d.font = `bold 9px "${fontName}", sans-serif`;
             ctx2d.textAlign = 'center';
             ctx2d.textBaseline = 'middle';
             ctx2d.fillText(badgeText, cx, avatarY + avatarSize + 2);
 
             // Draw Username
             ctx2d.fillStyle = '#ffffff';
-            ctx2d.font = 'bold 12px "Inter", sans-serif';
+            ctx2d.font = `bold 12px "${fontName}", sans-serif`;
             ctx2d.textAlign = 'center';
             const displayName = entry.username.length > 14 ? entry.username.substring(0, 12) + '..' : entry.username;
             ctx2d.fillText(displayName, cx, cardY + cardH - 35);
 
             // Draw Score
             ctx2d.fillStyle = color;
-            ctx2d.font = 'bold 10px "Inter", sans-serif';
+            ctx2d.font = `bold 10px "${fontName}", sans-serif`;
             ctx2d.textAlign = 'center';
             ctx2d.fillText(entry.scoreText, cx, cardY + cardH - 18);
 
@@ -352,7 +385,7 @@ export default class Leaderboard extends Command {
 
             // Rank indicator
             ctx2d.fillStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx2d.font = 'bold 12px "Inter", sans-serif';
+            ctx2d.font = `bold 12px "${fontName}", sans-serif`;
             ctx2d.textAlign = 'left';
             ctx2d.textBaseline = 'middle';
             ctx2d.fillText(`#${i + 1}`, rowX + 15, currentY + rowH / 2);
@@ -389,13 +422,13 @@ export default class Leaderboard extends Command {
 
             // Username
             ctx2d.fillStyle = '#ffffff';
-            ctx2d.font = 'bold 12px "Inter", sans-serif';
+            ctx2d.font = `bold 12px "${fontName}", sans-serif`;
             ctx2d.textAlign = 'left';
             ctx2d.fillText(entry.username, rowX + 100, currentY + rowH / 2);
 
             // Score
             ctx2d.fillStyle = '#c084fc'; // Light purple/fuchsia
-            ctx2d.font = 'bold 12px "Inter", sans-serif';
+            ctx2d.font = `bold 12px "${fontName}", sans-serif`;
             ctx2d.textAlign = 'right';
             ctx2d.fillText(entry.scoreText, rowX + rowW - 15, currentY + rowH / 2);
 
@@ -473,7 +506,7 @@ export default class Leaderboard extends Command {
         );
 	}
 
-	private async handleAll(client: ExtendedClient, ctx: Context) {
+	private async handleAll(client: ExtendedClient, ctx: Context, fontName = 'Inter') {
 		const levelEntries = await this.getLeaderboardData(client, ctx.guild.id, 'level', 5);
 		const messageEntries = await this.getLeaderboardData(client, ctx.guild.id, 'messages', 5);
 		const inviteEntries = await this.getLeaderboardData(client, ctx.guild.id, 'invite', 5);
@@ -509,13 +542,13 @@ export default class Leaderboard extends Command {
 
         // Draw Header
         ctx2d.fillStyle = '#ffffff';
-        ctx2d.font = 'bold 28px "Inter", sans-serif';
+        ctx2d.font = `bold 28px "${fontName}", sans-serif`;
         ctx2d.textAlign = 'left';
         ctx2d.textBaseline = 'top';
         ctx2d.fillText('SERVER LEADERBOARD SUMMARY', 50, 35);
 
         ctx2d.fillStyle = '#c084fc';
-        ctx2d.font = 'bold 11px "Inter", sans-serif';
+        ctx2d.font = `bold 11px "${fontName}", sans-serif`;
         ctx2d.fillText(`TOP performers IN ${ctx.guild.name.toUpperCase()} across ALL CATEGORIES`, 50, 70);
 
         ctx2d.strokeStyle = 'rgba(255, 255, 255, 0.08)';
@@ -528,7 +561,7 @@ export default class Leaderboard extends Command {
         const drawColumn = async (title: string, listEntries: LeaderboardEntry[], colX: number, colW: number, startIdx: number) => {
             // Draw title
             ctx2d.fillStyle = '#a855f7'; // Purple title color
-            ctx2d.font = 'bold 13px "Inter", sans-serif';
+            ctx2d.font = `bold 13px "${fontName}", sans-serif`;
             ctx2d.textAlign = 'left';
             ctx2d.textBaseline = 'top';
             ctx2d.fillText(title.toUpperCase(), colX, 115);
@@ -553,7 +586,7 @@ export default class Leaderboard extends Command {
 
                 // Rank
                 ctx2d.fillStyle = i === 0 ? '#fbbf24' : i === 1 ? '#94a3b8' : i === 2 ? '#d97706' : 'rgba(255,255,255,0.2)';
-                ctx2d.font = 'bold 11px "Inter", sans-serif';
+                ctx2d.font = `bold 11px "${fontName}", sans-serif`;
                 ctx2d.textAlign = 'left';
                 ctx2d.textBaseline = 'middle';
                 ctx2d.fillText(`#${i + 1}`, colX + 12, itemY + rowH / 2);
@@ -590,14 +623,14 @@ export default class Leaderboard extends Command {
 
                 // Name
                 ctx2d.fillStyle = '#ffffff';
-                ctx2d.font = 'bold 11px "Inter", sans-serif';
+                ctx2d.font = `bold 11px "${fontName}", sans-serif`;
                 ctx2d.textAlign = 'left';
                 const displayName = entry.username.length > 12 ? entry.username.substring(0, 10) + '..' : entry.username;
                 ctx2d.fillText(displayName, colX + 72, itemY + rowH / 2);
 
                 // Score
                 ctx2d.fillStyle = '#c084fc';
-                ctx2d.font = 'bold 10px "Inter", sans-serif';
+                ctx2d.font = `bold 10px "${fontName}", sans-serif`;
                 ctx2d.textAlign = 'right';
                 ctx2d.fillText(entry.scoreText, colX + colW - 12, itemY + rowH / 2);
 

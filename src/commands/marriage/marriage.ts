@@ -7,6 +7,7 @@ export default class Marriage extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'marriage',
+            aliases: ['m', 'marry'],
             description: {
                 content: 'Global Marriage & Family system.',
                 usage: 'marriage <marry/divorce/partner/setring/adopt/disown/abandon/tree> [args]',
@@ -116,6 +117,12 @@ export default class Marriage extends Command {
                             description: 'Children page index (default: 1)',
                             type: ApplicationCommandOptionType.Integer,
                             required: false
+                        },
+                        {
+                            name: 'font',
+                            description: 'Custom font name (e.g. Outfit, Poppins, Lora)',
+                            type: ApplicationCommandOptionType.String,
+                            required: false
                         }
                     ]
                 },
@@ -128,6 +135,12 @@ export default class Marriage extends Command {
                             name: 'page',
                             description: 'Page index',
                             type: ApplicationCommandOptionType.Integer,
+                            required: false
+                        },
+                        {
+                            name: 'font',
+                            description: 'Custom font name (e.g. Outfit, Poppins, Lora)',
+                            type: ApplicationCommandOptionType.String,
                             required: false
                         }
                     ]
@@ -194,31 +207,64 @@ export default class Marriage extends Command {
             case 'tree': {
                 const user = ctx.options.getUser('user') || ctx.options.getUser('user', 0);
                 
-                // Get page index
                 let page = 1;
+                let font = 'Inter';
                 if (ctx.interaction) {
                     page = ctx.options.getInteger('page') || 1;
+                    font = ctx.options.getString('font') || 'Inter';
                 } else {
-                    // Check if second argument is a page number
-                    const pageVal = parseInt(args[1] || '1', 10);
-                    if (!isNaN(pageVal) && pageVal > 0) {
-                        page = pageVal;
+                    const subArgs = args.slice(1);
+                    
+                    const fontIndex = subArgs.findIndex(arg => arg.toLowerCase().startsWith('font=') || arg.toLowerCase().startsWith('font="'));
+                    if (fontIndex !== -1) {
+                        const fontArg = subArgs.splice(fontIndex, 1)[0];
+                        const match = fontArg.match(/font=["']?([^"']+)["']?/i);
+                        if (match) font = match[1].trim();
+                    }
+
+                    const pageIndex = subArgs.findIndex(arg => !isNaN(parseInt(arg, 10)) && !arg.includes('<@') && !arg.includes('@'));
+                    if (pageIndex !== -1) {
+                        page = parseInt(subArgs.splice(pageIndex, 1)[0], 10);
+                    }
+
+                    const userIndex = subArgs.findIndex(arg => arg.startsWith('<@') || /^\d{17,19}$/.test(arg));
+                    if (userIndex !== -1) {
+                        subArgs.splice(userIndex, 1);
+                    }
+
+                    if (font === 'Inter' && subArgs.length > 0) {
+                        font = subArgs.join(' ').trim();
                     }
                 }
                 
-                return await marriageHelper.drawTree(client, ctx, user, page);
+                return await marriageHelper.drawTree(client, ctx, user, page, font);
             }
             case 'fulltree': {
                 let page = 1;
+                let font = 'Inter';
                 if (ctx.interaction) {
                     page = ctx.options.getInteger('page') || 1;
+                    font = ctx.options.getString('font') || 'Inter';
                 } else {
-                    const pageVal = parseInt(args[0] === 'fulltree' ? args[1] || '1' : args[0] || '1', 10);
-                    if (!isNaN(pageVal) && pageVal > 0) {
-                        page = pageVal;
+                    const subArgs = args[0] === 'fulltree' ? args.slice(1) : args;
+                    
+                    const fontIndex = subArgs.findIndex(arg => arg.toLowerCase().startsWith('font=') || arg.toLowerCase().startsWith('font="'));
+                    if (fontIndex !== -1) {
+                        const fontArg = subArgs.splice(fontIndex, 1)[0];
+                        const match = fontArg.match(/font=["']?([^"']+)["']?/i);
+                        if (match) font = match[1].trim();
+                    }
+
+                    const pageIndex = subArgs.findIndex(arg => !isNaN(parseInt(arg, 10)));
+                    if (pageIndex !== -1) {
+                        page = parseInt(subArgs.splice(pageIndex, 1)[0], 10);
+                    }
+
+                    if (font === 'Inter' && subArgs.length > 0) {
+                        font = subArgs.join(' ').trim();
                     }
                 }
-                return await marriageHelper.fulltree(client, ctx, page);
+                return await marriageHelper.fulltree(client, ctx, page, font);
             }
             case 'relationship': {
                 const user = ctx.options.getUser('user') || ctx.options.getUser('user', 0);

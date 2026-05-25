@@ -60,3 +60,6 @@ errors.txt
 .gemini/
 scratch/
 .vercel
+
+# Fonts Cache
+src/assets/fonts/cached/

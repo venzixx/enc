@@ -12,6 +12,7 @@ import { Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { V2Helper } from '../../utils/V2Helper';
+import { QuoteGenerator } from '../../utils/QuoteGenerator';
 
 // Helper to fetch avatar and convert to buffer for canvas
 async function fetchAvatarBuffer(url: string): Promise<Buffer | null> {
@@ -25,7 +26,7 @@ async function fetchAvatarBuffer(url: string): Promise<Buffer | null> {
 }
 
 // Draw a beautiful glassmorphic card
-function drawGlassCard(ctx: any, x: number, y: number, width: number, height: number, avatarImg: any, name: string, role: string, isSelf = false) {
+function drawGlassCard(ctx: any, x: number, y: number, width: number, height: number, avatarImg: any, name: string, role: string, isSelf = false, fontName = 'Segoe UI') {
     ctx.save();
     
     // Drop shadow
@@ -81,11 +82,11 @@ function drawGlassCard(ctx: any, x: number, y: number, width: number, height: nu
     
     // Draw Name and Role Text
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 13px "Segoe UI", sans-serif';
+    ctx.font = `bold 13px "${fontName}", sans-serif`;
     ctx.fillText(name.length > 15 ? name.substring(0, 13) + '..' : name, x + 66, y + 33);
     
     ctx.fillStyle = isSelf ? '#f472b6' : 'rgba(255, 255, 255, 0.6)';
-    ctx.font = '10px "Segoe UI", sans-serif';
+    ctx.font = `10px "${fontName}", sans-serif`;
     ctx.fillText(role.toUpperCase(), x + 66, y + 50);
 }
 
@@ -539,7 +540,10 @@ export const marriageHelper = {
     },
 
     // 8. TREE
-    async drawTree(client: ExtendedClient, ctx: Context, targetUser: User | null, page = 1): Promise<any> {
+    async drawTree(client: ExtendedClient, ctx: Context, targetUser: User | null, page = 1, fontName = 'Inter'): Promise<any> {
+        if (fontName && fontName.toLowerCase() !== 'segoe ui' && fontName.toLowerCase() !== 'sans-serif') {
+            await QuoteGenerator.loadGoogleFont(fontName).catch(() => {});
+        }
         const user = targetUser || ctx.author;
 
         // ═══════════════════════════════════════════════════
@@ -938,14 +942,14 @@ export const marriageHelper = {
             const p1User = userMap.get(pc.id1);
             const p1Pos = parentCardPositions.get(pc.id1);
             if (p1User && p1Pos) {
-                drawGlassCard(cCtx, p1Pos.x, p1Pos.y, cardW, cardH, avatarMap.get(pc.id1), p1User.username, 'Parent');
+                drawGlassCard(cCtx, p1Pos.x, p1Pos.y, cardW, cardH, avatarMap.get(pc.id1), p1User.username, 'Parent', false, fontName);
             }
             if (pc.id2) {
                 const p2User = userMap.get(pc.id2);
                 const p2Pos = parentCardPositions.get(pc.id2);
                 if (p2User && p2Pos) {
                     const roleLabel = parentIds.includes(pc.id2) ? 'Parent' : 'Step-Parent';
-                    drawGlassCard(cCtx, p2Pos.x, p2Pos.y, cardW, cardH, avatarMap.get(pc.id2), p2User.username, roleLabel);
+                    drawGlassCard(cCtx, p2Pos.x, p2Pos.y, cardW, cardH, avatarMap.get(pc.id2), p2User.username, roleLabel, false, fontName);
                 }
             }
         }
@@ -956,14 +960,14 @@ export const marriageHelper = {
             const nPos = selfCardPositions.get(node.id);
             if (nUser && nPos) {
                 const role = node.isSelf ? 'You' : 'Sibling';
-                drawGlassCard(cCtx, nPos.x, nPos.y, cardW, cardH, avatarMap.get(node.id), nUser.username, role, node.isSelf);
+                drawGlassCard(cCtx, nPos.x, nPos.y, cardW, cardH, avatarMap.get(node.id), nUser.username, role, node.isSelf, fontName);
             }
             if (node.spouseId) {
                 const sUser = userMap.get(node.spouseId);
                 const sPos = selfCardPositions.get(node.spouseId);
                 if (sUser && sPos) {
                     const spouseRole = node.isSelf ? 'Spouse' : 'In-Law';
-                    drawGlassCard(cCtx, sPos.x, sPos.y, cardW, cardH, avatarMap.get(node.spouseId), sUser.username, spouseRole);
+                    drawGlassCard(cCtx, sPos.x, sPos.y, cardW, cardH, avatarMap.get(node.spouseId), sUser.username, spouseRole, false, fontName);
                 }
             }
         }
@@ -973,14 +977,14 @@ export const marriageHelper = {
             const cUser = userMap.get(cid);
             const cPos = childCardPositions.get(cid);
             if (cUser && cPos) {
-                drawGlassCard(cCtx, cPos.x, cPos.y, cardW, cardH, avatarMap.get(cid), cUser.username, 'Child');
+                drawGlassCard(cCtx, cPos.x, cPos.y, cardW, cardH, avatarMap.get(cid), cUser.username, 'Child', false, fontName);
             }
             const cs = childSpouseMap.get(cid);
             if (cs) {
                 const csUser = userMap.get(cs);
                 const csPos = childCardPositions.get(cs);
                 if (csUser && csPos) {
-                    drawGlassCard(cCtx, csPos.x, csPos.y, cardW, cardH, avatarMap.get(cs), csUser.username, 'Child-In-Law');
+                    drawGlassCard(cCtx, csPos.x, csPos.y, cardW, cardH, avatarMap.get(cs), csUser.username, 'Child-In-Law', false, fontName);
                 }
             }
         }
@@ -991,7 +995,7 @@ export const marriageHelper = {
 
         // Row labels
         cCtx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-        cCtx.font = 'bold 10px sans-serif';
+        cCtx.font = `bold 10px "${fontName}", sans-serif`;
         cCtx.textAlign = 'left';
         if (parentCouples.length > 0) cCtx.fillText('PARENTS', 30, parentsY + 10);
         cCtx.fillText('FAMILY', 30, selfY + 10);
@@ -999,13 +1003,13 @@ export const marriageHelper = {
 
         // Title
         cCtx.fillStyle = '#ffffff';
-        cCtx.font = 'bold 24px sans-serif';
+        cCtx.font = `bold 24px "${fontName}", sans-serif`;
         cCtx.textAlign = 'center';
         cCtx.fillText(`${user.username}'s Family Tree`, width / 2, 55);
 
         // Subtitle with stats
         cCtx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-        cCtx.font = '12px sans-serif';
+        cCtx.font = `12px "${fontName}", sans-serif`;
         const stats = [
             spouseId ? '💍 Married' : '💔 Single',
             `👪 ${siblings.length} sibling${siblings.length !== 1 ? 's' : ''}`,
@@ -1016,7 +1020,7 @@ export const marriageHelper = {
 
         // Footer
         cCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        cCtx.font = '11px sans-serif';
+        cCtx.font = `11px "${fontName}", sans-serif`;
         let footerText = `Global Marriage System`;
         if (childIds.length > itemsPerPage) {
             footerText += `  ·  Children Page ${page}/${totalPages} (${childIds.length} total)  ·  Use .tree [page] to browse`;
@@ -1024,7 +1028,7 @@ export const marriageHelper = {
         cCtx.fillText(footerText, width / 2, height - 25);
 
         // Legend
-        cCtx.font = '9px sans-serif';
+        cCtx.font = `9px "${fontName}", sans-serif`;
         cCtx.textAlign = 'right';
         cCtx.fillStyle = 'rgba(236, 72, 153, 0.6)';
         cCtx.fillText('━━ Marriage', width - 30, height - 50);
@@ -1045,7 +1049,10 @@ export const marriageHelper = {
     },
 
     // 9. FULL TREE
-    async fulltree(client: ExtendedClient, ctx: Context, page = 1): Promise<any> {
+    async fulltree(client: ExtendedClient, ctx: Context, page = 1, fontName = 'Inter'): Promise<any> {
+        if (fontName && fontName.toLowerCase() !== 'segoe ui' && fontName.toLowerCase() !== 'sans-serif') {
+            await QuoteGenerator.loadGoogleFont(fontName).catch(() => {});
+        }
         // Fetch all Marriage and FamilyRelation
         const marriages = await client.prisma.marriage.findMany();
         const familyRelations = await client.prisma.familyRelation.findMany();
@@ -1474,19 +1481,19 @@ export const marriageHelper = {
                 roleLabel = `Generation ${level.get(uid)!}`;
             }
 
-            drawGlassCard(cCtx, pos.x, pos.y, cardW, cardH, avatarMap.get(uid), name, roleLabel, isSelf);
+            drawGlassCard(cCtx, pos.x, pos.y, cardW, cardH, avatarMap.get(uid), name, roleLabel, isSelf, fontName);
         }
 
         // ═══════════════════════════════════════════════════
         // HEADER & FOOTER METADATA
         // ═══════════════════════════════════════════════════
         cCtx.fillStyle = '#ffffff';
-        cCtx.font = 'bold 24px sans-serif';
+        cCtx.font = `bold 24px "${fontName}", sans-serif`;
         cCtx.textAlign = 'center';
         cCtx.fillText(`Global Marriage Tree #${currentPage}`, width / 2, 55);
 
         cCtx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-        cCtx.font = '12px sans-serif';
+        cCtx.font = `12px "${fontName}", sans-serif`;
         const statsStr = [
             `👥 ${comp.length} member${comp.length !== 1 ? 's' : ''}`,
             `🌳 ${generations.length} generation${generations.length !== 1 ? 's' : ''}`
@@ -1494,14 +1501,14 @@ export const marriageHelper = {
         cCtx.fillText(statsStr, width / 2, 80);
 
         cCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        cCtx.font = '11px sans-serif';
+        cCtx.font = `11px "${fontName}", sans-serif`;
         let footerText = `Global Marriage System`;
         if (totalPages > 1) {
             footerText += `  ·  Family Tree Page ${currentPage}/${totalPages}  ·  Use .fulltree [page] to browse`;
         }
         cCtx.fillText(footerText, width / 2, height - 25);
 
-        cCtx.font = '9px sans-serif';
+        cCtx.font = `9px "${fontName}", sans-serif`;
         cCtx.textAlign = 'right';
         cCtx.fillStyle = 'rgba(236, 72, 153, 0.6)';
         cCtx.fillText('━━ Marriage', width - 30, height - 42);

@@ -28,7 +28,7 @@ export interface QuoteOptions {
 export class QuoteGenerator {
     private static readonly API_URL = 'https://api.voids.top/fakequote';
 
-    private static async loadGoogleFont(fontName: string): Promise<boolean> {
+    public static async loadGoogleFont(fontName: string): Promise<boolean> {
         const fontPath = path.join(process.cwd(), 'src', 'assets', 'fonts');
         const cachedDir = path.join(fontPath, 'cached');
         if (!fs.existsSync(cachedDir)) {
