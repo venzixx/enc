@@ -417,7 +417,7 @@ export class QuoteGenerator {
             avatar: avatarUrl,
             username: username.startsWith('@') ? username.slice(1) : username,
             display_name: displayName,
-            color: color,
+            color: color ? 'true' : 'false',
             watermark: 'enceladus'
         };
 
