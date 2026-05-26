@@ -16,6 +16,10 @@ export default class MessageUpdate extends Event {
         if (!newMessage.guild || newMessage.author?.bot) return;
         if (oldMessage.content === newMessage.content) return;
 
+        // Capture attachments
+        const attachments = newMessage.attachments.map(att => att.url);
+        const attachmentText = attachments.length > 0 ? `\nAttachments:\n${attachments.map(url => `- ${url}`).join('\n')}` : '';
+
         await AuditLogger.log(this.client, newMessage.guild, {
             type: AuditLogType.MESSAGES,
             event: 'Message Updated',
@@ -24,7 +28,7 @@ export default class MessageUpdate extends Event {
             executorTag: newMessage.author?.tag,
             targetId: newMessage.id,
             targetName: (newMessage.channel as any).name || 'Unknown Channel',
-            details: `Old: ${oldMessage.content || '[Empty]'}\nNew: ${newMessage.content || '[Empty]'}`,
+            details: `Old: ${oldMessage.content || '[Empty]'}\nNew: ${newMessage.content || '[Empty]'}${attachmentText}`,
             color: this.client.color.main
         });
     }

@@ -19,6 +19,10 @@ export default class MessageDelete extends Event {
         const { Sniper } = await import('../utils/Sniper');
         Sniper.add(message.channelId, message);
 
+        // Capture attachments
+        const attachments = message.attachments.map(att => att.url);
+        const attachmentText = attachments.length > 0 ? `\nAttachments:\n${attachments.map(url => `- ${url}`).join('\n')}` : '';
+
         // Log to Data Core Manifest
         await AuditLogger.log(this.client, message.guild, {
             type: AuditLogType.MESSAGES,
@@ -28,7 +32,7 @@ export default class MessageDelete extends Event {
             executorTag: message.author?.tag,
             targetId: message.channelId,
             targetName: (message.channel as any).name || 'Unknown Channel',
-            details: `Content: ${message.content || '[No Text/Embed Only]'}\nAuthor: ${message.author?.tag} (${message.author?.id})`,
+            details: `Content: ${message.content || '[No Text/Embed Only]'}${attachmentText}\nAuthor: ${message.author?.tag} (${message.author?.id})`,
             color: this.client.color.red
         });
 
@@ -50,6 +54,20 @@ export default class MessageDelete extends Event {
                 )
                 .setFooter({ text: `User ID: ${message.author?.id}` })
                 .setTimestamp();
+
+            if (attachments.length > 0) {
+                embed.addFields({ name: 'Attachments', value: attachments.map((url, index) => `[Attachment ${index + 1}](${url})`).join('\n'), inline: false });
+                
+                // If there's an image attachment, set it as the embed image
+                const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
+                const firstImg = attachments.find(url => {
+                    const lowercaseUrl = url.toLowerCase().split('?')[0];
+                    return imageExtensions.some(ext => lowercaseUrl.endsWith(ext));
+                });
+                if (firstImg) {
+                    embed.setImage(firstImg);
+                }
+            }
 
             await (logChannel as any).send({ embeds: [embed] });
         }
