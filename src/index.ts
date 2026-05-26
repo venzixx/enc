@@ -1,6 +1,7 @@
 import { GatewayIntentBits, Partials } from 'discord.js';
 import { ExtendedClient } from './client';
 import { loadCommands, loadEvents, loadComponents } from './handlers/loader';
+import { MermaidRenderer } from './utils/MermaidRenderer';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -35,5 +36,18 @@ async function main() {
 }
 
 main().catch(console.error);
+
+async function shutdown() {
+    console.log('Shutting down gracefully...');
+    try {
+        await MermaidRenderer.cleanup();
+    } catch (err) {
+        console.error('Error during MermaidRenderer cleanup:', err);
+    }
+    process.exit(0);
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 export { client };

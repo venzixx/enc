@@ -202,17 +202,13 @@ export class QuoteGenerator {
 
         finalCtx.textAlign = 'left';
         
-        const quoteFontSize = 44;
-        const quoteLineHeight = 56;
+        let quoteFontSize = 44;
+        let quoteLineHeight = 56;
         const displayNameFontSize = 30;
         const usernameFontSize = 24;
         const spacing = 32;
         const spacing2 = 12;
 
-        const fontList = `500 ${quoteFontSize}px "${selectedFont}", sans-serif`;
-        finalCtx.font = fontList;
-        console.log("finalCtx.font set to:", finalCtx.font);
-        
         const emojiMap = new Map<string, Image>();
         const emojiRegex = /<a?:([a-zA-Z0-9_]+):([0-9]+)>/g;
         let match;
@@ -239,22 +235,41 @@ export class QuoteGenerator {
 
         // Tokenize and Wrap text with emoji support
         const paragraphs = content.split('\n');
-        const wrappedLines: any[] = [];
-        for (const para of paragraphs) {
-            const tokens = this.tokenizeParagraph(para);
-            console.log("Tokens for paragraph:", tokens);
-            const lines = this.wrapTokens(finalCtx, tokens, maxWidth, quoteFontSize);
-            console.log("Wrapped lines for paragraph:", JSON.stringify(lines));
-            wrappedLines.push(...lines);
+        let wrappedLines: any[] = [];
+        let quoteTextHeight = 0;
+        let totalHeight = 0;
+
+        // Loop to scale down font size until it fits within the 630px height card
+        while (quoteFontSize >= 18) {
+            const currentFontList = `500 ${quoteFontSize}px "${selectedFont}", sans-serif`;
+            finalCtx.font = currentFontList;
+
+            wrappedLines = [];
+            for (const para of paragraphs) {
+                const tokens = this.tokenizeParagraph(para);
+                const lines = this.wrapTokens(finalCtx, tokens, maxWidth, quoteFontSize);
+                wrappedLines.push(...lines);
+            }
+
+            quoteTextHeight = (wrappedLines.length - 1) * quoteLineHeight + quoteFontSize;
+            totalHeight = quoteTextHeight + spacing + displayNameFontSize + spacing2 + usernameFontSize;
+
+            // 520px leaves 55px top/bottom padding (630 - 520 = 110px total padding)
+            if (totalHeight <= 520 || quoteFontSize === 18) {
+                break;
+            }
+
+            quoteFontSize -= 2;
+            quoteLineHeight = Math.round(quoteFontSize * 1.27);
         }
-        
-        // Vertical centering calculation
-        const quoteTextHeight = (wrappedLines.length - 1) * quoteLineHeight + quoteFontSize;
-        const totalHeight = quoteTextHeight + spacing + displayNameFontSize + spacing2 + usernameFontSize;
-        
+
+        const fontList = `500 ${quoteFontSize}px "${selectedFont}", sans-serif`;
+        finalCtx.font = fontList;
+
         const topY = (630 - totalHeight) / 2;
         let currentY = topY + quoteFontSize - 4;
-        
+
+        console.log("Scaled QuoteFontSize:", quoteFontSize, "QuoteLineHeight:", quoteLineHeight);
         console.log("QuoteTextHeight:", quoteTextHeight, "TotalHeight:", totalHeight, "TopY:", topY, "Initial currentY:", currentY);
         console.log("fontList:", fontList);
         console.log("textColor:", textColor);
@@ -374,13 +389,68 @@ export class QuoteGenerator {
                 tokenWidth = emojiSize + 4;
             }
 
-            if (currentLineWidth + tokenWidth > maxWidth && currentLineTokens.length > 0) {
-                lines.push({ tokens: this.trimLineTokens(currentLineTokens) });
-                currentLineTokens = [token];
-                currentLineWidth = tokenWidth;
+            if (token.type === 'emoji') {
+                if (currentLineWidth + tokenWidth > maxWidth && currentLineTokens.length > 0) {
+                    lines.push({ tokens: this.trimLineTokens(currentLineTokens) });
+                    currentLineTokens = [token];
+                    currentLineWidth = tokenWidth;
+                } else {
+                    currentLineTokens.push(token);
+                    currentLineWidth += tokenWidth;
+                }
             } else {
-                currentLineTokens.push(token);
-                currentLineWidth += tokenWidth;
+                if (currentLineWidth + tokenWidth <= maxWidth) {
+                    currentLineTokens.push(token);
+                    currentLineWidth += tokenWidth;
+                } else {
+                    if (tokenWidth <= maxWidth && currentLineTokens.length > 0) {
+                        lines.push({ tokens: this.trimLineTokens(currentLineTokens) });
+                        currentLineTokens = [token];
+                        currentLineWidth = tokenWidth;
+                    } else {
+                        let remainingText = token.text;
+                        while (remainingText.length > 0) {
+                            const availableWidth = maxWidth - currentLineWidth;
+                            let low = 0;
+                            let high = remainingText.length;
+                            let fitCount = 0;
+
+                            while (low <= high) {
+                                const mid = Math.floor((low + high) / 2);
+                                const testSub = remainingText.slice(0, mid);
+                                const testWidth = ctx.measureText(testSub).width;
+                                if (testWidth <= availableWidth) {
+                                    fitCount = mid;
+                                    low = mid + 1;
+                                } else {
+                                    high = mid - 1;
+                                }
+                            }
+
+                            if (fitCount === 0 && currentLineTokens.length > 0) {
+                                lines.push({ tokens: this.trimLineTokens(currentLineTokens) });
+                                currentLineTokens = [];
+                                currentLineWidth = 0;
+                                continue;
+                            }
+
+                            if (fitCount === 0) {
+                                fitCount = 1;
+                            }
+
+                            const fitText = remainingText.slice(0, fitCount);
+                            currentLineTokens.push({ type: 'word', text: fitText });
+                            currentLineWidth += ctx.measureText(fitText).width;
+                            remainingText = remainingText.slice(fitCount);
+
+                            if (remainingText.length > 0) {
+                                lines.push({ tokens: this.trimLineTokens(currentLineTokens) });
+                                currentLineTokens = [];
+                                currentLineWidth = 0;
+                            }
+                        }
+                    }
+                }
             }
         }
 

@@ -11,6 +11,7 @@ import {
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { QuoteGenerator, QuoteOptions } from '../../utils/QuoteGenerator';
+import { cleanFancyText } from '../../utils/Utils';
 
 export default class QuoteCommand extends Command {
     constructor(client: ExtendedClient) {
@@ -87,9 +88,9 @@ export default class QuoteCommand extends Command {
             font: initialFont
         };
 
-        const content = targetMessage.content || "(Image/Attachment)";
+        const content = cleanFancyText(targetMessage.content || "(Image/Attachment)");
         const author = targetMessage.author;
-        let displayName = author.displayName || author.username;
+        let displayName = cleanFancyText(author.displayName || author.username);
         const username = `@${author.username}`;
         let avatarUrl = author.displayAvatarURL({ extension: 'png', size: 512 });
 
@@ -98,7 +99,7 @@ export default class QuoteCommand extends Command {
             try {
                 const member = await guild.members.fetch(author.id);
                 if (member) {
-                    displayName = member.displayName;
+                    displayName = cleanFancyText(member.displayName);
                     avatarUrl = member.displayAvatarURL({ extension: 'png', size: 512 });
                 }
             } catch (err) {

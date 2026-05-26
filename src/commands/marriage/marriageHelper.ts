@@ -10,101 +10,23 @@ import {
 } from 'discord.js';
 import { Context } from '../../structures';
 import { ExtendedClient } from '../../client';
-import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { V2Helper } from '../../utils/V2Helper';
-import { QuoteGenerator } from '../../utils/QuoteGenerator';
+import { MermaidRenderer } from '../../utils/MermaidRenderer';
 
-// Helper to fetch avatar and convert to buffer for canvas
-async function fetchAvatarBuffer(url: string): Promise<Buffer | null> {
-    try {
-        const res = await fetch(url);
-        if (!res.ok) return null;
-        return Buffer.from(await res.arrayBuffer());
-    } catch {
-        return null;
-    }
-}
-
-// Draw a beautiful glassmorphic card
-function drawGlassCard(ctx: any, x: number, y: number, width: number, height: number, avatarImg: any, name: string, role: string, isSelf = false, fontName = 'Segoe UI') {
-    ctx.save();
-    
-    // Drop shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-    ctx.shadowBlur = 12;
-    ctx.shadowOffsetX = 3;
-    ctx.shadowOffsetY = 6;
-    
-    // Card path
-    const radius = 12;
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-    
-    // Fill Card Background (Glass effect)
-    ctx.fillStyle = isSelf ? 'rgba(255, 255, 255, 0.16)' : 'rgba(255, 255, 255, 0.08)';
-    ctx.fill();
-    
-    // Border
-    ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = isSelf ? 'rgba(236, 72, 153, 0.5)' : 'rgba(255, 255, 255, 0.15)'; // Pink border for self
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    
-    ctx.restore();
-
-    // Draw Avatar clipped to a circle
-    ctx.save();
-    const avatarSize = 44;
-    const avatarX = x + 12;
-    const avatarY = y + (height - avatarSize) / 2;
-    
-    ctx.beginPath();
-    ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.clip();
-    
-    if (avatarImg) {
-        ctx.drawImage(avatarImg, avatarX, avatarY, avatarSize, avatarSize);
-    } else {
-        ctx.fillStyle = '#4b5563';
-        ctx.fill();
-    }
-    ctx.restore();
-    
-    // Draw Name and Role Text
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold 13px "${fontName}", sans-serif`;
-    ctx.fillText(name.length > 15 ? name.substring(0, 13) + '..' : name, x + 66, y + 33);
-    
-    ctx.fillStyle = isSelf ? '#f472b6' : 'rgba(255, 255, 255, 0.6)';
-    ctx.font = `10px "${fontName}", sans-serif`;
-    ctx.fillText(role.toUpperCase(), x + 66, y + 50);
-}
-
-// Draw glowing connection lines
-function drawConnectingLine(ctx: any, x1: number, y1: number, x2: number, y2: number, color = 'rgba(255, 255, 255, 0.25)') {
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-    ctx.restore();
+/**
+ * Sanitize a username for safe use inside a Mermaid node label.
+ * Escapes double quotes and strips characters that would break mermaid syntax.
+ */
+function sanitizeMermaidLabel(text: string): string {
+    return text
+        .replace(/"/g, "'")
+        .replace(/[<>{}|[\]\\#&]/g, '')
+        .replace(/\n/g, ' ')
+        .substring(0, 20);
 }
 
 export const marriageHelper = {
+
     // 1. MARRY
     async marry(client: ExtendedClient, ctx: Context, targetUser: User | null): Promise<any> {
         if (!targetUser) {
@@ -541,9 +463,7 @@ export const marriageHelper = {
 
     // 8. TREE
     async drawTree(client: ExtendedClient, ctx: Context, targetUser: User | null, page = 1, fontName = 'Inter'): Promise<any> {
-        if (fontName && fontName.toLowerCase() !== 'segoe ui' && fontName.toLowerCase() !== 'sans-serif') {
-            await QuoteGenerator.loadGoogleFont(fontName).catch(() => {});
-        }
+        
         const user = targetUser || ctx.author;
 
         // ═══════════════════════════════════════════════════
@@ -670,389 +590,202 @@ export const marriageHelper = {
         );
         const userMap = new Map<string, User>(fetchedUsers.filter(Boolean).map(u => [u!.id, u!]));
 
-        const avatarMap = new Map<string, any>();
-        await Promise.all(
-            Array.from(userMap.values()).map(async (u) => {
-                const url = u.displayAvatarURL({ extension: 'png', size: 128 });
-                const buf = await fetchAvatarBuffer(url);
-                if (buf) {
-                    try { const img = await loadImage(buf); avatarMap.set(u.id, img); } catch {}
-                }
-            })
-        );
-
         // ═══════════════════════════════════════════════════
-        // CANVAS SETUP
+        // BUILD MERMAID DEFINITION
         // ═══════════════════════════════════════════════════
-        const cardW = 175;
-        const cardH = 68;
-        const coupleGap = 50;  // gap between couple cards
-        const sibGap = 30;     // gap between sibling groups
-        const childGap = 35;   // gap between child pairs
+        const getName = (id: string): string => {
+            const u = userMap.get(id);
+            return sanitizeMermaidLabel(u ? u.username : 'Unknown');
+        };
 
-        // Calculate how many nodes we need horizontally on Row 1 (self row)
-        // Self + Spouse = 1 couple, then siblings (each potentially with spouse)
-        const selfRowNodes: { id: string; spouseId: string | null; isSelf: boolean }[] = [];
-        selfRowNodes.push({ id: user.id, spouseId, isSelf: true });
-        for (const sid of siblings) {
-            selfRowNodes.push({ id: sid, spouseId: siblingSpouseMap.get(sid) || null, isSelf: false });
-        }
+        const nodeId = (id: string): string => `u${id.substring(0, 8)}`;
 
-        // Calculate width needed for self row
-        let selfRowWidth = 0;
-        for (let i = 0; i < selfRowNodes.length; i++) {
-            const node = selfRowNodes[i];
-            selfRowWidth += cardW; // person
-            if (node.spouseId) selfRowWidth += coupleGap + cardW; // + spouse
-            if (i < selfRowNodes.length - 1) selfRowWidth += sibGap + 20; // gap between sibling groups
-        }
+        const lines: string[] = [];
+        lines.push('graph TD');
+        lines.push('');
 
-        // Calculate width needed for children row
-        let childRowWidth = 0;
-        for (let i = 0; i < paginatedChildIds.length; i++) {
-            const cs = childSpouseMap.get(paginatedChildIds[i]);
-            childRowWidth += cardW;
-            if (cs) childRowWidth += coupleGap + cardW;
-            if (i < paginatedChildIds.length - 1) childRowWidth += childGap;
-        }
-
-        // Calculate width needed for parents row
-        let parentRowWidth = 0;
-        for (let i = 0; i < parentCouples.length; i++) {
-            parentRowWidth += cardW;
-            if (parentCouples[i].id2) parentRowWidth += coupleGap + cardW;
-            if (i < parentCouples.length - 1) parentRowWidth += sibGap;
-        }
-
-        const width = Math.max(1200, selfRowWidth + 200, childRowWidth + 200, parentRowWidth + 200);
-        const height = 820;
-        const canvas = createCanvas(width, height);
-        const cCtx = canvas.getContext('2d');
-
-        // ═══════════════════════════════════════════════════
-        // BACKGROUND
-        // ═══════════════════════════════════════════════════
-        const grad = cCtx.createRadialGradient(width / 2, height / 2, 100, width / 2, height / 2, 700);
-        grad.addColorStop(0, '#1a0a2e');
-        grad.addColorStop(0.5, '#16082a');
-        grad.addColorStop(1, '#0a0614');
-        cCtx.fillStyle = grad;
-        cCtx.fillRect(0, 0, width, height);
-
-        // Subtle decorative blobs
-        const blobs = [
-            { x: width * 0.2, y: 200, r: 200, color: 'rgba(236, 72, 153, 0.03)' },
-            { x: width * 0.8, y: 500, r: 250, color: 'rgba(147, 51, 234, 0.03)' },
-            { x: width * 0.5, y: 700, r: 180, color: 'rgba(59, 130, 246, 0.03)' },
-        ];
-        for (const b of blobs) {
-            cCtx.fillStyle = b.color;
-            cCtx.beginPath();
-            cCtx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-            cCtx.fill();
-        }
-
-        // ═══════════════════════════════════════════════════
-        // LAYOUT POSITIONS
-        // ═══════════════════════════════════════════════════
-        const parentsY = 140;
-        const selfY = 360;
-        const childrenY = 580;
-
-        // Helper to draw a marriage diamond between two cards
-        function drawMarriageDiamond(ctx: any, x: number, y: number) {
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(Math.PI / 4);
-            ctx.fillStyle = '#f472b6';
-            ctx.shadowColor = '#f472b6';
-            ctx.shadowBlur = 12;
-            ctx.fillRect(-5, -5, 10, 10);
-            ctx.restore();
-
-            // Small heart above diamond
-            ctx.save();
-            ctx.fillStyle = '#f472b6';
-            ctx.font = '10px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('💍', x, y - 12);
-            ctx.restore();
-        }
-
-        // ── PARENTS ROW ──
-        interface CardPos { x: number; y: number; }
-        const parentCardPositions = new Map<string, CardPos>();
-        let parentStartX = width / 2 - parentRowWidth / 2;
-
-        for (let i = 0; i < parentCouples.length; i++) {
-            const pc = parentCouples[i];
-            parentCardPositions.set(pc.id1, { x: parentStartX, y: parentsY });
-            if (pc.id2) {
-                const spX = parentStartX + cardW + coupleGap;
-                parentCardPositions.set(pc.id2, { x: spX, y: parentsY });
-
-                // Draw marriage connector line between couple
-                drawConnectingLine(cCtx, parentStartX + cardW, parentsY + cardH / 2, spX, parentsY + cardH / 2, 'rgba(236, 72, 153, 0.5)');
-                drawMarriageDiamond(cCtx, parentStartX + cardW + coupleGap / 2, parentsY + cardH / 2);
-
-                parentStartX = spX + cardW + sibGap;
-            } else {
-                parentStartX += cardW + sibGap;
-            }
-        }
-
-        // ── SELF ROW (Self + Siblings, each with optional spouse) ──
-        const selfCardPositions = new Map<string, CardPos>();
-        let selfStartX = width / 2 - selfRowWidth / 2;
-
-        for (let i = 0; i < selfRowNodes.length; i++) {
-            const node = selfRowNodes[i];
-            selfCardPositions.set(node.id, { x: selfStartX, y: selfY });
-
-            if (node.spouseId) {
-                const spX = selfStartX + cardW + coupleGap;
-                selfCardPositions.set(node.spouseId, { x: spX, y: selfY });
-
-                // Marriage connector
-                drawConnectingLine(cCtx, selfStartX + cardW, selfY + cardH / 2, spX, selfY + cardH / 2, 'rgba(236, 72, 153, 0.5)');
-                drawMarriageDiamond(cCtx, selfStartX + cardW + coupleGap / 2, selfY + cardH / 2);
-
-                selfStartX = spX + cardW + sibGap + 20;
-            } else {
-                selfStartX += cardW + sibGap + 20;
-            }
-        }
-
-        // ── CHILDREN ROW ──
-        const childCardPositions = new Map<string, CardPos>();
-        let childStartX = width / 2 - childRowWidth / 2;
-
-        for (let i = 0; i < paginatedChildIds.length; i++) {
-            const cid = paginatedChildIds[i];
-            childCardPositions.set(cid, { x: childStartX, y: childrenY });
-
-            const cs = childSpouseMap.get(cid);
-            if (cs) {
-                const csX = childStartX + cardW + coupleGap;
-                childCardPositions.set(cs, { x: csX, y: childrenY });
-
-                // Marriage connector
-                drawConnectingLine(cCtx, childStartX + cardW, childrenY + cardH / 2, csX, childrenY + cardH / 2, 'rgba(236, 72, 153, 0.4)');
-                drawMarriageDiamond(cCtx, childStartX + cardW + coupleGap / 2, childrenY + cardH / 2);
-
-                childStartX = csX + cardW + childGap;
-            } else {
-                childStartX += cardW + childGap;
-            }
-        }
-
-        // ═══════════════════════════════════════════════════
-        // DRAW CONNECTING LINES (parent→self row, self→children)
-        // ═══════════════════════════════════════════════════
-
-        // Lines from parents to all children in self row (self + siblings)
-        if (parentCouples.length > 0) {
-            // Find the center anchor of parents row
-            const allParentXs: number[] = [];
-            for (const pc of parentCouples) {
-                const p1 = parentCardPositions.get(pc.id1)!;
-                allParentXs.push(p1.x + cardW / 2);
-                if (pc.id2) {
-                    const p2 = parentCardPositions.get(pc.id2)!;
-                    allParentXs.push(p2.x + cardW / 2);
-                }
-            }
-            // Use the center between the first and last parent card
-            const parentsCenterX = (Math.min(...allParentXs) + Math.max(...allParentXs)) / 2;
-            const parentBottomY = parentsY + cardH;
-            const splitY = parentBottomY + 35;
-
-            // Vertical from parents center down to split
-            drawConnectingLine(cCtx, parentsCenterX, parentBottomY, parentsCenterX, splitY, 'rgba(147, 51, 234, 0.4)');
-
-            // Horizontal bar across all self-row nodes
-            const selfRowCenters: number[] = [];
-            for (const node of selfRowNodes) {
-                const pos = selfCardPositions.get(node.id)!;
-                if (node.spouseId) {
-                    const spPos = selfCardPositions.get(node.spouseId)!;
-                    selfRowCenters.push((pos.x + spPos.x + cardW) / 2);
-                } else {
-                    selfRowCenters.push(pos.x + cardW / 2);
-                }
-            }
-
-            if (selfRowCenters.length > 1) {
-                const minCx = Math.min(...selfRowCenters);
-                const maxCx = Math.max(...selfRowCenters);
-                drawConnectingLine(cCtx, minCx, splitY, maxCx, splitY, 'rgba(147, 51, 234, 0.4)');
-            }
-
-            // Vertical lines from split bar down to each self-row node
-            for (const cx of selfRowCenters) {
-                drawConnectingLine(cCtx, cx, splitY, cx, selfY, 'rgba(147, 51, 234, 0.35)');
-            }
-        }
-
-        // Lines from Self (+ spouse) to children
-        if (paginatedChildIds.length > 0) {
-            const selfPos = selfCardPositions.get(user.id)!;
-            let anchorX: number;
-            if (spouseId) {
-                const spousePos = selfCardPositions.get(spouseId)!;
-                anchorX = (selfPos.x + spousePos.x + cardW) / 2;
-            } else {
-                anchorX = selfPos.x + cardW / 2;
-            }
-            const anchorY = selfY + cardH;
-            const splitY = anchorY + 40;
-
-            drawConnectingLine(cCtx, anchorX, anchorY, anchorX, splitY, 'rgba(59, 130, 246, 0.4)');
-
-            // Child centers
-            const childCenters: number[] = [];
-            for (const cid of paginatedChildIds) {
-                const cPos = childCardPositions.get(cid)!;
-                const cs = childSpouseMap.get(cid);
-                if (cs) {
-                    const csPos = childCardPositions.get(cs)!;
-                    childCenters.push((cPos.x + csPos.x + cardW) / 2);
-                } else {
-                    childCenters.push(cPos.x + cardW / 2);
-                }
-            }
-
-            if (childCenters.length > 1) {
-                const minCx = Math.min(...childCenters);
-                const maxCx = Math.max(...childCenters);
-                drawConnectingLine(cCtx, minCx, splitY, maxCx, splitY, 'rgba(59, 130, 246, 0.4)');
-            }
-
-            for (const cx of childCenters) {
-                drawConnectingLine(cCtx, cx, splitY, cx, childrenY, 'rgba(59, 130, 246, 0.35)');
-            }
-        }
-
-        // ═══════════════════════════════════════════════════
-        // DRAW ALL CARDS
-        // ═══════════════════════════════════════════════════
-
-        // Parents
-        for (const pc of parentCouples) {
-            const p1User = userMap.get(pc.id1);
-            const p1Pos = parentCardPositions.get(pc.id1);
-            if (p1User && p1Pos) {
-                drawGlassCard(cCtx, p1Pos.x, p1Pos.y, cardW, cardH, avatarMap.get(pc.id1), p1User.username, 'Parent', false, fontName);
-            }
-            if (pc.id2) {
-                const p2User = userMap.get(pc.id2);
-                const p2Pos = parentCardPositions.get(pc.id2);
-                if (p2User && p2Pos) {
-                    const roleLabel = parentIds.includes(pc.id2) ? 'Parent' : 'Step-Parent';
-                    drawGlassCard(cCtx, p2Pos.x, p2Pos.y, cardW, cardH, avatarMap.get(pc.id2), p2User.username, roleLabel, false, fontName);
-                }
-            }
-        }
-
-        // Self row
-        for (const node of selfRowNodes) {
-            const nUser = userMap.get(node.id);
-            const nPos = selfCardPositions.get(node.id);
-            if (nUser && nPos) {
-                const role = node.isSelf ? 'You' : 'Sibling';
-                drawGlassCard(cCtx, nPos.x, nPos.y, cardW, cardH, avatarMap.get(node.id), nUser.username, role, node.isSelf, fontName);
-            }
-            if (node.spouseId) {
-                const sUser = userMap.get(node.spouseId);
-                const sPos = selfCardPositions.get(node.spouseId);
-                if (sUser && sPos) {
-                    const spouseRole = node.isSelf ? 'Spouse' : 'In-Law';
-                    drawGlassCard(cCtx, sPos.x, sPos.y, cardW, cardH, avatarMap.get(node.spouseId), sUser.username, spouseRole, false, fontName);
-                }
-            }
-        }
-
-        // Children
-        for (const cid of paginatedChildIds) {
-            const cUser = userMap.get(cid);
-            const cPos = childCardPositions.get(cid);
-            if (cUser && cPos) {
-                drawGlassCard(cCtx, cPos.x, cPos.y, cardW, cardH, avatarMap.get(cid), cUser.username, 'Child', false, fontName);
-            }
-            const cs = childSpouseMap.get(cid);
-            if (cs) {
-                const csUser = userMap.get(cs);
-                const csPos = childCardPositions.get(cs);
-                if (csUser && csPos) {
-                    drawGlassCard(cCtx, csPos.x, csPos.y, cardW, cardH, avatarMap.get(cs), csUser.username, 'Child-In-Law', false, fontName);
-                }
-            }
-        }
-
-        // ═══════════════════════════════════════════════════
-        // HEADER + FOOTER
-        // ═══════════════════════════════════════════════════
-
-        // Row labels
-        cCtx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-        cCtx.font = `bold 10px "${fontName}", sans-serif`;
-        cCtx.textAlign = 'left';
-        if (parentCouples.length > 0) cCtx.fillText('PARENTS', 30, parentsY + 10);
-        cCtx.fillText('FAMILY', 30, selfY + 10);
-        if (paginatedChildIds.length > 0) cCtx.fillText('CHILDREN', 30, childrenY + 10);
-
-        // Title
-        cCtx.fillStyle = '#ffffff';
-        cCtx.font = `bold 24px "${fontName}", sans-serif`;
-        cCtx.textAlign = 'center';
-        cCtx.fillText(`${user.username}'s Family Tree`, width / 2, 55);
-
-        // Subtitle with stats
-        cCtx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-        cCtx.font = `12px "${fontName}", sans-serif`;
+        // Stats for title
         const stats = [
             spouseId ? '💍 Married' : '💔 Single',
-            `👪 ${siblings.length} sibling${siblings.length !== 1 ? 's' : ''}`,
+            `👥 ${siblings.length} sibling${siblings.length !== 1 ? 's' : ''}`,
             `👶 ${childIds.length} child${childIds.length !== 1 ? 'ren' : ''}`,
             `👨‍👩‍👧 ${parentIds.length} parent${parentIds.length !== 1 ? 's' : ''}`
-        ].join('  ·  ');
-        cCtx.fillText(stats, width / 2, 80);
+        ].join(' · ');
+        
+        // Title node (dark text for white background)
+        lines.push(`    TITLE["👑 ${getName(user.id)}'s Family Tree<br/><small>${stats}</small>"]`);
+        lines.push(`    style TITLE fill:transparent,stroke:none,color:#000000,font-size:18px`);
+        lines.push('');
 
-        // Footer
-        cCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        cCtx.font = `11px "${fontName}", sans-serif`;
-        let footerText = `Global Marriage System`;
-        if (childIds.length > itemsPerPage) {
-            footerText += `  ·  Children Page ${page}/${totalPages} (${childIds.length} total)  ·  Use .tree [page] to browse`;
+        // ── PARENT NODES ──
+        const parentNodeIds: string[] = [];
+        const parentJunctions = new Map<string, string>();
+        for (const pc of parentCouples) {
+            const p1 = nodeId(pc.id1);
+            const p1Name = getName(pc.id1);
+            lines.push(`    ${p1}["${p1Name}"]`);
+            parentNodeIds.push(p1);
+
+            if (pc.id2) {
+                const p2 = nodeId(pc.id2);
+                const p2Name = getName(pc.id2);
+                lines.push(`    ${p2}["${p2Name}"]`);
+                parentNodeIds.push(p2);
+                
+                // Create junction for parent couple
+                const pJuncId = `j_${p1}_${p2}`;
+                lines.push(`    ${pJuncId}(( ))`);
+                lines.push(`    class ${pJuncId} junctionNode`);
+                
+                lines.push(`    ${p1} --- ${pJuncId}`);
+                lines.push(`    ${p2} --- ${pJuncId}`);
+                parentJunctions.set(pc.id1, pJuncId);
+                parentJunctions.set(pc.id2, pJuncId);
+            }
         }
-        cCtx.fillText(footerText, width / 2, height - 25);
+        lines.push('');
 
-        // Legend
-        cCtx.font = `9px "${fontName}", sans-serif`;
-        cCtx.textAlign = 'right';
-        cCtx.fillStyle = 'rgba(236, 72, 153, 0.6)';
-        cCtx.fillText('━━ Marriage', width - 30, height - 50);
-        cCtx.fillStyle = 'rgba(147, 51, 234, 0.6)';
-        cCtx.fillText('━━ Parent-Child', width - 30, height - 37);
-        cCtx.fillStyle = 'rgba(59, 130, 246, 0.6)';
-        cCtx.fillText('━━ Your Children', width - 30, height - 24);
+        // ── SELF NODE ──
+        const selfId = nodeId(user.id);
+        lines.push(`    ${selfId}["${getName(user.id)}"]`);
 
-        // ═══════════════════════════════════════════════════
-        // OUTPUT
-        // ═══════════════════════════════════════════════════
-        const buffer = canvas.toBuffer('image/png');
-        const attachment = new AttachmentBuilder(buffer, { name: `family_tree_${user.id}.png` });
+        // Self marriage
+        let selfJunctionId: string | null = null;
+        if (spouseId) {
+            const spId = nodeId(spouseId);
+            lines.push(`    ${spId}["${getName(spouseId)}"]`);
+            
+            selfJunctionId = `j_${selfId}_${spId}`;
+            lines.push(`    ${selfJunctionId}(( ))`);
+            lines.push(`    class ${selfJunctionId} junctionNode`);
+            
+            lines.push(`    ${selfId} --- ${selfJunctionId}`);
+            lines.push(`    ${spId} --- ${selfJunctionId}`);
+        }
 
-        return ctx.reply({
-            files: [attachment]
-        });
+        // ── SIBLING NODES ──
+        const siblingNodeIds: string[] = [];
+        for (const sid of siblings) {
+            const sId = nodeId(sid);
+            lines.push(`    ${sId}["${getName(sid)}"]`);
+            siblingNodeIds.push(sId);
+
+            const ss = siblingSpouseMap.get(sid);
+            if (ss) {
+                const ssId = nodeId(ss);
+                lines.push(`    ${ssId}["${getName(ss)}"]`);
+                lines.push(`    ${sId} --- ${ssId}`);
+            }
+        }
+        lines.push('');
+
+        // ── PARENT → SELF/SIBLINGS CONNECTIONS ──
+        if (parentCouples.length > 0) {
+            // Connect each parent couple/single parent to self and siblings
+            for (const pc of parentCouples) {
+                const pJuncId = parentJunctions.get(pc.id1);
+                if (pJuncId) {
+                    // Connect junction to self
+                    lines.push(`    ${pJuncId} --> ${selfId}`);
+                    // Connect junction to siblings
+                    for (const sNodeId of siblingNodeIds) {
+                        lines.push(`    ${pJuncId} --> ${sNodeId}`);
+                    }
+                } else {
+                    const p1 = nodeId(pc.id1);
+                    // Connect parent directly to self
+                    lines.push(`    ${p1} --> ${selfId}`);
+                    // Connect parent to siblings
+                    for (const sNodeId of siblingNodeIds) {
+                        lines.push(`    ${p1} --> ${sNodeId}`);
+                    }
+                }
+            }
+        }
+
+        // ── CHILDREN NODES ──
+        for (const cid of paginatedChildIds) {
+            const cNodeId = nodeId(cid);
+            lines.push(`    ${cNodeId}["${getName(cid)}"]`);
+            
+            const cs = childSpouseMap.get(cid);
+            if (cs) {
+                const csId = nodeId(cs);
+                lines.push(`    ${csId}["${getName(cs)}"]`);
+                lines.push(`    ${cNodeId} --- ${csId}`);
+            }
+
+            // Connect parent(s) to child
+            if (selfJunctionId) {
+                lines.push(`    ${selfJunctionId} --> ${cNodeId}`);
+            } else {
+                lines.push(`    ${selfId} --> ${cNodeId}`);
+            }
+        }
+        lines.push('');
+
+        // ── TITLE → Parents / Self connection (invisible, for layout ordering) ──
+        if (parentNodeIds.length > 0) {
+            lines.push(`    TITLE ~~~ ${parentNodeIds[0]}`);
+        } else {
+            lines.push(`    TITLE ~~~ ${selfId}`);
+        }
+        lines.push('');
+
+        // ── PAGINATION FOOTER NODE (dark text for white background) ──
+        if (childIds.length > itemsPerPage) {
+            lines.push(`    FOOTER["<small>Children Page ${page}/${totalPages} · ${childIds.length} total · Use .tree [page] to browse</small>"]`);
+            lines.push(`    style FOOTER fill:transparent,stroke:none,color:#888888,font-size:11px`);
+            // Connect footer after children
+            if (paginatedChildIds.length > 0) {
+                const lastChildId = nodeId(paginatedChildIds[paginatedChildIds.length - 1]);
+                lines.push(`    ${lastChildId} ~~~ FOOTER`);
+            }
+        }
+        lines.push('');
+
+        // Apply classes
+        for (const pc of parentCouples) {
+            lines.push(`    class ${nodeId(pc.id1)} parentNode`);
+            if (pc.id2) lines.push(`    class ${nodeId(pc.id2)} parentNode`);
+        }
+        for (const sid of siblings) {
+            lines.push(`    class ${nodeId(sid)} siblingNode`);
+            const ss = siblingSpouseMap.get(sid);
+            if (ss) lines.push(`    class ${nodeId(ss)} siblingNode`);
+        }
+        for (const cid of paginatedChildIds) {
+            lines.push(`    class ${nodeId(cid)} childNode`);
+            const cs = childSpouseMap.get(cid);
+            if (cs) lines.push(`    class ${nodeId(cs)} childNode`);
+        }
+        lines.push(`    class ${selfId} selfNode`);
+        if (spouseId) lines.push(`    class ${nodeId(spouseId)} selfNode`); // highlight target and spouse in blue
+        lines.push('');
+
+        const definition = lines.join('\n');
+
+        try {
+            const buffer = await MermaidRenderer.renderToBuffer(definition, {
+                theme: 'default',
+                fontFamily: `"${fontName}", Georgia, Times New Roman, serif`,
+                backgroundColor: '#ffffff'
+            });
+            const attachment = new AttachmentBuilder(buffer, { name: `family_tree_${user.id}.png` });
+
+            return ctx.reply({
+                files: [attachment]
+            });
+        } catch (err) {
+            console.error('Mermaid tree render error:', err);
+            return ctx.replyV2({ description: 'Failed to render the family tree. Please try again later.', isAlert: true });
+        }
     },
+
 
     // 9. FULL TREE
     async fulltree(client: ExtendedClient, ctx: Context, page = 1, fontName = 'Inter'): Promise<any> {
-        if (fontName && fontName.toLowerCase() !== 'segoe ui' && fontName.toLowerCase() !== 'sans-serif') {
-            await QuoteGenerator.loadGoogleFont(fontName).catch(() => {});
-        }
+        
         // Fetch all Marriage and FamilyRelation
         const marriages = await client.prisma.marriage.findMany();
         const familyRelations = await client.prisma.familyRelation.findMany();
@@ -1255,276 +988,157 @@ export const marriageHelper = {
         );
         const userMap = new Map<string, User>(fetchedUsers.filter(Boolean).map(u => [u!.id, u!]));
 
-        const avatarMap = new Map<string, any>();
-        await Promise.all(
-            Array.from(userMap.values()).map(async (u) => {
-                const url = u.displayAvatarURL({ extension: 'png', size: 128 });
-                const buf = await fetchAvatarBuffer(url);
-                if (buf) {
-                    try { const img = await loadImage(buf); avatarMap.set(u.id, img); } catch {}
-                }
-            })
-        );
-
         // ═══════════════════════════════════════════════════
-        // CANVAS SETUP & POSITIONING
+        // BUILD MERMAID DEFINITION
         // ═══════════════════════════════════════════════════
-        const cardW = 175;
-        const cardH = 68;
-        const coupleGap = 50;  
-        const nodeGap = 55;    
-        const genHeightGap = 220; 
+        const getName = (id: string): string => {
+            const u = userMap.get(id);
+            return sanitizeMermaidLabel(u ? u.username : 'Unknown');
+        };
 
-        // Find max generation width
-        let maxGenWidth = 0;
-        const genWidths = generations.map(nodes => {
-            let w = 0;
-            for (let i = 0; i < nodes.length; i++) {
-                const n = nodes[i];
-                if (n.type === 'COUPLE') {
-                    w += cardW * 2 + coupleGap;
-                } else {
-                    w += cardW;
-                }
-                if (i < nodes.length - 1) {
-                    w += nodeGap;
-                }
-            }
-            if (w > maxGenWidth) maxGenWidth = w;
-            return w;
-        });
+        const nodeId = (id: string): string => `u${id.substring(0, 8)}`;
 
-        const width = Math.max(1200, maxGenWidth + 200);
-        const height = Math.max(700, 180 + generations.length * genHeightGap);
-        const canvas = createCanvas(width, height);
-        const cCtx = canvas.getContext('2d');
+        const lines: string[] = [];
+        lines.push('graph TD');
+        lines.push('');
 
-        // Layout positions
-        const cardPositions = new Map<string, { x: number; y: number }>();
-        const startY = 140;
-
-        for (let g = 0; g < generations.length; g++) {
-            const nodes = generations[g];
-            const genW = genWidths[g];
-            const y = startY + g * genHeightGap;
-
-            let startX = (width - genW) / 2;
-
-            for (const n of nodes) {
-                if (n.type === 'COUPLE') {
-                    cardPositions.set(n.id1, { x: startX, y });
-                    const spX = startX + cardW + coupleGap;
-                    cardPositions.set(n.id2!, { x: spX, y });
-                    startX = spX + cardW + nodeGap;
-                } else {
-                    cardPositions.set(n.id1, { x: startX, y });
-                    startX += cardW + nodeGap;
-                }
-            }
-        }
-
-        // ═══════════════════════════════════════════════════
-        // BACKGROUND
-        // ═══════════════════════════════════════════════════
-        const grad = cCtx.createRadialGradient(width / 2, height / 2, 100, width / 2, height / 2, Math.max(width, height) * 0.7);
-        grad.addColorStop(0, '#1a0a2e');
-        grad.addColorStop(0.5, '#16082a');
-        grad.addColorStop(1, '#0a0614');
-        cCtx.fillStyle = grad;
-        cCtx.fillRect(0, 0, width, height);
-
-        const blobs = [
-            { x: width * 0.2, y: height * 0.3, r: 250, color: 'rgba(236, 72, 153, 0.03)' },
-            { x: width * 0.8, y: height * 0.7, r: 300, color: 'rgba(147, 51, 234, 0.03)' },
-            { x: width * 0.5, y: height * 0.5, r: 200, color: 'rgba(59, 130, 246, 0.03)' },
-        ];
-        for (const b of blobs) {
-            cCtx.fillStyle = b.color;
-            cCtx.beginPath();
-            cCtx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-            cCtx.fill();
-        }
-
-        // ═══════════════════════════════════════════════════
-        // DRAW CONNECTING LINES
-        // ═══════════════════════════════════════════════════
-        // 1. Marriages
-        for (const nodes of generations) {
-            for (const n of nodes) {
-                if (n.type === 'COUPLE') {
-                    const pos1 = cardPositions.get(n.id1)!;
-                    const pos2 = cardPositions.get(n.id2!)!;
-                    const marriageLineY = pos1.y + cardH / 2;
-                    drawConnectingLine(cCtx, pos1.x + cardW, marriageLineY, pos2.x, marriageLineY, 'rgba(236, 72, 153, 0.5)');
-                    
-                    // Draw diamond
-                    cCtx.save();
-                    cCtx.translate(pos1.x + cardW + coupleGap / 2, marriageLineY);
-                    cCtx.rotate(Math.PI / 4);
-                    cCtx.fillStyle = '#f472b6';
-                    cCtx.shadowColor = '#f472b6';
-                    cCtx.shadowBlur = 12;
-                    cCtx.fillRect(-5, -5, 10, 10);
-                    cCtx.restore();
-
-                    cCtx.save();
-                    cCtx.fillStyle = '#f472b6';
-                    cCtx.font = '10px sans-serif';
-                    cCtx.textAlign = 'center';
-                    cCtx.fillText('💍', pos1.x + cardW + coupleGap / 2, marriageLineY - 12);
-                    cCtx.restore();
-                }
-            }
-        }
-
-        // 2. Parent-to-child connections
-        const parentGroups = new Map<string, string[]>();
-
-        for (const cid of comp) {
-            const parents = parentsMap.get(cid) || [];
-            const compParents = parents.filter(p => comp.includes(p));
-
-            if (compParents.length > 0) {
-                compParents.sort();
-                let groupKey = '';
-                if (compParents.length === 2) {
-                    const isMarried = spouseMap.get(compParents[0]) === compParents[1];
-                    if (isMarried) {
-                        groupKey = `${compParents[0]}_${compParents[1]}`;
-                    } else {
-                        for (const p of compParents) {
-                            if (!parentGroups.has(p)) parentGroups.set(p, []);
-                            parentGroups.get(p)!.push(cid);
-                        }
-                        continue;
-                    }
-                } else {
-                    groupKey = compParents[0];
-                }
-
-                if (!parentGroups.has(groupKey)) {
-                    parentGroups.set(groupKey, []);
-                }
-                parentGroups.get(groupKey)!.push(cid);
-            }
-        }
-
-        for (const [key, children] of parentGroups.entries()) {
-            let parentX = 0;
-            let parentY = 0;
-
-            if (key.includes('_')) {
-                const [p1, p2] = key.split('_');
-                const pos1 = cardPositions.get(p1)!;
-                const pos2 = cardPositions.get(p2)!;
-                parentX = (pos1.x + pos2.x + cardW) / 2;
-                parentY = pos1.y + cardH;
-            } else {
-                const pos = cardPositions.get(key)!;
-                parentX = pos.x + cardW / 2;
-                parentY = pos.y + cardH;
-            }
-
-            const splitY = parentY + 35;
-            const childXs = children.map(cid => {
-                const pos = cardPositions.get(cid)!;
-                return pos.x + cardW / 2;
-            });
-            const minChildX = Math.min(...childXs);
-            const maxChildX = Math.max(...childXs);
-            const childY = cardPositions.get(children[0])!.y;
-
-            // Draw vertical from parents to split
-            drawConnectingLine(cCtx, parentX, parentY, parentX, splitY, 'rgba(147, 51, 234, 0.45)');
-
-            // Draw horizontal bar at splitY
-            drawConnectingLine(cCtx, Math.min(parentX, minChildX), splitY, Math.max(parentX, maxChildX), splitY, 'rgba(147, 51, 234, 0.45)');
-
-            // Draw vertical lines from splitY to each child
-            for (const cid of children) {
-                const pos = cardPositions.get(cid)!;
-                const cx = pos.x + cardW / 2;
-                drawConnectingLine(cCtx, cx, splitY, cx, childY, 'rgba(147, 51, 234, 0.4)');
-            }
-        }
-
-        // ═══════════════════════════════════════════════════
-        // DRAW CARDS
-        // ═══════════════════════════════════════════════════
-        const selfLevel = level.get(ctx.author.id) ?? -1;
-
-        for (const [uid, pos] of cardPositions.entries()) {
-            const u = userMap.get(uid);
-            const name = u ? u.username : `Unknown`;
-            const isSelf = uid === ctx.author.id;
-            
-            let roleLabel = 'Family';
-            if (isSelf) {
-                roleLabel = 'You';
-            } else if (spouseMap.get(ctx.author.id) === uid) {
-                roleLabel = 'Spouse';
-            } else if (selfLevel !== -1) {
-                const lvl = level.get(uid)!;
-                const diff = lvl - selfLevel;
-                if (diff === 0) {
-                    roleLabel = 'Sibling/In-Law';
-                } else if (diff === -1) {
-                    roleLabel = 'Parent';
-                } else if (diff < -1) {
-                    roleLabel = 'Ancestor';
-                } else if (diff === 1) {
-                    roleLabel = 'Child';
-                } else if (diff > 1) {
-                    roleLabel = 'Descendant';
-                }
-            } else {
-                roleLabel = `Generation ${level.get(uid)!}`;
-            }
-
-            drawGlassCard(cCtx, pos.x, pos.y, cardW, cardH, avatarMap.get(uid), name, roleLabel, isSelf, fontName);
-        }
-
-        // ═══════════════════════════════════════════════════
-        // HEADER & FOOTER METADATA
-        // ═══════════════════════════════════════════════════
-        cCtx.fillStyle = '#ffffff';
-        cCtx.font = `bold 24px "${fontName}", sans-serif`;
-        cCtx.textAlign = 'center';
-        cCtx.fillText(`Global Marriage Tree #${currentPage}`, width / 2, 55);
-
-        cCtx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-        cCtx.font = `12px "${fontName}", sans-serif`;
-        const statsStr = [
+        // Title statistics (dark text for white background)
+        const stats = [
             `👥 ${comp.length} member${comp.length !== 1 ? 's' : ''}`,
             `🌳 ${generations.length} generation${generations.length !== 1 ? 's' : ''}`
-        ].join('  ·  ');
-        cCtx.fillText(statsStr, width / 2, 80);
+        ].join(' · ');
 
-        cCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        cCtx.font = `11px "${fontName}", sans-serif`;
-        let footerText = `Global Marriage System`;
-        if (totalPages > 1) {
-            footerText += `  ·  Family Tree Page ${currentPage}/${totalPages}  ·  Use .fulltree [page] to browse`;
+        lines.push(`    TITLE["👑 Global Marriage Tree #${currentPage}<br/><small>${stats}</small>"]`);
+        lines.push(`    style TITLE fill:transparent,stroke:none,color:#000000,font-size:18px`);
+        lines.push('');
+
+        const selfLevel = level.get(ctx.author.id) ?? -1;
+
+        // Draw nodes with plain usernames (no roles)
+        for (const uid of comp) {
+            const uIdStr = nodeId(uid);
+            const name = getName(uid);
+            lines.push(`    ${uIdStr}["${name}"]`);
         }
-        cCtx.fillText(footerText, width / 2, height - 25);
+        lines.push('');
 
-        cCtx.font = `9px "${fontName}", sans-serif`;
-        cCtx.textAlign = 'right';
-        cCtx.fillStyle = 'rgba(236, 72, 153, 0.6)';
-        cCtx.fillText('━━ Marriage', width - 30, height - 42);
-        cCtx.fillStyle = 'rgba(147, 51, 234, 0.6)';
-        cCtx.fillText('━━ Parent-Child', width - 30, height - 28);
+        // Draw marriages & create junctions
+        const processedMarriages = new Set<string>();
+        const coupleJunctions = new Map<string, string>(); // pairKey -> junctionNodeId
+        for (const uid of comp) {
+            const spouseId = spouseMap.get(uid);
+            if (spouseId && comp.includes(spouseId)) {
+                const pairKey = uid < spouseId ? `${uid}_${spouseId}` : `${spouseId}_${uid}`;
+                if (!processedMarriages.has(pairKey)) {
+                    processedMarriages.add(pairKey);
+                    const id1 = nodeId(uid);
+                    const id2 = nodeId(spouseId);
+                    
+                    const juncId = `j_${id1}_${id2}`;
+                    lines.push(`    ${juncId}(( ))`);
+                    lines.push(`    class ${juncId} junctionNode`);
+                    
+                    lines.push(`    ${id1} --- ${juncId}`);
+                    lines.push(`    ${id2} --- ${juncId}`);
+                    coupleJunctions.set(pairKey, juncId);
+                }
+            }
+        }
 
-        // ═══════════════════════════════════════════════════
-        // OUTPUT
-        // ═══════════════════════════════════════════════════
-        const buffer = canvas.toBuffer('image/png');
-        const attachment = new AttachmentBuilder(buffer, { name: `global_family_tree_${currentPage}.png` });
+        // Draw parent-to-child connections
+        const childToParentsMap = new Map<string, string[]>();
+        for (const rel of familyRelations) {
+            if (comp.includes(rel.parentId) && comp.includes(rel.childId)) {
+                const parents = childToParentsMap.get(rel.childId) || [];
+                parents.push(rel.parentId);
+                childToParentsMap.set(rel.childId, parents);
+            }
+        }
 
-        return ctx.reply({
-            files: [attachment]
-        });
+        for (const [childId, parents] of childToParentsMap.entries()) {
+            const cId = nodeId(childId);
+            let connectedViaJunction = false;
+            
+            if (parents.length >= 2) {
+                // Find if any pair of parents are married and have a junction
+                for (let i = 0; i < parents.length; i++) {
+                    for (let j = i + 1; j < parents.length; j++) {
+                        const p1 = parents[i];
+                        const p2 = parents[j];
+                        const pairKey = p1 < p2 ? `${p1}_${p2}` : `${p2}_${p1}`;
+                        const juncId = coupleJunctions.get(pairKey);
+                        if (juncId) {
+                            lines.push(`    ${juncId} --> ${cId}`);
+                            connectedViaJunction = true;
+                            break;
+                        }
+                    }
+                    if (connectedViaJunction) break;
+                }
+            }
+            
+            if (!connectedViaJunction) {
+                // If single parent or parents not married, connect directly to primary parent
+                parents.sort();
+                const primaryParentId = parents[0];
+                const pId = nodeId(primaryParentId);
+                lines.push(`    ${pId} --> ${cId}`);
+            }
+        }
+        lines.push('');
+
+        // Title to top level connection (invisible)
+        if (generations.length > 0 && generations[0].length > 0) {
+            const firstNode = nodeId(generations[0][0].id1);
+            lines.push(`    TITLE ~~~ ${firstNode}`);
+        }
+        lines.push('');
+
+        // Pagination footer (dark text for white background)
+        if (totalPages > 1) {
+            lines.push(`    FOOTER["<small>Family Tree Page ${currentPage}/${totalPages} · Use .fulltree [page] to browse</small>"]`);
+            lines.push(`    style FOOTER fill:transparent,stroke:none,color:#888888,font-size:11px`);
+            
+            const lastGen = generations[generations.length - 1];
+            if (lastGen && lastGen.length > 0) {
+                const lastNode = nodeId(lastGen[lastGen.length - 1].id1);
+                lines.push(`    ${lastNode} ~~~ FOOTER`);
+            }
+        }
+        lines.push('');
+
+        // Assign classes
+        for (const uid of comp) {
+            const uIdStr = nodeId(uid);
+            const isSelf = uid === ctx.author.id;
+            const isSpouse = spouseMap.get(ctx.author.id) === uid;
+            
+            if (isSelf || isSpouse) {
+                lines.push(`    class ${uIdStr} selfNode`); // highlight target and spouse in blue
+            } else {
+                lines.push(`    class ${uIdStr} genNode`);
+            }
+        }
+
+        const definition = lines.join('\n');
+
+        try {
+            const buffer = await MermaidRenderer.renderToBuffer(definition, {
+                theme: 'default',
+                fontFamily: `"${fontName}", Georgia, Times New Roman, serif`,
+                backgroundColor: '#ffffff'
+            });
+            const attachment = new AttachmentBuilder(buffer, { name: `global_family_tree_${currentPage}.png` });
+
+            return ctx.reply({
+                files: [attachment]
+            });
+        } catch (err) {
+            console.error('Mermaid fulltree render error:', err);
+            return ctx.replyV2({ description: 'Failed to render the global family tree. Please try again later.', isAlert: true });
+        }
     },
+
 
     // 10. RELATIONSHIP
     async relationship(client: ExtendedClient, ctx: Context, targetUser: User | null): Promise<any> {
