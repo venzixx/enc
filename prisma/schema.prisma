@@ -930,3 +930,19 @@ model UserMention {
   @@index([userId, createdAt])
 }
 
+model DevLock {
+  id         Int      @id @default(autoincrement())
+  targetId   String   @unique
+  targetType String   // "user" or "channel"
+  lockType   String   // "uwu", "nsfw", "mommy", "react"
+  emoji      String?  // Optional emoji for react lock
+  createdAt  DateTime @default(now())
+}
+
+model DevAntiNuke {
+  id        Int      @id @default(autoincrement())
+  guildId   String   @unique
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+

@@ -7,6 +7,7 @@ import { LOCALE_SUB_KEYS, type LocaleSubKeys } from "../types/locales";
 import logger from "./Logger";
 
 const LOCALES_PATH = join(process.cwd(), "locales");
+console.log(`[i18n DEBUG] LOCALES_PATH resolved to: ${LOCALES_PATH}`);
 
 const UNSUPPORTED_LOCALES = ["pt-PT"];
 

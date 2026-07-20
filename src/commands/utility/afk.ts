@@ -55,6 +55,16 @@ export default class Afk extends Command {
 			.setFooter({ text: 'Send any message to remove your AFK status' })
 			.setTimestamp();
 
+		// Change server nickname to [AFK] Nickname (safely truncated to 32 characters using Array.from to support surrogate pairs/emojis)
+		if (ctx.member) {
+			const currentNickname = ctx.member.nickname;
+			const baseName = currentNickname || ctx.author.displayName || ctx.author.username;
+			if (!baseName.startsWith('[AFK]')) {
+				const afkName = Array.from(`[AFK] ${baseName}`).slice(0, 32).join('');
+				await ctx.member.setNickname(afkName).catch(() => {});
+			}
+		}
+
 		if (isMedia) {
 			try {
 				if (reason.includes('tenor.com/view/')) {

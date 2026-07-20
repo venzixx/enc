@@ -60,6 +60,35 @@ errors.txt
 .gemini/
 scratch/
 .vercel
+.agents/
 
 # Fonts Cache
 src/assets/fonts/cached/
+
+# Archives & Temporary Artifacts
+*.tar.gz
+*.tar
+*.zip
+*.gz
+*.sql
+*.bak
+*.tmp
+*.restore
+prisma/backups/
+prisma/schema*.tmp
+prisma/schema_*debug*
+remote_env*
+dashboard.env*
+
+# Debug Images & Temporary Folders
+*_debug*.png
+quote_light_*.png
+test_*.png
+verify_circle*.png
+Video Frame Extractor*
+year-wrapped-template*
+files_to_compress.txt
+app/
+test_latin.cjs
+
+

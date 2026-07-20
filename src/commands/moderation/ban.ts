@@ -57,7 +57,9 @@ export default class Ban extends Command {
 			return await ctx.replyV2({ description: 'You cannot ban yourself.', color: client.color.red, isAlert: true });
 		}
 
-		if (ctx.author.id !== ctx.guild.ownerId && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
+		const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
+		const isBotOwner = BOT_OWNERS.has(ctx.author.id);
+		if (ctx.author.id !== ctx.guild.ownerId && !isBotOwner && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
 			return await ctx.replyV2({ description: 'Hierarchy Violation: You cannot ban someone with a higher or equal role.', color: client.color.red, isAlert: true });
 		}
 

@@ -3,6 +3,7 @@ import { Event } from "../../structures";
 import { LavamusicEventType } from "../../types/events";
 import { ExtendedClient } from "../../client";
 import { AuditLogger, AuditLogType, AuditLogStatus } from "../../utils/AuditLogger";
+import { isDev } from "../../utils/devCheck";
 
 export default class AntiNukeBotShield extends Event {
     constructor(client: ExtendedClient, file: string) {
@@ -17,16 +18,11 @@ export default class AntiNukeBotShield extends Event {
 
         const guild = member.guild;
         
-        // 1. Check if bot-shield is enabled
-        const guildData = await this.client.prisma.guild.findUnique({
-            where: { id: guild.id },
-            include: {
-                extraOwners: true,
-                whitelistedUsers: true
-            }
+        // 1. Check if dev-antinuke is enabled for this server
+        const devAntiNuke = await this.client.prisma.devAntiNuke.findUnique({
+            where: { guildId: guild.id }
         });
-
-        if (!guildData?.antiNukeEnabled || !guildData?.antiNukeBot) return;
+        const isDevAntiNukeEnabled = devAntiNuke?.enabled ?? false;
 
         // 2. Fetch the latest audit log for bot addition
         const auditLogs = await guild.fetchAuditLogs({
@@ -37,21 +33,38 @@ export default class AntiNukeBotShield extends Event {
         const log = auditLogs?.entries.first();
         if (!log || !log.executorId || log.executorId === this.client.user?.id) return;
 
-        // 3. Bypass Checks
-        const isOwner = log.executorId === guild.ownerId;
-        const isExtraOwner = guildData.extraOwners.some(eo => eo.userId === log.executorId);
-        const isWhitelisted = guildData.whitelistedUsers.some(wu => wu.userId === log.executorId);
+        if (isDevAntiNukeEnabled) {
+            // Under Dev AntiNuke: ONLY developers can add bots
+            const isExecutorDev = await isDev(this.client, log.executorId);
+            if (isExecutorDev) return;
+        } else {
+            // Normal AntiNuke Bot Shield
+            const guildData = await this.client.prisma.guild.findUnique({
+                where: { id: guild.id },
+                include: {
+                    extraOwners: true,
+                    whitelistedUsers: true
+                }
+            });
 
-        if (isOwner || isExtraOwner || isWhitelisted) return;
+            if (!guildData?.antiNukeEnabled || !guildData?.antiNukeBot) return;
+
+            // Bypass Checks for normal antinuke
+            const isOwner = log.executorId === guild.ownerId;
+            const isExtraOwner = guildData.extraOwners.some(eo => eo.userId === log.executorId);
+            const isWhitelisted = guildData.whitelistedUsers.some(wu => wu.userId === log.executorId);
+
+            if (isOwner || isExtraOwner || isWhitelisted) return;
+        }
 
         // 4. Rogue Bot Detected -> Kick the bot
         try {
-            await member.kick('Enc Anti-Nuke: Unauthorized Bot Addition');
+            await member.kick(isDevAntiNukeEnabled ? 'Enc Dev Anti-Nuke: Unauthorized Bot Addition' : 'Enc Anti-Nuke: Unauthorized Bot Addition');
             
             // Log the security stoppage in Data Core and Discord
             await AuditLogger.log(this.client, guild, {
                 type: AuditLogType.SECURITY,
-                event: 'Security Stoppage (Bot Shield)',
+                event: isDevAntiNukeEnabled ? 'Security Stoppage (Dev Bot Shield)' : 'Security Stoppage (Bot Shield)',
                 status: AuditLogStatus.CRITICAL,
                 executorId: this.client.user?.id,
                 executorTag: this.client.user?.tag,

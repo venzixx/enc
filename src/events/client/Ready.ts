@@ -5,6 +5,7 @@ import logger from "../../structures/Logger";
 import { LavamusicEventType } from "../../types/events";
 import { ExtendedClient } from "../../client";
 import { startGiveawayScheduler } from "../../tasks/giveawayScheduler";
+import { startRainbowScheduler } from "../../tasks/rainbowScheduler";
 
 
 export default class Ready extends Event {
@@ -18,6 +19,7 @@ export default class Ready extends Event {
 	public async run(): Promise<void> {
 		logger.success(`${this.client.user?.tag} is ready!`);
 		await startGiveawayScheduler(this.client);
+		await startRainbowScheduler(this.client);
 
 		await this.client.updateMaintenancePresence();
 

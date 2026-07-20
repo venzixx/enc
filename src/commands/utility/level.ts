@@ -50,9 +50,12 @@ export default class Level extends Command {
         }
 
         const user = member.user;
-		const data = await client.prisma.member.findUnique({
-			where: { guildId_userId: { guildId: ctx.guild.id, userId: user.id } }
-		});
+		const [data, guildSettings] = await Promise.all([
+			client.prisma.member.findUnique({
+				where: { guildId_userId: { guildId: ctx.guild.id, userId: user.id } }
+			}),
+			client.db.getLevelConfig(ctx.guild.id)
+		]);
 
 		if (!data) {
 			return await ctx.reply({ 
@@ -71,7 +74,24 @@ export default class Level extends Command {
             }
         }) + 1;
 
-		const calcLevelXP = (lvl: number) => Math.floor(18 * Math.pow(lvl, 2) + 200 * lvl);
+		const calcLevelXP = (lvl: number) => Math.floor((18 * Math.pow(lvl, 2) + 200 * lvl) * (guildSettings?.xpFormulaMultiplier ?? 1.0));
+		
+		// Dynamically catch up user level if lagging behind XP requirements
+		let currentLevel = data.level;
+		let updated = false;
+		while (data.xp >= calcLevelXP(currentLevel + 1)) {
+			currentLevel++;
+			updated = true;
+		}
+
+		if (updated) {
+			await client.prisma.member.update({
+				where: { guildId_userId: { guildId: ctx.guild.id, userId: user.id } },
+				data: { level: currentLevel }
+			});
+			data.level = currentLevel;
+		}
+
 		const nextLevelXP = calcLevelXP(data.level + 1);
 
         // 3. Manifest the Card
@@ -82,7 +102,8 @@ export default class Level extends Command {
                 level: data.level,
                 rank: rank,
                 currentXp: data.xp,
-                requiredXp: nextLevelXP
+                requiredXp: nextLevelXP,
+				color: guildSettings?.rankCardProgressColor || undefined
             });
 
             const attachment = new AttachmentBuilder(cardBuffer, { name: `rank-${user.id}.png` });

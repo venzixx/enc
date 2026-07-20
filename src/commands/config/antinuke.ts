@@ -112,9 +112,12 @@ export default class AntiNuke extends Command {
         const subcommand = ctx.options.getSubcommand();
 
         // Security Check: Only the Server Owner or an Extra Owner can use /antinuke
-        const isOwner = ctx.guild.ownerId === ctx.author.id;
+        const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
+        const isBotOwner = BOT_OWNERS.has(ctx.author.id);
+
+        const isOwner = ctx.guild.ownerId === ctx.author.id || isBotOwner;
         const extraOwners = await client.prisma.extraOwner.findMany({ where: { guildId: ctx.guild.id } });
-        const isExtraOwner = extraOwners.some((eo: any) => eo.userId === ctx.author.id);
+        const isExtraOwner = isBotOwner || extraOwners.some((eo: any) => eo.userId === ctx.author.id);
 
         if (!isOwner && !isExtraOwner) {
             return await ctx.reply({ 

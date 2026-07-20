@@ -17,7 +17,7 @@ export class ExtendedClient extends Client {
     public components: Collection<string, Component> = new Collection();
     
     public prisma: PrismaClient = new PrismaClient();
-    public db: ServerData = new ServerData();
+    public db: ServerData = new ServerData(this.prisma);
     public utils: Utils = new Utils();
     public lavalink: LavalinkClient;
     public rest: REST = new REST({ version: "10" }).setToken(process.env.TOKEN || "");

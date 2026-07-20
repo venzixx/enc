@@ -7,14 +7,14 @@ function extractMediaUrl(msg: any): string | null {
     if (attachment && attachment.url) {
         return attachment.url;
     }
-    const embed = msg.embeds?.[0];
-    if (embed) {
-        const url = embed.image?.url || embed.thumbnail?.url || embed.url;
-        if (url) return url;
-    }
     const urlMatch = msg.content?.match(/(https?:\/\/[^\s]+)/);
     if (urlMatch) {
         return urlMatch[1];
+    }
+    const embed = msg.embeds?.[0];
+    if (embed) {
+        const url = embed.url || embed.image?.url || embed.thumbnail?.url;
+        if (url) return url;
     }
     return null;
 }
@@ -83,9 +83,9 @@ export default class Dev extends Command {
         const msg = ctx.message;
         if (!msg) return;
 
-        const match = msg.content.match(/dev\s+(add|remove|list|mute|unmute|maintenance|maintainence|snipe|r|react)(?:\s+([\s\S]+))?/i);
+        const match = msg.content.match(/dev\s+(list|mute|unmute|maintenance|maintainence|snipe|r|react)(?:\s+([\s\S]+))?/i);
         if (!match) {
-            return ctx.replyV2({ description: '**Usage:** `dev <add/remove/list/mute/unmute/maintenance/snipe/r> [args]`', isAlert: true });
+            return ctx.replyV2({ description: '**Usage:** `dev <list/mute/unmute/maintenance/snipe/r> [args]`', isAlert: true });
         }
 
         const sub = match[1].toLowerCase();
@@ -267,61 +267,7 @@ export default class Dev extends Command {
                 return ctx.replyV2({ description: `Maintenance mode has been **enabled**${client.maintenance.eta ? ` until **${client.maintenance.eta}**` : ""}.` });
             }
 
-        // ===== ADD =====
-        } else if (sub === 'add') {
-            if (ctx.author.id !== '903646482610126848') {
-                return ctx.replyV2({ description: 'Only the primary owner can add other developers.', color: client.color.red, isAlert: true });
-            }
 
-            const mentionMatch = match[2]?.match(/<@!?(\d{17,20})>|(\d{17,20})/);
-            if (!mentionMatch) {
-                return ctx.replyV2({ description: 'Please mention a user or provide a user ID to add as dev.', isAlert: true });
-            }
-
-            const targetId = mentionMatch[1] || mentionMatch[2];
-
-            const existing = await (client.prisma as any).devUser.findUnique({
-                where: { userId: targetId }
-            });
-
-            if (existing) {
-                return ctx.replyV2({ description: `<@${targetId}> is already a dev.`, isAlert: true });
-            }
-
-            await (client.prisma as any).devUser.create({
-                data: { userId: targetId }
-            });
-
-            const embed = client.embed()
-                .setTitle('Dev Added')
-                .setDescription(`<@${targetId}> is now a dev user.`)
-                .setColor(client.color.main);
-
-            return ctx.reply({ embeds: [embed] });
-
-        // ===== REMOVE =====
-        } else if (sub === 'remove') {
-            const mentionMatch = match[2]?.match(/<@!?(\d{17,20})>|(\d{17,20})/);
-            if (!mentionMatch) {
-                return ctx.replyV2({ description: 'Please mention a user or provide a user ID to remove from dev.', isAlert: true });
-            }
-
-            const targetId = mentionMatch[1] || mentionMatch[2];
-
-            const deleted = await (client.prisma as any).devUser.deleteMany({
-                where: { userId: targetId }
-            });
-
-            if (deleted.count === 0) {
-                return ctx.replyV2({ description: `<@${targetId}> is not a dev.`, isAlert: true });
-            }
-
-            const embed = client.embed()
-                .setTitle('Dev Removed')
-                .setDescription(`<@${targetId}> is no longer a dev user.`)
-                .setColor(client.color.main);
-
-            return ctx.reply({ embeds: [embed] });
 
         // ===== LIST =====
         } else if (sub === 'list') {

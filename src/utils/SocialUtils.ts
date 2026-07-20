@@ -9,15 +9,21 @@ export default class SocialUtils {
         let customGifs: string[] = [];
         try {
             const dbReactions = await client.prisma.customReaction.findMany({
-                where: { action }
+                where: { action },
+                orderBy: { createdAt: 'desc' }
             });
             customGifs = dbReactions.map((r: any) => r.url);
         } catch (e) {
             console.error('[SocialUtils] Failed to load custom reactions:', e);
         }
 
+        // If a custom reaction exists, always show the most recently added one
+        if (customGifs.length > 0) {
+            return await SocialUtils.resolveMediaUrl(customGifs[0]);
+        }
+
         if (action === 'suicide') {
-            let suicideGifs = [
+            const suicideGifs = [
                 'https://tenor.com/view/kermit-kermit-the-frog-i-cant-take-this-shh-no-more-jump-off-suicide-gif-15872103',
                 'https://tenor.com/view/homer-suicide-sobbing-simpsons-gif-11098229',
                 'https://tenor.com/view/bird-jump-%E0%B8%99%E0%B8%81%E0%B9%82%E0%B8%94%E0%B8%94-%E0%B8%99%E0%B8%81-%E0%B9%82%E0%B8%94%E0%B8%94-gif-13943434',
@@ -32,24 +38,34 @@ export default class SocialUtils {
                 'https://64.media.tumblr.com/a465a4e63434719a3be94df795376a24/tumblr_nqewxpXqEk1s59hlpo1_500.gifv',
                 'https://tenor.com/view/alex-geerken-geerken-animator-animation-cartoon-gif-16352411'
             ];
-            if (customGifs.length > 0) {
-                suicideGifs = [...suicideGifs, ...customGifs];
-            }
             const randomIndex = Math.floor(Math.random() * suicideGifs.length);
             const chosenUrl = suicideGifs[randomIndex];
             return await SocialUtils.resolveMediaUrl(chosenUrl);
         }
 
-        if (customGifs.length > 0) {
-            const chosenUrl = customGifs[Math.floor(Math.random() * customGifs.length)];
+        if (action === 'kill') {
+            const killGifs = [
+                'https://tenor.com/view/anime-kill-gif-26154625',
+                'https://tenor.com/view/anime-fight-gif-25167667',
+                'https://tenor.com/view/anime-stab-kabaneri-gif-12712217',
+                'https://tenor.com/view/anime-shoot-aim-gif-13659288',
+                'https://tenor.com/view/anime-dead-gif-5415276',
+                'https://tenor.com/view/anime-kill-gif-26330364',
+                'https://tenor.com/view/anime-kill-bang-gif-22872355',
+                'https://tenor.com/view/anime-boy-kill-gif-25114757',
+                'https://tenor.com/view/akame-ga-kill-anime-kill-gif-20078835',
+                'https://tenor.com/view/kill-la-kill-anime-badass-gif-12001550'
+            ];
+            const randomIndex = Math.floor(Math.random() * killGifs.length);
+            const chosenUrl = killGifs[randomIndex];
             return await SocialUtils.resolveMediaUrl(chosenUrl);
         }
 
         const giphyKey = client.env?.GIPHY_API_KEY?.trim();
         const klipyKey = client.env?.KLIPY_API_KEY?.trim();
 
-        // 1. Klipy Search (Highest priority for kill/suicide if key available)
-        if (klipyKey && (action === 'kill' || action === 'suicide')) {
+        // 1. Klipy Search (Highest priority for kill/suicide/bonk if key available)
+        if (klipyKey && (action === 'kill' || action === 'suicide' || action === 'bonk')) {
             try {
                 // Using Klipy v1 search with key in path and content filter off
                 const res = await fetch(`https://api.klipy.com/api/v1/${klipyKey}/gifs/search?q=anime+${action}&per_page=10&content_filter=off`);
@@ -123,7 +139,7 @@ export default class SocialUtils {
         // 7. Final Fallback: Giphy Search
         if (giphyKey) {
             try {
-                const query = (action === 'kill' || action === 'suicide') ? `anime ${action}` : `anime ${action} aesthetic`;
+                const query = (action === 'kill' || action === 'suicide' || action === 'bonk') ? `anime ${action}` : `anime ${action} aesthetic`;
                 const res = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=${giphyKey}&q=${encodeURIComponent(query)}&limit=50&rating=pg-13`);
                 if (res.ok) {
                     const data = await res.json() as any;
@@ -144,6 +160,12 @@ export default class SocialUtils {
      * Resolves a Tenor/Giphy/Tumblr view or proxy URL to its direct media/GIF link.
      */
     public static async resolveMediaUrl(url: string): Promise<string> {
+        if (url.includes('media.tenor.com/')) {
+            let directUrl = url.replace(/\.png$/, '.gif');
+            directUrl = directUrl.replace(/AAAA[a-zA-Z]/, 'AAAAC');
+            return directUrl;
+        }
+
         if (url.includes('tenor.com/view/')) {
             try {
                 const oembedUrl = `https://tenor.com/oembed?url=${encodeURIComponent(url)}`;

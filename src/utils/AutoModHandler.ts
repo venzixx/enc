@@ -21,6 +21,31 @@ export class AutoModHandler {
         if (await PermitManager.isImmune(client, message.guildId!, message.member!)) return false;
         if (await PermitManager.hasPermission(client, message.guildId!, message.member!, PermitPermission.BYPASS_AUTOMOD)) return false;
 
+        // 2b. AutoModWhitelist Check
+        const automodWhitelists = await client.prisma.autoModWhitelist.findMany({
+            where: { guildId: message.guildId! }
+        });
+
+        if (automodWhitelists.length > 0) {
+            const userWhitelisted = automodWhitelists.some(w => w.type === 'USER' && w.targetId === message.author.id);
+            if (userWhitelisted) return false;
+
+            const channelWhitelisted = automodWhitelists.some(w => w.type === 'CHANNEL' && w.targetId === message.channelId);
+            if (channelWhitelisted) return false;
+
+            if (message.member) {
+                const memberRoleIds = message.member.roles.cache.map(r => r.id);
+                const hasWhitelistedRole = automodWhitelists.some(w => w.type === 'ROLE' && memberRoleIds.includes(w.targetId));
+                if (hasWhitelistedRole) return false;
+            }
+
+            const channel = message.channel as TextChannel;
+            if (channel.parentId) {
+                const categoryWhitelisted = automodWhitelists.some(w => w.type === 'CATEGORY' && w.targetId === channel.parentId);
+                if (categoryWhitelisted) return false;
+            }
+        }
+
         // 3. Fetch Filters
         const filters = await client.prisma.autoModFilter.findMany({
             where: { guildId: message.guild.id, enabled: true }
@@ -69,7 +94,7 @@ export class AutoModHandler {
         // GIF / Media hosts
         'tenor.com', 'giphy.com', 'imgur.com', 'gfycat.com', 'giphy.org',
         'media.tenor.com', 'media.giphy.com', 'i.imgur.com', 'media1.tenor.com',
-        'media.tenor.co', 'tenor.co',
+        'media.tenor.co', 'tenor.co', 'klipy.com', 'api.klipy.com',
         // Discord CDN
         'cdn.discordapp.com', 'media.discordapp.net', 'images-ext-1.discordapp.net',
         'images-ext-2.discordapp.net', 'discord.com', 'discordapp.com',
@@ -93,6 +118,22 @@ export class AutoModHandler {
         'i.redd.it', 'v.redd.it', 'preview.redd.it',
     ];
 
+    private static isGifOrGifDomain(url: string): boolean {
+        // Check file extension (.gif, .gifv)
+        const pathPart = url.split('?')[0];
+        if (pathPart.toLowerCase().endsWith('.gif') || pathPart.toLowerCase().endsWith('.gifv')) {
+            return true;
+        }
+        // Check gif domains
+        const gifDomains = ['tenor.com', 'giphy.com', 'klipy.com', 'gfycat.com'];
+        try {
+            const domain = url.replace(/https?:\/\//i, '').split('/')[0].toLowerCase().replace(/^www\./, '');
+            return gifDomains.some(d => domain === d || domain.endsWith('.' + d));
+        } catch {
+            return false;
+        }
+    }
+
     private static checkLinks(message: Message, customWhitelist?: string | null): boolean {
         const content = message.content;
         const urlRegex = /https?:\/\/([^\s/]+)[^\s]*/gi;
@@ -108,6 +149,11 @@ export class AutoModHandler {
 
         let match;
         while ((match = urlRegex.exec(content)) !== null) {
+            const fullUrl = match[0];
+            // Bypass link check if it is a GIF or from a GIF domain
+            if (this.isGifOrGifDomain(fullUrl)) {
+                continue;
+            }
             const domain = match[1].toLowerCase().replace(/^www\./, '');
             const isSafe = safeDomains.some(safe => {
                 const cleanSafe = safe.replace(/^www\./, '');

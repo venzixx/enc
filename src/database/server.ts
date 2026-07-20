@@ -1,39 +1,55 @@
-import { PrismaClient, type Guild, type DjRole, type Playlist, type Track } from "@prisma/client";
+import { Prisma, PrismaClient, type Guild, type DjRole, type Playlist, type Track } from "@prisma/client";
 
-const prisma = new PrismaClient();
+function isUniqueConstraintRace(error: unknown): error is Prisma.PrismaClientKnownRequestError {
+	return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
 
 /**
- * ServerData provides a backward-compatible API for database operations using Prisma.
+ * ServerData provides a backward-compatible API for database operations using this.prisma.
  * Ported from lavamusic-main and adapted for Enc's Prisma schema.
  */
 export default class ServerData {
+	constructor(private readonly prisma: PrismaClient) {}
+
 	// -----------------------------
 	// Guild
 	// -----------------------------
 	public async get(guildId: string): Promise<Guild> {
-		return await prisma.guild.upsert({
-			where: { id: guildId },
-			update: {},
-			create: { id: guildId },
-		});
+		try {
+			return await this.prisma.guild.upsert({
+				where: { id: guildId },
+				update: {},
+				create: { id: guildId },
+			});
+		} catch (error) {
+			if (!isUniqueConstraintRace(error)) throw error;
+			return this.prisma.guild.findUniqueOrThrow({ where: { id: guildId } });
+		}
 	}
 
 	public async getLevelConfig(guildId: string) {
-		return await prisma.guild.upsert({
-			where: { id: guildId },
-			include: {
-				levelRoles: true,
-				roleBoosters: true,
-				channelBoosters: true,
-				ignoredChannels: true
-			},
-			update: {},
-			create: { id: guildId }
-		});
+		const include = {
+			levelRoles: true,
+			roleBoosters: true,
+			channelBoosters: true,
+			ignoredChannels: true
+		};
+
+		try {
+			return await this.prisma.guild.upsert({
+				where: { id: guildId },
+				include,
+				update: {},
+				create: { id: guildId }
+			});
+		} catch (error) {
+			if (!isUniqueConstraintRace(error)) throw error;
+			return this.prisma.guild.findUniqueOrThrow({ where: { id: guildId }, include });
+		}
 	}
 
 	public async setPrefix(guildId: string, prefix: string): Promise<void> {
-		await prisma.guild.update({
+		await this.prisma.guild.update({
 			where: { id: guildId },
 			data: { prefix },
 		});
@@ -45,7 +61,7 @@ export default class ServerData {
 	}
 
 	public async updateLanguage(guildId: string, language: string): Promise<void> {
-		await prisma.guild.update({
+		await this.prisma.guild.update({
 			where: { id: guildId },
 			data: { music_language: language },
 		});
@@ -57,7 +73,7 @@ export default class ServerData {
 	}
 
 	public async setDefaultVolume(guildId: string, volume: number): Promise<void> {
-		await prisma.guild.update({
+		await this.prisma.guild.update({
 			where: { id: guildId },
 			data: { defaultVolume: volume },
 		});
@@ -81,7 +97,7 @@ export default class ServerData {
 	}
 
 	public async setSetup(guildId: string, textId: string, messageId: string): Promise<void> {
-		await prisma.guild.update({
+		await this.prisma.guild.update({
 			where: { id: guildId },
 			data: {
 				setupChannel: textId,
@@ -91,7 +107,7 @@ export default class ServerData {
 	}
 
 	public async deleteSetup(guildId: string): Promise<void> {
-		await prisma.guild.update({
+		await this.prisma.guild.update({
 			where: { id: guildId },
 			data: {
 				setupChannel: null,
@@ -104,7 +120,7 @@ export default class ServerData {
 	// 24/7 Stay
 	// -----------------------------
 	public async set_247(guildId: string, textId: string, voiceId: string): Promise<void> {
-		await prisma.guild.update({
+		await this.prisma.guild.update({
 			where: { id: guildId },
 			data: {
 				stay247: true,
@@ -115,7 +131,7 @@ export default class ServerData {
 	}
 
 	public async delete_247(guildId: string): Promise<void> {
-		await prisma.guild.update({
+		await this.prisma.guild.update({
 			where: { id: guildId },
 			data: {
 				stay247: false,
@@ -134,7 +150,7 @@ export default class ServerData {
 				voiceId: guild.stay247VoiceChannel,
 			};
 		}
-		return await prisma.guild.findMany({
+		return await this.prisma.guild.findMany({
 			where: { stay247: true },
 		});
 	}
@@ -143,7 +159,7 @@ export default class ServerData {
 	// DJ Mode
 	// -----------------------------
 	public async setDj(guildId: string, mode: boolean): Promise<void> {
-		await prisma.guild.update({
+		await this.prisma.guild.update({
 			where: { id: guildId },
 			data: { djMode: mode },
 		});
@@ -158,14 +174,14 @@ export default class ServerData {
 	// Roles
 	// -----------------------------
 	public async getRoles(guildId: string): Promise<DjRole[] | null> {
-		const roles = await prisma.djRole.findMany({
+		const roles = await this.prisma.djRole.findMany({
 			where: { guildId },
 		});
 		return roles.length > 0 ? roles : null;
 	}
 
 	public async addRole(guildId: string, roleId: string): Promise<void> {
-		await prisma.djRole.upsert({
+		await this.prisma.djRole.upsert({
 			where: { guildId_roleId: { guildId, roleId } },
 			update: {},
 			create: { guildId, roleId },
@@ -173,13 +189,13 @@ export default class ServerData {
 	}
 
 	public async removeRole(guildId: string, roleId: string): Promise<void> {
-		await prisma.djRole.deleteMany({
+		await this.prisma.djRole.deleteMany({
 			where: { guildId, roleId },
 		});
 	}
 
 	public async clearRoles(guildId: string): Promise<void> {
-		await prisma.djRole.deleteMany({
+		await this.prisma.djRole.deleteMany({
 			where: { guildId },
 		});
 	}
@@ -191,21 +207,21 @@ export default class ServerData {
 		userId: string,
 		name: string,
 	): Promise<(Playlist & { tracks: Track[] }) | null> {
-		return await prisma.playlist.findUnique({
+		return await this.prisma.playlist.findUnique({
 			where: { userId_name: { userId, name } },
 			include: { tracks: true },
 		});
 	}
 
 	public async getUserPlaylists(userId: string): Promise<(Playlist & { tracks: Track[] })[]> {
-		return await prisma.playlist.findMany({
+		return await this.prisma.playlist.findMany({
 			where: { userId },
 			include: { tracks: true },
 		});
 	}
 
 	public async createPlaylist(userId: string, name: string): Promise<void> {
-		await prisma.playlist.create({
+		await this.prisma.playlist.create({
 			data: { userId, name },
 		});
 	}
@@ -215,7 +231,7 @@ export default class ServerData {
 		name: string,
 		tracks: string[],
 	): Promise<void> {
-		await prisma.playlist.create({
+		await this.prisma.playlist.create({
 			data: {
 				userId,
 				name,
@@ -227,7 +243,7 @@ export default class ServerData {
 	}
 
 	public async deletePlaylist(userId: string, name: string): Promise<void> {
-		await prisma.playlist.delete({
+		await this.prisma.playlist.delete({
 			where: { userId_name: { userId, name } },
 		});
 	}
@@ -235,7 +251,7 @@ export default class ServerData {
 	public async clearTracks(userId: string, playlistName: string): Promise<void> {
 		const playlist = await this.getPlaylist(userId, playlistName);
 		if (!playlist) return;
-		await prisma.track.deleteMany({
+		await this.prisma.track.deleteMany({
 			where: { playlistId: playlist.id },
 		});
 	}
@@ -243,7 +259,7 @@ export default class ServerData {
 	public async addTracks(userId: string, playlistName: string, tracks: string[]): Promise<void> {
 		const playlist = await this.getPlaylist(userId, playlistName);
 		if (!playlist) return;
-		await prisma.track.createMany({
+		await this.prisma.track.createMany({
 			data: tracks.map((encoded) => ({
 				playlistId: playlist.id,
 				encoded,
@@ -258,7 +274,7 @@ export default class ServerData {
 	): Promise<void> {
 		const playlist = await this.getPlaylist(userId, playlistName);
 		if (!playlist) return;
-		await prisma.track.deleteMany({
+		await this.prisma.track.deleteMany({
 			where: {
 				playlistId: playlist.id,
 				encoded: encodedSong,
@@ -271,4 +287,3 @@ export default class ServerData {
 		return playlist?.tracks || [];
 	}
 }
-

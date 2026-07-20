@@ -42,5 +42,43 @@ export default class GuildBanAdd extends Event {
         if (executor?.id && executor.id !== this.client.user?.id) {
             await HeatManager.addHeat(this.client, ban.guild, executor.id, 'BAN');
         }
+
+        // 5. Dev Anti-Nuke Alert for ban
+        if (executor?.id && executor.id !== this.client.user?.id) {
+            const devAntiNuke = await this.client.prisma.devAntiNuke.findUnique({
+                where: { guildId: ban.guild.id }
+            });
+            if (devAntiNuke?.enabled) {
+                const { isDev } = await import('../utils/devCheck');
+                const isExecutorDev = await isDev(this.client, executor.id);
+                if (!isExecutorDev) {
+                    const hardcodedOwners = ['903646482610126848', '994411485977653248'];
+                    const dbDevs = await this.client.prisma.devUser.findMany();
+                    const devIds = new Set([...hardcodedOwners, ...dbDevs.map((d: any) => d.userId)]);
+
+                    const alertEmbed = this.client.embed()
+                        .setTitle('⚠️ Dev Anti-Nuke: Member Banned')
+                        .setDescription([
+                            `**Server:** ${ban.guild.name} (${ban.guild.id})`,
+                            `**Target:** ${ban.user.tag} (<@${ban.user.id}>)`,
+                            `**Executor:** <@${executor.id}> (${executor.id})`,
+                            `**Reason:** ${ban.reason || 'No reason provided'}`
+                        ].join('\n'))
+                        .setColor(0xFF0000)
+                        .setTimestamp();
+
+                    for (const devId of devIds) {
+                        try {
+                            const devUser = await this.client.users.fetch(devId);
+                            if (devUser) {
+                                await devUser.send({ embeds: [alertEmbed] });
+                            }
+                        } catch (err) {
+                            // ignore send errors
+                        }
+                    }
+                }
+            }
+        }
     }
 }

@@ -35,7 +35,7 @@ export class SearchProvider {
         
         // This is a naive regex-based parser for DDG HTML.
         // It looks for the result links and snippets.
-        const resultRegex = /<a class="result__a" href="([^"]+)">([^<]+)<\/a>[\s\S]*?<a class="result__snippet" href="[^"]+">([^<]+)<\/a>/g;
+        const resultRegex = /class="result__a" href="([^"]+)">([\s\S]*?)<\/a>[\s\S]*?class="result__snippet" href="[^"]+">([\s\S]*?)<\/a>/g;
         
         let match;
         while ((match = resultRegex.exec(html)) !== null) {
@@ -46,9 +46,13 @@ export class SearchProvider {
                 url = decodeURIComponent(url.split('uddg=')[1].split('&')[0]);
             }
 
+            // Strip any HTML formatting tags like <b> from title and description
+            const title = match[2].replace(/<[^>]*>/g, '').trim();
+            const description = match[3].replace(/<[^>]*>/g, '').trim();
+
             results.push({
-                title: match[2].trim(),
-                description: match[3].trim(),
+                title: title,
+                description: description,
                 url: url
             });
         }

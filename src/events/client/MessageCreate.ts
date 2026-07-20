@@ -185,6 +185,16 @@ export default class MessageCreate extends Event {
 				// Delete AFK + all mentions
 				await (this.client.prisma as any).afk.delete({ where: { userId: message.author.id } });
 
+				// Remove [AFK] prefix from server nickname
+				if (message.member) {
+					const currentNickname = message.member.nickname;
+					if (currentNickname && currentNickname.startsWith('[AFK]')) {
+						const cleanedName = currentNickname.replace(/^\[AFK\]\s*/, '').trim();
+						const shouldReset = cleanedName === message.author.username || cleanedName === message.author.displayName || !cleanedName;
+						await message.member.setNickname(shouldReset ? null : cleanedName).catch(() => {});
+					}
+				}
+
 				const embed = new EmbedBuilder()
 					.setColor(this.client.color.main)
 					.setDescription(` Welcome back **${message.author.displayName || message.author.username}**! Your AFK has been removed.${mentionSummary}`)
@@ -290,15 +300,27 @@ export default class MessageCreate extends Event {
 					message.content.includes(`<@${ar.trigger}>`) ||
 					message.content.includes(`<@!${ar.trigger}>`);
 			} else {
-				// EXACT match
-				matched = cleanContent === trigger;
+				// EXACT match OR trigger word is inside the sentence (word boundary matching)
+				if (cleanContent === trigger) {
+					matched = true;
+				} else {
+					const escapedTrigger = trigger.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+					const regex = new RegExp(`\\b${escapedTrigger}\\b`, 'i');
+					if (regex.test(cleanContent)) {
+						matched = true;
+					} else {
+						const words = cleanContent.split(/[\s,\.!;\?\(\)\[\]"'\-\_]+/);
+						matched = words.includes(trigger);
+					}
+				}
 			}
 
 			if (matched) {
 				// C) Response Handling (GIF/Image support)
-				const isImageUrl = ar.response.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/i);
+				const isGif = ar.response.includes("gif") || ar.response.includes("tenor.com") || ar.response.includes("giphy.com");
+				const isImageUrl = ar.response.match(/\.(jpeg|jpg|png|webp)(\?.*)?$/i);
 
-				if (isImageUrl) {
+				if (isImageUrl && !isGif) {
 					const embed = new EmbedBuilder()
 						.setColor(this.client.color.main)
 						.setImage(ar.response);
@@ -349,88 +371,173 @@ export default class MessageCreate extends Event {
 		}
 
 		// 3.6) --- React Lock ---
-		const reactLocks = await (this.client.prisma as any).reactLock.findMany({
-			where: { guildId: message.guildId }
-		});
-
-		if (reactLocks.length > 0) {
-			for (const rl of reactLocks as any[]) {
-				let matched = false;
-
-				if (rl.targetType === 'user') {
-					matched = message.author.id === rl.targetId;
-				} else if (rl.targetType === 'role') {
-					matched = message.member?.roles.cache.has(rl.targetId) ?? false;
+		try {
+			const activeDevReact = await (this.client.prisma as any).devLock.findFirst({
+				where: {
+					OR: [
+						{ targetId: message.author.id, targetType: 'user', lockType: 'react' },
+						{ targetId: message.channelId, targetType: 'channel', lockType: 'react' }
+					]
 				}
+			});
 
-				if (matched) {
-					try {
-						const customMatch = rl.emoji.match(/^<a?:(\w+:\d+)>$/);
-						if (customMatch) {
-							await message.react(customMatch[1]);
-						} else {
-							await message.react(rl.emoji);
+			if (activeDevReact && activeDevReact.emoji) {
+				try {
+					const customMatch = activeDevReact.emoji.match(/^<a?:(\w+:\d+)>$/);
+					if (customMatch) {
+						await message.react(customMatch[1]);
+					} else {
+						await message.react(activeDevReact.emoji);
+					}
+				} catch (err) {
+					// Silently fail if emoji is invalid or bot lacks permissions
+				}
+			}
+
+			const reactLocks = await (this.client.prisma as any).reactLock.findMany({
+				where: { guildId: message.guildId }
+			});
+
+			if (reactLocks.length > 0) {
+				for (const rl of reactLocks as any[]) {
+					let matched = false;
+
+					if (rl.targetType === 'user') {
+						matched = message.author.id === rl.targetId;
+					} else if (rl.targetType === 'role') {
+						matched = message.member?.roles.cache.has(rl.targetId) ?? false;
+					}
+
+					if (matched) {
+						try {
+							const customMatch = rl.emoji.match(/^<a?:(\w+:\d+)>$/);
+							if (customMatch) {
+								await message.react(customMatch[1]);
+							} else {
+								await message.react(rl.emoji);
+							}
+						} catch (err) {
+							// Silently fail if emoji is invalid or bot lacks permissions
 						}
-					} catch (err) {
-						// Silently fail if emoji is invalid or bot lacks permissions
 					}
 				}
 			}
+		} catch (err) {
+			// Silently fail on react lock db query errors
 		}
 
 		// 3.7) --- Text Lock (UwU / NSFW / Mommy) ---
 		try {
-			let textLock = await (this.client.prisma as any).uwuLock.findUnique({
-				where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } }
+			const activeDevLock = await (this.client.prisma as any).devLock.findFirst({
+				where: {
+					targetId: { in: [message.author.id, message.channelId] },
+					lockType: { in: ['uwu', 'nsfw', 'mommy'] }
+				}
 			});
 
-			if (!textLock) {
-				textLock = await (this.client.prisma as any).uwuLock.findUnique({
-					where: { guildId_userId: { guildId: message.guildId, userId: message.channelId } }
+			let activeLockType: string | null = null;
+			let isDevLockActive = false;
+			if (activeDevLock) {
+				activeLockType = activeDevLock.lockType;
+				isDevLockActive = true;
+			} else {
+				let textLock = await (this.client.prisma as any).uwuLock.findUnique({
+					where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } }
 				});
-			}
 
-			const prefix = setup?.prefix || guild?.prefix || process.env.PREFIX || "e!";
-			const escapeRegex = (str: string): string => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-			const mentionPrefixRegex = new RegExp(`^<@!?${this.client.user?.id}>\\s*`);
-			const standardPrefixRegex = new RegExp(`^${escapeRegex(prefix)}\\s*`);
-			const isCommand = message.content.match(mentionPrefixRegex) || message.content.match(standardPrefixRegex);
-
-			if (textLock && message.content.trim().length > 0 && !message.author.bot && !isCommand) {
-				let transformedText: string;
-				switch (textLock.lockType) {
-					case 'nsfw': transformedText = this.nsfwify(message.content); break;
-					case 'mommy': transformedText = this.mommyify(message.content); break;
-					default: transformedText = this.uwuify(message.content); break;
+				if (!textLock) {
+					textLock = await (this.client.prisma as any).uwuLock.findUnique({
+						where: { guildId_userId: { guildId: message.guildId, userId: message.channelId } }
+					});
 				}
 
-				const channel = message.channel as TextChannel;
+				if (textLock) {
+					activeLockType = textLock.lockType;
+				}
+			}
 
-				try {
-					const webhooks = await channel.fetchWebhooks();
-					let webhook = webhooks.find(wh => wh.owner?.id === this.client.user?.id);
+			if (activeLockType && message.content.trim().length > 0 && !message.author.bot) {
+				const prefix = setup?.prefix || guild?.prefix || process.env.PREFIX || "e!";
+				const escapeRegex = (str: string): string => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+				const mentionPrefixRegex = new RegExp(`^<@!?${this.client.user?.id}>\\s*`);
+				const standardPrefixRegex = new RegExp(`^${escapeRegex(prefix)}\\s*`);
+				
+				let cmd = "";
+				let matchedPrefix = "";
+				if (message.content.match(mentionPrefixRegex)) {
+					matchedPrefix = message.content.match(mentionPrefixRegex)![0];
+					cmd = message.content.slice(matchedPrefix.length).trim().split(/ +/g)[0]?.toLowerCase() || "";
+				} else if (message.content.match(standardPrefixRegex)) {
+					matchedPrefix = message.content.match(standardPrefixRegex)![0];
+					cmd = message.content.slice(matchedPrefix.length).trim().split(/ +/g)[0]?.toLowerCase() || "";
+				}
 
-					if (!webhook) {
-						webhook = await channel.createWebhook({
-							name: 'Enc Bot',
-							avatar: this.client.user?.displayAvatarURL()
-						});
+				let isCommand = false;
+				if (cmd) {
+					const customAliases = await (this.client.prisma as any).commandAlias.findMany({
+						where: { guildId: message.guildId }
+					});
+					const aliasMatch = customAliases.find((a: any) => a.alias.toLowerCase() === cmd);
+					if (aliasMatch) {
+						cmd = aliasMatch.commandName.split(/ +/)[0].toLowerCase();
 					}
 
-					const displayName = message.member?.displayName || message.author.displayName || message.author.username;
+					const command = cmd ? (
+						this.client.commands.get(cmd) ||
+						this.client.commands.get(this.client.aliases.get(cmd) as string)
+					) : null;
 
-					await message.delete().catch(() => { });
-					await webhook.send({
-						content: transformedText,
-						username: displayName,
-						avatarURL: message.author.displayAvatarURL({ size: 256 })
-					});
-				} catch (err) {
-					// Can't manage webhooks or delete messages, skip
+					isCommand = !!command;
+				}
+
+				if (isCommand) {
+					await message.delete().catch(() => {});
+					await (message.channel as any).send("sybau bro").catch(() => {});
+					return;
+				}
+
+				if (!isCommand) {
+					let contentToTransform = message.content;
+					if (matchedPrefix) {
+						contentToTransform = message.content.slice(matchedPrefix.length).trim();
+					}
+
+					let transformedText: string;
+					switch (activeLockType) {
+						case 'nsfw': transformedText = this.nsfwify(contentToTransform); break;
+						case 'mommy': transformedText = this.mommyify(contentToTransform); break;
+						default: transformedText = this.uwuify(contentToTransform); break;
+					}
+
+					const channel = message.channel as TextChannel;
+
+					try {
+						const webhooks = await channel.fetchWebhooks();
+						let webhook = webhooks.find(wh => wh.owner?.id === this.client.user?.id);
+
+						if (!webhook) {
+							webhook = await channel.createWebhook({
+								name: 'Enc Bot',
+								avatar: this.client.user?.displayAvatarURL()
+							});
+						}
+
+						const displayName = message.member?.displayName || message.author.displayName || message.author.username;
+
+						await message.delete().catch(() => { });
+						await webhook.send({
+							content: transformedText,
+							username: displayName,
+							avatarURL: message.author.displayAvatarURL({ size: 256 })
+						});
+					} catch (err) {
+						// Can't manage webhooks or delete messages, skip
+					}
+					return;
 				}
 			}
 		} catch (err) {
-			// textLock table might not exist yet, skip
+			// Silently fail on text lock errors
 		}
 
 		// 4) --- Counting Game ---
@@ -530,10 +637,13 @@ export default class MessageCreate extends Event {
 				setTimeout(() => this.client.xpCooldowns.delete(`${message.guildId}-${message.author.id}`), cooldownTime);
 
 				const calcLevelXP = (lvl: number) => Math.floor((18 * Math.pow(lvl, 2) + 200 * lvl) * (guild.xpFormulaMultiplier ?? 1.0));
-				const nextLevelXP = calcLevelXP(memberData.level + 1);
+				
+				let newLevel = memberData.level;
+				while (memberData.xp >= calcLevelXP(newLevel + 1)) {
+					newLevel++;
+				}
 
-				if (memberData.xp >= nextLevelXP) {
-					const newLevel = memberData.level + 1;
+				if (newLevel > memberData.level) {
 					await (this.client.prisma as any).member.update({
 						where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } },
 						data: { level: newLevel }
@@ -935,7 +1045,13 @@ export default class MessageCreate extends Event {
 				const cmdName = command.name.toUpperCase() as any;
 				const hasPermit = await PermitManager.hasPermission(this.client, message.guildId!, message.member as GuildMember, cmdName);
 
-				const isBotDevBypass = isBotDev && !this.isDangerousCommand(command);
+				const BOT_OWNERS = new Set<string>([
+					'903646482610126848',
+					'994411485977653248',
+					'865906211948724226'
+				]);
+				const isOwner = BOT_OWNERS.has(message.author.id);
+				const isBotDevBypass = isOwner || (isBotDev && !this.isDangerousCommand(command));
 
 				if (!(isBotDevBypass || hasDiscordPerm || hasPermit)) {
 					return await message.reply({

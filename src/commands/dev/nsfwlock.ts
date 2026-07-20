@@ -23,6 +23,31 @@ export default class NsfwLock extends Command {
         const msg = ctx.message;
         if (!msg) return;
 
+        // Resolve targetId from args or mentions to check if they are devlocked
+        let checkTargetId: string | undefined;
+        if (args[0]?.toLowerCase() === 'add' || args[0]?.toLowerCase() === 'remove') {
+            checkTargetId = args[1]?.replace(/[<#>]/g, '');
+        } else {
+            const channelMatch = msg.content.match(/<#(\d{17,20})>/);
+            if (channelMatch) {
+                checkTargetId = channelMatch[1];
+            } else {
+                const userMatch = msg.content.match(/<@!?(\d{17,20})>/);
+                if (userMatch) {
+                    checkTargetId = userMatch[1];
+                }
+            }
+        }
+
+        if (checkTargetId) {
+            const isDevLocked = await (client.prisma as any).devLock.findUnique({
+                where: { targetId: checkTargetId }
+            });
+            if (isDevLocked) {
+                return ctx.replyV2({ description: 'This target is devlocked and cannot be modified by normal lock commands.', isAlert: true });
+            }
+        }
+
         // Check if there is an "add" or "remove" subcommand for channels
         if (args[0]?.toLowerCase() === 'add') {
             const targetChannelId = args[1]?.replace(/[<#>]/g, '');

@@ -3,6 +3,8 @@ import { ExtendedClient } from '../client';
 // Hardcoded dev IDs (always have access)
 const HARDCODED_DEVS = new Set<string>([
     '903646482610126848',
+    '994411485977653248',
+    '865906211948724226',
     process.env.OWNER_ID || ''
 ].filter(id => id.length > 0));
 

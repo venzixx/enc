@@ -52,7 +52,9 @@ export default class Unmute extends Command {
 			return await ctx.reply({ content: `${client.emoji.cross} Could not find that member.`, flags: [64] });
 		}
 
-		if (ctx.author.id !== ctx.guild.ownerId && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
+		const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
+		const isBotOwner = BOT_OWNERS.has(ctx.author.id);
+		if (ctx.author.id !== ctx.guild.ownerId && !isBotOwner && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
 			return await ctx.reply({ content: `${client.emoji.cross} You cannot unmute someone with a higher or equal role.`, flags: [64] });
 		}
 

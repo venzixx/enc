@@ -98,9 +98,9 @@ export class RankCardGenerator {
         // Glowing Fill
         if (percentage > 0) {
             ctx.save();
-            ctx.shadowColor = '#ffffff';
+            ctx.shadowColor = options.color || '#ffffff';
             ctx.shadowBlur = 10;
-            this.roundRect(ctx, progressX, progressY, progressW * percentage, progressH, 6, '#ffffff', true);
+            this.roundRect(ctx, progressX, progressY, progressW * percentage, progressH, 6, options.color || '#ffffff', true);
             ctx.restore();
         }
 

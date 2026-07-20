@@ -159,6 +159,13 @@ export default class ReactLock extends Command {
                 return ctx.replyV2({ description: 'Please provide a user/role and an emoji.\n**Usage:** `reactlock add <@user/@role> <emoji>`', isAlert: true });
             }
 
+            const isDevLocked = await (client.prisma as any).devLock.findUnique({
+                where: { targetId }
+            });
+            if (isDevLocked) {
+                return ctx.replyV2({ description: 'This target is devlocked and cannot be modified by normal lock commands.', isAlert: true });
+            }
+
             // Validate emoji
             const isCustomEmoji = /^<a?:\w+:\d+>$/.test(emoji);
             const isUnicodeEmoji = EMOJI_REGEX.test(emoji);
@@ -220,6 +227,13 @@ export default class ReactLock extends Command {
 
             if (!targetId || !emoji) {
                 return ctx.replyV2({ description: 'Please provide the user/role and emoji to remove.\n**Usage:** `reactlock remove <@user/@role> <emoji>`', isAlert: true });
+            }
+
+            const isDevLocked = await (client.prisma as any).devLock.findUnique({
+                where: { targetId }
+            });
+            if (isDevLocked) {
+                return ctx.replyV2({ description: 'This target is devlocked and cannot be modified by normal lock commands.', isAlert: true });
             }
 
             const deleted = await (client.prisma as any).reactLock.deleteMany({

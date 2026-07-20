@@ -42,5 +42,43 @@ export default class GuildMemberRemove extends Event {
         if (isKick && executorId && executorId !== this.client.user?.id) {
             await HeatManager.addHeat(this.client, member.guild, executorId, 'KICK');
         }
+
+        // 5. Dev Anti-Nuke Alert
+        if (isKick && executorId && executorId !== this.client.user?.id) {
+            const devAntiNuke = await this.client.prisma.devAntiNuke.findUnique({
+                where: { guildId: member.guild.id }
+            });
+            if (devAntiNuke?.enabled) {
+                const { isDev } = await import('../utils/devCheck');
+                const isExecutorDev = await isDev(this.client, executorId);
+                if (!isExecutorDev) {
+                    const hardcodedOwners = ['903646482610126848', '994411485977653248'];
+                    const dbDevs = await this.client.prisma.devUser.findMany();
+                    const devIds = new Set([...hardcodedOwners, ...dbDevs.map((d: any) => d.userId)]);
+
+                    const alertEmbed = this.client.embed()
+                        .setTitle('⚠️ Dev Anti-Nuke: Member Kicked')
+                        .setDescription([
+                            `**Server:** ${member.guild.name} (${member.guild.id})`,
+                            `**Target:** ${member.user.tag} (<@${member.id}>)`,
+                            `**Executor:** <@${executorId}> (${executorId})`,
+                            `**Reason:** ${auditLog?.reason || 'No reason provided'}`
+                        ].join('\n'))
+                        .setColor(0xFF0000)
+                        .setTimestamp();
+
+                    for (const devId of devIds) {
+                        try {
+                            const devUser = await this.client.users.fetch(devId);
+                            if (devUser) {
+                                await devUser.send({ embeds: [alertEmbed] });
+                            }
+                        } catch (err) {
+                            // ignore send errors
+                        }
+                    }
+                }
+            }
+        }
     }
 }

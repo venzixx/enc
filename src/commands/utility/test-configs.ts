@@ -34,30 +34,37 @@ export default class TestConfigCommand extends Command {
                     name: 'greeter',
                     description: 'Test the welcome/greeter message.',
                     type: 1
+                },
+                {
+                    name: 'welcome',
+                    description: 'Test the welcome image and message.',
+                    type: 1
                 }
             ]
         });
-    }
-
-    public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-        const sub = ctx.interaction ? ctx.options.getSubcommand() : args[0]?.toLowerCase();
-
-        if (!sub || !['level', 'streak', 'greeter'].includes(sub)) {
-            return await ctx.reply({ content: `Usage: \`${ctx.prefix}test <level/streak/greeter>\`` });
-        }
-
-        const guildData = await client.prisma.guild.findUnique({ where: { id: ctx.guild.id } });
-        if (!guildData) return await ctx.reply({ content: "Guild data not found." });
-
-        switch (sub) {
-            case 'level':
-                return this.testLevel(client, ctx, guildData);
-            case 'streak':
-                return this.testStreak(client, ctx, guildData);
-            case 'greeter':
-                return this.testGreeter(client, ctx, guildData);
-        }
-    }
+     }
+ 
+     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+         const sub = ctx.interaction ? ctx.options.getSubcommand() : args[0]?.toLowerCase();
+ 
+         if (!sub || !['level', 'streak', 'greeter', 'welcome'].includes(sub)) {
+             return await ctx.reply({ content: `Usage: \`${ctx.prefix}test <level/streak/greeter/welcome>\`` });
+         }
+ 
+         const guildData = await client.prisma.guild.findUnique({ where: { id: ctx.guild.id } });
+         if (!guildData) return await ctx.reply({ content: "Guild data not found." });
+ 
+         switch (sub) {
+             case 'level':
+                 return this.testLevel(client, ctx, guildData);
+             case 'streak':
+                 return this.testStreak(client, ctx, guildData);
+             case 'greeter':
+                 return this.testGreeter(client, ctx, guildData);
+             case 'welcome':
+                 return this.testWelcome(client, ctx, guildData);
+         }
+     }
 
     private async testLevel(client: ExtendedClient, ctx: Context, guild: any) {
         if (ctx.interaction) await ctx.deferReply();
@@ -228,6 +235,48 @@ export default class TestConfigCommand extends Command {
             await ctx.reply({ content: `✅ Test greeter message sent to <#${greeterChannelId}>` });
         } else {
             await ctx.reply(payload);
+        }
+    }
+
+    private async testWelcome(client: ExtendedClient, ctx: Context, guild: any) {
+        const welcomeChannelId = guild.welcomeChannelId;
+        const welcomeChannel = welcomeChannelId ? (ctx.guild.channels.cache.get(welcomeChannelId) as TextChannel) : (ctx.channel as TextChannel);
+
+        if (!welcomeChannel) return await ctx.reply({ content: "No welcome channel configured." });
+
+        if (ctx.interaction) await ctx.deferReply();
+        else await ctx.reply({ content: "⏳ Generating test welcome image..." });
+
+        try {
+            const { generateWelcomeImage } = await import('../../services/imageBuilder');
+            const avatarUrl = ctx.author.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
+            const imageBuffer = await generateWelcomeImage(avatarUrl, ctx.author.username, ctx.guild.memberCount);
+            const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome-preview.png' });
+
+            const welcomeRaw = guild.welcomeMessage || "Welcome to the server, {user}!";
+            const resolved = await PlaceholderManager.resolve(client, welcomeRaw, ctx.member as any, ctx.guild as any);
+
+            const embed = new EmbedBuilder()
+                .setTitle('👋 Welcome!')
+                .setDescription(resolved.content || null)
+                .setImage('attachment://welcome-preview.png')
+                .setColor(client.color.main)
+                .setTimestamp();
+
+            const payload = {
+                embeds: [embed, ...resolved.embeds],
+                components: resolved.components,
+                files: [attachment]
+            };
+
+            if (welcomeChannelId && welcomeChannelId !== ctx.channel.id) {
+                await welcomeChannel.send(payload);
+                await ctx.reply({ content: `✅ Test welcome image and message sent to <#${welcomeChannelId}>` });
+            } else {
+                await ctx.reply(payload);
+            }
+        } catch (e: any) {
+            await ctx.reply({ content: `❌ Failed to generate welcome preview: ${e.message}` });
         }
     }
 }

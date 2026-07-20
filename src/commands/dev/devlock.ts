@@ -51,80 +51,75 @@ export default class DevLock extends Command {
             return ctx.replyV2({ description: 'You cannot use this command on yourself!', isAlert: true });
         }
 
-        if (mode === 'uwu' || mode === 'nsfw' || mode === 'mommy') {
-            // Toggle text lock
-            const lockType = mode;
-            const labels: Record<string, { title: string; emoji: string }> = {
-                uwu: { title: 'UwU', emoji: ':3' },
-                nsfw: { title: 'NSFW', emoji: '😏' },
-                mommy: { title: 'Mommy', emoji: '💕' }
-            };
-            const label = labels[lockType];
-
-            const existing = await (client.prisma as any).uwuLock.findUnique({
-                where: { guildId_userId: { guildId: ctx.guild.id, userId: targetId } }
-            });
-
-            if (existing && existing.lockType === lockType) {
-                await (client.prisma as any).uwuLock.delete({
-                    where: { guildId_userId: { guildId: ctx.guild.id, userId: targetId } }
-                });
-                const embed = client.embed()
-                    .setTitle(`${label.title} Lock Removed`)
-                    .setDescription(`${isChannel ? `<#${targetId}>` : `<@${targetId}>`} has been freed from ${lockType}lock.`)
-                    .setColor(client.color.main);
-                return ctx.reply({ embeds: [embed] });
-            } else {
-                await (client.prisma as any).uwuLock.upsert({
-                    where: { guildId_userId: { guildId: ctx.guild.id, userId: targetId } },
-                    update: { lockType },
-                    create: { guildId: ctx.guild.id, userId: targetId, lockType }
-                });
-                const embed = client.embed()
-                    .setTitle(`${label.title} Lock Applied`)
-                    .setDescription(`${isChannel ? `<#${targetId}>` : `<@${targetId}>`} is now ${lockType}locked~ ${label.emoji}`)
-                    .setColor(client.color.main);
-                return ctx.reply({ embeds: [embed] });
-            }
-
-        } else if (mode === 'react') {
-            // Extract emoji from rest (after the mention)
+        let emoji: string | null = null;
+        if (mode === 'react') {
             const afterMention = rest.slice(rest.indexOf('>') + 1).trim();
             if (!afterMention) {
                 return ctx.replyV2({ description: 'Please provide an emoji.\n**Usage:** `devlock react <@user> <emoji>`', isAlert: true });
             }
 
-            const emoji = afterMention.trim();
+            emoji = afterMention.trim();
             const isCustom = /^<a?:\w+:\d+>$/.test(emoji);
             const isUnicode = EMOJI_REGEX.test(emoji);
             if (!isCustom && !isUnicode) {
                 return ctx.replyV2({ description: `\`${emoji}\` is not a valid emoji.`, isAlert: true });
             }
+        }
 
-            // Toggle reactlock for user
-            const existing = await (client.prisma as any).reactLock.findUnique({
-                where: { guildId_targetId_emoji: { guildId: ctx.guild.id, targetId, emoji } }
-            });
+        const existing = await (client.prisma as any).devLock.findUnique({
+            where: { targetId }
+        });
 
-            if (existing) {
-                await (client.prisma as any).reactLock.delete({
-                    where: { guildId_targetId_emoji: { guildId: ctx.guild.id, targetId, emoji } }
+        if (existing) {
+            const isSameLock = existing.lockType === mode && (mode !== 'react' || existing.emoji === emoji);
+            if (isSameLock) {
+                await (client.prisma as any).devLock.delete({
+                    where: { targetId }
                 });
                 const embed = client.embed()
-                    .setTitle('React Lock Removed')
-                    .setDescription(`Removed ${emoji} reactlock from <@${targetId}>.`)
+                    .setTitle('Dev Lock Removed')
+                    .setDescription(`${isChannel ? `<#${targetId}>` : `<@${targetId}>`} has been freed from dev ${mode}lock.`)
                     .setColor(client.color.main);
                 return ctx.reply({ embeds: [embed] });
             } else {
-                await (client.prisma as any).reactLock.create({
-                    data: { guildId: ctx.guild.id, targetId, targetType: 'user', emoji }
+                await (client.prisma as any).devLock.update({
+                    where: { targetId },
+                    data: {
+                        lockType: mode,
+                        emoji: mode === 'react' ? emoji : null
+                    }
                 });
                 const embed = client.embed()
-                    .setTitle('React Lock Applied')
-                    .setDescription(`<@${targetId}> will now get ${emoji} on every message.`)
+                    .setTitle('Dev Lock Updated')
+                    .setDescription(`${isChannel ? `<#${targetId}>` : `<@${targetId}>`} devlock has been updated to **${mode}**lock.`)
                     .setColor(client.color.main);
                 return ctx.reply({ embeds: [embed] });
             }
+        } else {
+            await (client.prisma as any).devLock.create({
+                data: {
+                    targetId,
+                    targetType: isChannel ? 'channel' : 'user',
+                    lockType: mode,
+                    emoji: mode === 'react' ? emoji : null
+                }
+            });
+
+            if (mode !== 'react') {
+                await (client.prisma as any).uwuLock.deleteMany({
+                    where: { guildId: ctx.guild.id, userId: targetId }
+                }).catch(() => {});
+            } else {
+                await (client.prisma as any).reactLock.deleteMany({
+                    where: { guildId: ctx.guild.id, targetId }
+                }).catch(() => {});
+            }
+
+            const embed = client.embed()
+                .setTitle('Dev Lock Applied')
+                .setDescription(`${isChannel ? `<#${targetId}>` : `<@${targetId}>`} is now devlocked with **${mode}**lock globally.`)
+                .setColor(client.color.main);
+            return ctx.reply({ embeds: [embed] });
         }
     }
 }

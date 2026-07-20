@@ -63,6 +63,10 @@ export default class Mute extends Command {
 		const durationStr = ctx.options.getString('duration') || args[1];
 		const reason = ctx.options.getString('reason') || args.slice(2).join(' ') || 'No reason provided';
 
+		const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
+		const isBotOwner = BOT_OWNERS.has(ctx.author.id);
+		const isGuildOwner = ctx.guild.ownerId === ctx.author.id || isBotOwner;
+
 		if (!target) {
 			return await ctx.replyV2({ description: 'Could not find that member in this server.', color: client.color.red, isAlert: true });
 		}
@@ -71,12 +75,12 @@ export default class Mute extends Command {
 			return await ctx.replyV2({ description: 'Self-harm is not permitted. You cannot mute yourself.', color: client.color.red, isAlert: true });
 		}
 
-		if (ctx.author.id !== ctx.guild.ownerId && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
+		if (!isGuildOwner && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
 			return await ctx.replyV2({ description: 'Hierarchy Violation: You cannot mute someone with a higher or equal role.', color: client.color.red, isAlert: true });
 		}
 
 		if (!target.manageable) {
-            if (ctx.author.id === ctx.guild.ownerId) {
+            if (isGuildOwner) {
                 return await this.askForceMute(client, ctx, target, null, reason, durationStr);
             }
 			return await ctx.replyV2({ description: 'Hierarchy Block: My role position is below this user. Move me higher to enable moderation.', color: client.color.red, isAlert: true });
@@ -88,7 +92,7 @@ export default class Mute extends Command {
 		}
 
 		try {
-            if (target.permissions.has(PermissionFlagsBits.Administrator) && ctx.author.id === ctx.guild.ownerId) {
+            if (target.permissions.has(PermissionFlagsBits.Administrator) && isGuildOwner) {
                  return await this.askForceMute(client, ctx, target, time, reason, durationStr);
             }
 
@@ -108,7 +112,7 @@ export default class Mute extends Command {
 
             await logModerationAction(client, ctx.guild, 'MUTE', ctx.author, target.user, reason, durationStr);
 		} catch (error: any) {
-            if (ctx.author.id === ctx.guild.ownerId && (error.message.includes('Permissions') || error.code === 50013)) {
+            if (isGuildOwner && (error.message.includes('Permissions') || error.code === 50013)) {
                 return await this.askForceMute(client, ctx, target, time, reason, durationStr);
             }
 			await ctx.replyV2({ title: 'Execution Error', description: `Failed to execute mute: ${error.message}`, color: client.color.red, isAlert: true });

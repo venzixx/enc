@@ -7,8 +7,15 @@ import logger from '../structures/Logger';
 import { Routes, ApplicationCommandType, PermissionsBitField } from 'discord.js';
 import { env } from '../env';
 
+const runtimeExtension = path.extname(__filename) === '.ts' ? 'ts' : 'js';
+const runtimeRoot = runtimeExtension === 'ts' ? 'src' : 'dist';
+
+function runtimeGlob(area: 'commands' | 'events' | 'components') {
+    return `${runtimeRoot}/${area}/**/*.${runtimeExtension}`;
+}
+
 export async function loadCommands(client: ExtendedClient) {
-    const commandFiles = await glob('src/commands/**/*.ts');
+    const commandFiles = await glob(runtimeGlob('commands'));
     client.commands.clear();
     client.aliases.clear();
 
@@ -37,7 +44,7 @@ export async function loadCommands(client: ExtendedClient) {
             
             // Set category from folder name if not already explicitly set in the command
             if (!command.category || command.category === 'general') {
-                const relativePath = path.relative(path.join(process.cwd(), 'src', 'commands'), filePath);
+                const relativePath = path.relative(path.join(process.cwd(), runtimeRoot, 'commands'), filePath);
                 const category = path.dirname(relativePath).split(path.sep)[0];
                 command.category = category || 'general';
             }
@@ -131,7 +138,7 @@ export async function loadEvents(client: ExtendedClient) {
     const trace = new Error().stack?.split('\n')[2]?.trim();
     logger.info(`[LOAD_EVENTS] Manifold ignited. Trigger: ${trace}`);
 
-    const eventFiles = await glob('src/events/**/*.ts');
+    const eventFiles = await glob(runtimeGlob('events'));
 
     for (const file of eventFiles) {
         const filePath = path.resolve(file);
@@ -173,7 +180,7 @@ export async function loadEvents(client: ExtendedClient) {
 
 
 export async function loadComponents(client: ExtendedClient) {
-    const componentFiles = await glob('src/components/**/*.ts');
+    const componentFiles = await glob(runtimeGlob('components'));
     client.components.clear();
 
     for (const file of componentFiles) {
