@@ -1,81 +1,172 @@
-# 🌑 ENC NEXUS (Dimscord)
+<div align="center">
+  <img src="https://i.imgur.com/ud3EWNh.jpg" width="128" height="128" style="border-radius: 50%;" alt="Enc Logo" />
+  <h1>Enc • Discord Bot & Web Console</h1>
+  <p><strong>Next-Generation Multipurpose Discord Bot with Monochromatic V2 Architecture & High-Fidelity Audio</strong></p>
 
-> **High-Fidelity Discord Governance & Sovereign Audio Broadcast Suite.**
-
-ENC NEXUS is an elite, dual-engine ecosystem designed for peak guild administration and near-zero latency audio broadcasting. It bridges a high-velocity **Discord.js Vanguard Engine** with a clinical **Next.js Sovereign Console**, unified by the shared **Surgical Obsidian** design philosophy.
-
----
-
-## 🛰️ Architecture Overview
-
-### 1. Vanguard Engine (The Bot)
-A modular, high-performance Discord automation layer built for stability and tactical server dominance.
-- **Core Strategy**: Modular command architecture with hierarchical permission scaling.
-- **Audio Logic**: Powered by **Lavalink (Shoukaku/Kazagumo)** for 8D, Bassboost, and Nightcore spectrum broadcasting.
-- **Intelligence**: Integrated **Mistral AI** neural network for high-velocity chat interaction and character-based personality injection.
-- **Persistence**: **Prisma (SQLite)** database bridge for real-time configuration sync.
-
-### 2. Sovereign Console (The Dashboard)
-A boardroom-ready administrative suite for real-time fortress governance.
-- **Design Ethos**: **Surgical Obsidian** (11px radius, Poppins typography, spotlight-responsive glass panels).
-- **Frontend**: **Next.js 16 (Turbopack)** with **Framer Motion** for procedural ripple depth and refraction effects.
-- **Authorization**: **NextAuth.js (Discord OAuth2)** with identity matrix injection.
-- **Master Codex**: Interactive, single-page documentation manifest containing every functional protocol (~81+ commands).
+  <p>
+    <a href="https://discord.gg/zzN2vn6bwd"><img src="https://img.shields.io/badge/Discord-Support_Server-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" /></a>
+    <a href="https://top.gg/bot/1493482964246593556"><img src="https://img.shields.io/badge/Top.gg-Vote_for_Enc-FF3366?style=for-the-badge&logo=top.gg&logoColor=white" alt="Top.gg" /></a>
+    <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
+    <img src="https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white" alt="Prisma" />
+  </p>
+</div>
 
 ---
 
-## 🌑 Clinical Setup
+## ✨ Key Features
+
+### 🎵 High-Fidelity Audio Streaming
+- Powered by **Lavalink v4** with multi-node failover.
+- Lossless playback from **YouTube, Spotify, SoundCloud, Apple Music, Deezer, and JioSaavn**.
+- Real-time DSP audio filters: **Bassboost, Nightcore, 8D, Vaporwave, Tremolo, and Distortion**.
+- Interactive music player controls with dynamic action rows and live track progress.
+
+### 🛡️ Moderation, Cases & Anti-Nuke
+- **Case Tracking Engine:** Persistent case IDs for warnings, mutes, kicks, bans, and unbans.
+- **Hierarchical Warning System:** Auto-escalation thresholds with automated timeouts and kicks.
+- **Anti-Nuke Matrix:** Real-time protection against malicious bot adds, webhook spam, mass channel deletion, and mass role pruning.
+- **AutoMod:** Anti-invite, anti-link, anti-caps, anti-mention, and custom word blacklists.
+
+### 👑 Dynamic VoiceMaster
+- Create instant, temporary private voice channels on join.
+- Complete in-channel control panels for locking, hiding, renaming, and setting custom user limits.
+
+### 🎟️ Interactive Support Tickets
+- Customizable multi-category ticket panels with drop-down menus and interactive modals.
+- Real-time transcript generation, staff claiming, user adding/removing, and automatic logging.
+
+### 💍 Marriage & Visual Family Trees
+- Interactive proposals, ring customization, and divorce handling.
+- Full multi-generational family trees rendered dynamically with Mermaid & SVG engines.
+
+### 🏆 Leveling & Canvas Rank Cards
+- Multi-font rank card generator supporting international glyphs (Arabic, CJK, Cyrillic, Georgian, etc.).
+- Customizable XP rates, level-up announcement channels, and automatic role rewards.
+
+### 🗳️ Top.gg Vote Engine & Automated 12h Reminders
+- `/vote` command with real-time cooldown indicators and total vote counters.
+- Automated Top.gg webhook integration (`/api/vote/topgg`) with weekend double-vote detection.
+- Background reminder scheduler with 1-click DM notifications when a vote is ready.
+
+### 🌐 Next.js Sovereign Dashboard
+- Real-time server management console built on **Next.js 16 (Turbopack)** and **Tailwind CSS**.
+- **Interactive Features:** Visual Embed Creator, Emoji Studio, Role Connections Sync, Theme Customizer, and Audit Log Inspector.
+
+---
+
+## 🚀 Quick Start & Deployment
 
 ### Prerequisites
-- **Lavalink Node**: Version 4.0.0+ (Secure WebSocket recommended).
-- **Database**: SQLite (initialized via Prisma).
-- **Environment**: Node.js 20+ / NPM 10+.
+- **Node.js**: `v20.x` or `v22.x`
+- **PostgreSQL**: `v15+`
+- **Lavalink**: `v4.x` (Lavalink Java server)
+- **Discord Application**: Bot token and Client ID with Privileged Intents enabled.
 
-### Vanguard Initialization
-1. Synchronize the root `.env` manifest:
-   ```env
-   TOKEN="YOUR_DISCORD_TOKEN"
-   CLIENT_ID="YOUR_APPLICATION_ID"
-   LAVALINK_HOST="lavalink.node.com"
-   LAVALINK_PASS="your_password"
-   DATABASE_URL="file:./dev.db"
+---
+
+### 1. Bot Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/venzixx/enc.git
+   cd enc
    ```
-2. Deploy the Sovereign Schema:
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Configure Environment (`.env`):**
+   ```env
+   # Database (PostgreSQL)
+   DATABASE_URL="postgresql://username:password@localhost:5432/enc_db"
+
+   # Discord Credentials
+   TOKEN="YOUR_DISCORD_BOT_TOKEN"
+   CLIENT_ID="YOUR_DISCORD_CLIENT_ID"
+   PREFIX=","
+
+   # Lavalink Audio Server
+   LAVALINK_HOST="localhost"
+   LAVALINK_PORT=2333
+   LAVALINK_PASS="youshallnotpass"
+   LAVALINK_SECURE=false
+
+   # Optional Integrations
+   TOPGG_WEBHOOK_AUTH="your_topgg_auth_secret"
+   ```
+
+4. **Sync database schema:**
    ```bash
    npx prisma db push
-   ```
-3. Initialize the engine:
-   ```bash
-   npm run dev
+   npx prisma generate
    ```
 
-### Console Initialization
-1. Navigate to the `dashboard` directory and synchronize the local `.env`:
+5. **Build and start the bot:**
+   ```bash
+   npm run build
+   npm run start
+   ```
+
+---
+
+### 2. Dashboard Setup (Optional)
+
+1. **Navigate to the dashboard directory:**
+   ```bash
+   cd dashboard
+   npm install
+   ```
+
+2. **Configure Dashboard Environment (`dashboard/.env`):**
    ```env
-   DISCORD_CLIENT_ID="YOUR_ID"
-   DISCORD_CLIENT_SECRET="YOUR_SECRET"
-   NEXTAUTH_SECRET="GENERATED_SECRET"
+   DATABASE_URL="postgresql://username:password@localhost:5432/enc_db"
+   DISCORD_CLIENT_ID="YOUR_DISCORD_CLIENT_ID"
+   DISCORD_CLIENT_SECRET="YOUR_DISCORD_CLIENT_SECRET"
+   DISCORD_BOT_TOKEN="YOUR_DISCORD_BOT_TOKEN"
    NEXTAUTH_URL="http://localhost:3000"
-   DATABASE_URL="file:../../prisma/dev.db"
+   NEXTAUTH_SECRET="GENERATE_A_RANDOM_SECRET"
    ```
-2. Initialize the administrative relay:
+
+3. **Run the Dashboard:**
    ```bash
-   npm run dev
+   npm run build
+   npm run start
    ```
 
 ---
 
-## 📐 Design Philosophy: Surgical Obsidian
-The ENC NEXUS platform adheres to a strict visual protocol:
-- **Palette**: Deep Navy-Black (`#05050D`) with high-intensity Blue (`#0076FF`) and Purple (`#7C3AED`) accents.
-- **Refraction**: Reactive background starfields with procedural ripple distortions.
-- **Transparency**: Clinical glass panels with cursor-responsive spotlight hover engines.
+## 📁 Repository Structure
+
+```
+├── prisma/
+│   └── schema.prisma        # Prisma ORM Database Schemas
+├── src/
+│   ├── assets/              # Fonts, icons & templates
+│   ├── commands/            # Bot commands organized by category
+│   │   ├── config/          # Central /config suite
+│   │   ├── fun/             # Games, polls & trivia
+│   │   ├── general/         # Streaks & bot information
+│   │   ├── marriage/        # Marriages & family trees
+│   │   ├── moderation/      # Bans, kicks, mutes, cases & warnings
+│   │   ├── music/           # Lavalink audio commands
+│   │   ├── tickets/         # Ticket management
+│   │   └── utility/         # Ping, diagnostics, vote, afk, etc.
+│   ├── components/          # Discord buttons, select menus & modals
+│   ├── events/              # Discord gateway & Lavalink event handlers
+│   ├── structures/          # Base Command, Event & Context classes
+│   └── utils/               # Audio, AutoMod, Case, & Vote managers
+├── dashboard/               # Next.js 16 Web Dashboard Application
+├── package.json             # Root dependencies & scripts
+└── tsconfig.json            # TypeScript configuration
+```
 
 ---
 
-## 🛰️ Registry & Compliance
-- **Version**: 3.44.0-PRO (Nexus Division)
-- **Author**: Enc Infrastructure
-- **Status**: Boardroom-Ready // Production-Stable
+## 📄 License & Community
+- **Support Discord:** [discord.gg/zzN2vn6bwd](https://discord.gg/zzN2vn6bwd)
+- **Maintained by:** [Irvenyx](https://github.com/venzixx)
 
-> **Authorized Personnel Only.** Access to the Sovereign Console requires valid OAuth2 clearance and Administrator permissions within the target fortress.
+Distributed under the MIT License. See `LICENSE` for more information.
