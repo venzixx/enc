@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import logger from '../structures/Logger';
 
-const MONGO_URI = process.env.MONGODB_URI || "mongodb+srv://sidharhth123pupu_db_user:mjxlalzFJOOoQoZ5@cluster0.y5oxyz0.mongodb.net/dimscord?retryWrites=true&w=majority&appName=Cluster0";
+const MONGO_URI = process.env.MONGODB_URI || "";
 
 export async function connectMongoose(): Promise<typeof mongoose> {
     try {

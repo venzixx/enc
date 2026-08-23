@@ -155,12 +155,10 @@ export default class VoiceCommand extends Command {
 			});
 
 			// Premium VoiceMaster Control Panel
-			const { AttachmentBuilder } = await import('discord.js');
-			const bannerFile = new AttachmentBuilder('C:\\Users\\sidha\\.gemini\\antigravity\\brain\\ca3c4866-b5d2-4483-a74e-19930a3a350d\\voicemaster_premium_banner_1778150147326.png', { name: 'voicemaster_premium.png' });
-
 			const panelEmbed = new EmbedBuilder()
 				.setColor(0x000000)
 				.setAuthor({ name: 'VOICEMASTER // ELITE VOICE ECOSYSTEM', iconURL: client.user?.displayAvatarURL() })
+				.setImage('https://i.imgur.com/ud3EWNh.jpg')
 				.setDescription([
 					'### 🔒 SECURE NODE INTERFACE',
 					'Manage your temporary voice sanctuary with high-fidelity administrative protocols. Only the owner or authorized entities can interface with this node.',
@@ -214,7 +212,6 @@ export default class VoiceCommand extends Command {
 
 			const panelMsg = await (panelChannel as any).send({
 				embeds: [panelEmbed],
-				files: [bannerFile],
 				components: [actionRow1, actionRow2, actionRow3]
 			});
 
