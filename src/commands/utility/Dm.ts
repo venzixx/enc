@@ -154,6 +154,9 @@ export default class Dm extends Command {
 		}
 
 		try {
+			if (messagePayload.content && !embedMatch) {
+				messagePayload.content += `\n\n-# Sent by **${ctx.author.username}** via **${ctx.guild?.name || 'Discord'}**`;
+			}
 			await targetUser.send(messagePayload);
 			const replyMsg = await ctx.replyV2({ 
 				description: `${client.emoji.success} Successfully sent direct message to **${targetUser.tag}**!`, 

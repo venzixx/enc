@@ -63,7 +63,7 @@ export class VoteReminderManager {
                                 `Your support helps us grow and keep features online.`
                             )
                             .setColor(client.color.main || 0x5865F2)
-                            .setFooter({ text: `Total Votes: ${record.totalVotes} • Enc Vote Reminder` })
+                            .setFooter({ text: `Total Votes: ${record.totalVotes} • To unsubscribe, click Disable Reminders below or use ,vote` })
                             .setTimestamp();
 
                         await user.send({ embeds: [embed], components: [row] }).catch(() => null);
