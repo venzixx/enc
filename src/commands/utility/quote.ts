@@ -10,7 +10,7 @@ import {
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
-import { QuoteGenerator, QuoteOptions } from '../../utils/QuoteGenerator';
+import { QuoteGenerator, QuoteOptions, FONT_REGISTRY } from '../../utils/QuoteGenerator';
 import { cleanFancyText } from '../../utils/Utils';
 
 export default class QuoteCommand extends Command {
@@ -109,7 +109,9 @@ export default class QuoteCommand extends Command {
 
         const generateAndSend = async (isUpdate = false) => {
             try {
-                const buffer = await QuoteGenerator.generate(content, username, displayName, avatarUrl, options);
+                const buffer = targetMessage
+                    ? await QuoteGenerator.generateFromMessage(targetMessage, options)
+                    : await QuoteGenerator.generate(content, username, displayName, avatarUrl, options);
                 const attachment = new AttachmentBuilder(buffer, { name: options.gif ? 'quote.gif' : 'quote.png' });
 
                 const btnRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -135,22 +137,11 @@ export default class QuoteCommand extends Command {
                         .setStyle(options.gif ? ButtonStyle.Success : ButtonStyle.Secondary)
                 );
 
-                const baseFonts = [
-                    { label: 'Inter (Clean)', value: 'Inter' },
-                    { label: 'Poppins (Soft Geometric)', value: 'Poppins' },
-                    { label: 'Outfit (Sleek Geometric)', value: 'Outfit' },
-                    { label: 'Quicksand (Soft Rounded)', value: 'Quicksand' },
-                    { label: 'Comfortaa (Rounded Light)', value: 'Comfortaa' },
-                    { label: 'Nunito (Soft Rounded)', value: 'Nunito' },
-                    { label: 'Fredoka (Soft Bold)', value: 'Fredoka' },
-                    { label: 'Lora (Soft Serif)', value: 'Lora' },
-                    { label: 'Instrument Serif (Elegant)', value: 'Instrument Serif' },
-                    { label: 'Pacifico (Soft Script)', value: 'Pacifico' },
-                    { label: 'Dancing Script (Flowing)', value: 'Dancing Script' },
-                    { label: 'Playfair (Classic)', value: 'Playfair' },
-                    { label: 'Montserrat (Geometric)', value: 'Montserrat' },
-                    { label: 'System sans-serif', value: 'sans-serif' }
-                ];
+                const baseFonts = Object.keys(FONT_REGISTRY).slice(0, 24).map(fontName => ({
+                    label: fontName,
+                    value: fontName
+                }));
+                baseFonts.push({ label: 'System sans-serif', value: 'sans-serif' });
 
                 const isCustomFont = options.font && !baseFonts.some(f => f.value.toLowerCase() === options.font!.toLowerCase());
                 const menuOptions = baseFonts.map(opt => ({

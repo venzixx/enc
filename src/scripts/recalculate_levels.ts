@@ -7,34 +7,47 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const prisma = new PrismaClient();
 
-// The new 10k messages = Level 100 formula
-const calcLevelXP = (lvl: number) => Math.floor(18 * Math.pow(lvl, 2) + 200 * lvl);
-
 async function recalculate() {
     console.log("Starting level recalculation sync...");
 
-    const members = await prisma.member.findMany({
-        where: { xp: { gt: 0 } }
+    // Fetch all guilds with their xpFormulaMultiplier
+    const guilds = await prisma.guild.findMany({
+        where: { levelingEnabled: true },
+        select: { id: true, xpFormulaMultiplier: true }
     });
 
-    console.log(`Found ${members.length} members to update.`);
+    console.log(`Found ${guilds.length} guilds with leveling enabled.`);
 
-    for (const member of members) {
-        let level = 0;
-        while (member.xp >= calcLevelXP(level + 1)) {
-            level++;
-        }
+    let totalUpdated = 0;
 
-        if (level !== member.level) {
-            console.log(`Updating ${member.userId}: Level ${member.level} -> ${level} (${member.xp} XP)`);
-            await prisma.member.update({
-                where: { id: member.id },
-                data: { level }
-            });
+    for (const guild of guilds) {
+        const multiplier = (guild as any).xpFormulaMultiplier ?? 1.0;
+        const calcLevelXP = (lvl: number) => Math.floor((18 * Math.pow(lvl, 2) + 200 * lvl) * multiplier);
+
+        const members = await prisma.member.findMany({
+            where: { guildId: guild.id, xp: { gt: 0 } }
+        });
+
+        for (const member of members) {
+            let level = 0;
+            let iterations = 0;
+            while (member.xp >= calcLevelXP(level + 1) && iterations < 500) {
+                level++;
+                iterations++;
+            }
+
+            if (level !== member.level) {
+                console.log(`[${guild.id}] ${member.userId}: Level ${member.level} -> ${level} (${member.xp} XP, multiplier: ${multiplier})`);
+                await prisma.member.update({
+                    where: { id: member.id },
+                    data: { level }
+                });
+                totalUpdated++;
+            }
         }
     }
 
-    console.log("Recalculation complete!");
+    console.log(`\nRecalculation complete! Updated ${totalUpdated} members.`);
     process.exit(0);
 }
 

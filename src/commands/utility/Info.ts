@@ -1,38 +1,39 @@
-import { 
-    EmbedBuilder, 
-    ApplicationCommandOptionType,
-    ChannelType,
-    version as djsVersion
-} from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
+import { ApplicationCommandOptionType, ChannelType, EmbedBuilder, version as djsVersion } from 'discord.js';
 import { Resolver } from '../../utils/Resolver';
-import os from 'os';
+import * as os from 'os';
 
 export default class Info extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'info',
             description: {
-                content: 'Access the system information hub for server, user, or bot diagnostics.',
-                usage: 'info <subcommand>',
-                examples: ['info user @member', 'info server', 'info bot']
+                content: 'View system, guild, or user information',
+                usage: 'info <user|server|bot|ping>',
+                examples: ['info user', 'info server', 'info bot', 'info ping']
             },
             category: 'utility',
-            cooldown: 3,
+            cooldown: 5,
+            aliases: ['stats', 'status', 'botinfo', 'serverinfo', 'userinfo'],
             slashCommand: true,
             options: [
                 {
                     name: 'user',
-                    description: 'Analyze identity and membership data for a user.',
+                    description: 'View information about a guild member.',
                     type: ApplicationCommandOptionType.Subcommand,
                     options: [
-                        { name: 'target', description: 'User to analyze', type: ApplicationCommandOptionType.User, required: false }
+                        {
+                            name: 'target',
+                            description: 'The user to inspect.',
+                            type: ApplicationCommandOptionType.User,
+                            required: false
+                        }
                     ]
                 },
                 {
                     name: 'server',
-                    description: 'Retrieve technical and demographic data for this server.',
+                    description: 'View detailed server configuration and member count.',
                     type: ApplicationCommandOptionType.Subcommand
                 },
                 {
@@ -50,7 +51,9 @@ export default class Info extends Command {
     }
 
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-        await ctx.deferReply();
+        if (!ctx.deferred && !ctx.replied) {
+            await ctx.deferReply();
+        }
         const sub = (ctx.options.getSubcommand() || args[0] || 'bot').toLowerCase();
 
         switch (sub) {
@@ -81,9 +84,9 @@ export default class Info extends Command {
 
         const user = member.user;
         const roles = member.roles.cache
-            .filter((role) => role.id !== ctx.guild.id)
-            .sort((a, b) => b.position - a.position)
-            .map((role) => role.toString());
+            .filter((role: any) => role.id !== ctx.guild.id)
+            .sort((a: any, b: any) => b.position - a.position)
+            .map((role: any) => role.toString());
 
         const embed = new EmbedBuilder()
             .setAuthor({ name: user.tag, iconURL: user.displayAvatarURL() })
@@ -96,7 +99,7 @@ export default class Info extends Command {
             )
             .setTimestamp();
 
-        return await ctx.reply({ embeds: [embed] });
+        return await ctx.sendMessage({ embeds: [embed] });
     }
 
     private async handleServer(client: ExtendedClient, ctx: Context) {
@@ -117,7 +120,7 @@ export default class Info extends Command {
             .setTimestamp();
 
         if (guild.banner) embed.setImage(guild.bannerURL());
-        return await ctx.reply({ embeds: [embed] });
+        return await ctx.sendMessage({ embeds: [embed] });
     }
 
     public async handleBot(client: ExtendedClient, ctx: Context) {
@@ -137,10 +140,14 @@ export default class Info extends Command {
             .setTimestamp()
             .setFooter({ text: 'Enc Nexus OS v2.0' });
 
-        return await ctx.reply({ embeds: [embed] });
+        return await ctx.sendMessage({ embeds: [embed] });
     }
 
     private async handlePing(client: ExtendedClient, ctx: Context) {
+        const pingCmd = client.commands.get('ping');
+        if (pingCmd) {
+            return await pingCmd.run(client, ctx, []);
+        }
         const wsPing = client.ws.ping;
         return await ctx.replyV2({
             title: `System Latency`,

@@ -3,6 +3,7 @@ import { Event } from '../structures';
 import { LavamusicEventType } from '../types/events';
 import { ExtendedClient } from '../client';
 import { AuditLogger, AuditLogType, AuditLogStatus } from '../utils/AuditLogger';
+import { RoleRuleEvaluator } from '../utils/RoleRuleEvaluator';
 
 export default class GuildMemberUpdate extends Event {
     constructor(client: ExtendedClient, file: string) {
@@ -76,45 +77,51 @@ export default class GuildMemberUpdate extends Event {
             }
         }
 
-        // 4. Role Connections Logic
-        if (addedRoles.size > 0) {
-            for (const [roleId] of addedRoles) {
-                const connections = await client.prisma.roleConnection.findMany({
-                    where: { guildId: newMember.guild.id, triggerRoleId: roleId }
-                });
+        // 4. Role Connections & Advanced Role Rules Logic
+        if (addedRoles.size > 0 || removedRoles.size > 0) {
+            // Evaluate advanced multi-condition Role Rules
+            await RoleRuleEvaluator.evaluateMember(client, newMember);
 
-                if (connections.length > 0) {
-                    const rolesToGive = connections
-                        .map(c => c.connectedRoleId)
-                        .filter(id => !newMember.roles.cache.has(id));
+            // Legacy Role Connections Logic
+            if (addedRoles.size > 0) {
+                for (const [roleId] of addedRoles) {
+                    const connections = await client.prisma.roleConnection.findMany({
+                        where: { guildId: newMember.guild.id, triggerRoleId: roleId }
+                    });
 
-                    if (rolesToGive.length > 0) {
-                        try {
-                            await newMember.roles.add(rolesToGive, 'Role Connection Triggered');
-                        } catch (err) {
-                            console.error(`Failed to add connected roles for ${newMember.user.tag}: ${err}`);
+                    if (connections.length > 0) {
+                        const rolesToGive = connections
+                            .map(c => c.connectedRoleId)
+                            .filter(id => !newMember.roles.cache.has(id));
+
+                        if (rolesToGive.length > 0) {
+                            try {
+                                await newMember.roles.add(rolesToGive, 'Role Connection Triggered');
+                            } catch (err) {
+                                console.error(`Failed to add connected roles for ${newMember.user.tag}: ${err}`);
+                            }
                         }
                     }
                 }
             }
-        }
 
-        if (removedRoles.size > 0) {
-            for (const [roleId] of removedRoles) {
-                const connections = await client.prisma.roleConnection.findMany({
-                    where: { guildId: newMember.guild.id, triggerRoleId: roleId }
-                });
+            if (removedRoles.size > 0) {
+                for (const [roleId] of removedRoles) {
+                    const connections = await client.prisma.roleConnection.findMany({
+                        where: { guildId: newMember.guild.id, triggerRoleId: roleId }
+                    });
 
-                if (connections.length > 0) {
-                    const rolesToRemove = connections
-                        .map(c => c.connectedRoleId)
-                        .filter(id => newMember.roles.cache.has(id));
+                    if (connections.length > 0) {
+                        const rolesToRemove = connections
+                            .map(c => c.connectedRoleId)
+                            .filter(id => newMember.roles.cache.has(id));
 
-                    if (rolesToRemove.length > 0) {
-                        try {
-                            await newMember.roles.remove(rolesToRemove, 'Role Connection Removed');
-                        } catch (err) {
-                            console.error(`Failed to remove connected roles for ${newMember.user.tag}: ${err}`);
+                        if (rolesToRemove.length > 0) {
+                            try {
+                                await newMember.roles.remove(rolesToRemove, 'Role Connection Removed');
+                            } catch (err) {
+                                console.error(`Failed to remove connected roles for ${newMember.user.tag}: ${err}`);
+                            }
                         }
                     }
                 }

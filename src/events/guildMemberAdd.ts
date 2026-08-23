@@ -60,6 +60,10 @@ export default class GuildMemberAdd extends Event {
                 }
             }
 
+            // --- Role Rules Evaluation ---
+            const { RoleRuleEvaluator } = await import('../utils/RoleRuleEvaluator');
+            await RoleRuleEvaluator.evaluateMember(this.client, member);
+
             // --- Join DM ---
             if (guildData?.joinDmMessage) {
                 try {
@@ -98,34 +102,44 @@ export default class GuildMemberAdd extends Event {
             if (guildData?.welcomeChannelId) {
                 const welcomeChannel = guild.channels.cache.get(guildData.welcomeChannelId) as any;
                 if (welcomeChannel && welcomeChannel.isTextBased()) {
-                    const { generateWelcomeImage } = await import('../services/imageBuilder');
-                    
-                    const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
-                    const imageBuffer = await generateWelcomeImage(avatarUrl, member.user.username, guild.memberCount);
-                    
-                    const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome.png' });
-                    
                     const welcomeRaw = guildData.welcomeMessage || `Welcome to the server, {user}! You were invited by **{inviter}** using code \`${usedInvite?.code || 'Direct Join'}\`.`;
-                    // Pre-replace {inviter} as PlaceholderManager doesn't handle it currently
                     const welcomePreProcessed = welcomeRaw.replace(/{inviter}/g, usedInvite?.inviter?.tag || 'Unknown');
                     
                     const resolved = await PlaceholderManager.resolve(this.client, welcomePreProcessed, member, guild);
 
-                    const embed = new EmbedBuilder()
-                        .setTitle(' Welcome!')
-                        .setDescription(resolved.content || null)
-                        .setImage('attachment://welcome.png')
-                        .setColor(this.client.color.main)
-                        .setTimestamp();
-                    
-                    // Add any resolved embeds from tags as well
-                    const finalEmbeds = [embed, ...resolved.embeds];
-                    
-                    await welcomeChannel.send({ 
-                        embeds: finalEmbeds, 
-                        components: resolved.components,
-                        files: [attachment] 
-                    });
+                    if (resolved.embeds && resolved.embeds.length > 0) {
+                        // Custom embeds configured by user
+                        await welcomeChannel.send({
+                            content: resolved.content || undefined,
+                            embeds: resolved.embeds,
+                            components: resolved.components
+                        }).catch(() => {});
+                    } else {
+                        // Standard Welcome Banner + Text
+                        try {
+                            const { generateWelcomeImage } = await import('../services/imageBuilder');
+                            const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
+                            const imageBuffer = await generateWelcomeImage(avatarUrl, member.user.username, guild.memberCount);
+                            const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome.png' });
+
+                            const embed = new EmbedBuilder()
+                                .setTitle('👋 Welcome!')
+                                .setDescription(resolved.content || `Welcome to the server, ${member.toString()}!`)
+                                .setImage('attachment://welcome.png')
+                                .setColor(this.client.color.main)
+                                .setTimestamp();
+
+                            await welcomeChannel.send({
+                                embeds: [embed],
+                                components: resolved.components,
+                                files: [attachment]
+                            }).catch(() => {});
+                        } catch {
+                            await welcomeChannel.send({
+                                content: resolved.content || `Welcome ${member.toString()} to **${guild.name}**!`
+                            }).catch(() => {});
+                        }
+                    }
                 }
             }
         } catch (e) {

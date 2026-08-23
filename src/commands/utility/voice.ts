@@ -185,26 +185,26 @@ export default class VoiceCommand extends Command {
 
 			// Row 1: Privacy (Monochromatic Secondary)
 			const row1Buttons = [
-				new ButtonBuilder().setCustomId('vc_lock').setLabel('Lock').setEmoji('🔒').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_unlock').setLabel('Unlock').setEmoji('🔓').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_hide').setLabel('Hide').setEmoji('👁️').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_show').setLabel('Show').setEmoji('🌐').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_lock').setLabel('Lock').setEmoji(client.emoji.vc_lock.match(/\d+/)?.[0] || '🔒').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_unlock').setLabel('Unlock').setEmoji(client.emoji.vc_unlock.match(/\d+/)?.[0] || '🔓').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_hide').setLabel('Hide').setEmoji(client.emoji.vc_hide.match(/\d+/)?.[0] || '👁️').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_show').setLabel('Show').setEmoji(client.emoji.link.match(/\d+/)?.[0] || '🌐').setStyle(ButtonStyle.Secondary),
 			];
 
 			// Row 2: Config (Monochromatic Secondary + Primary for Claim)
 			const row2Buttons = [
-				new ButtonBuilder().setCustomId('vc_rename').setLabel('Rename').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_limit_up').setLabel('Limit +').setEmoji('🔼').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_limit_down').setLabel('Limit -').setEmoji('🔽').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_claim').setLabel('Claim').setEmoji('👑').setStyle(ButtonStyle.Primary),
+				new ButtonBuilder().setCustomId('vc_rename').setLabel('Rename').setEmoji(client.emoji.edit.match(/\d+/)?.[0] || '✏️').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_limit_up').setLabel('Limit +').setEmoji(client.emoji.vc_limit_up.match(/\d+/)?.[0] || '🔼').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_limit_down').setLabel('Limit -').setEmoji(client.emoji.vc_limit_down.match(/\d+/)?.[0] || '🔽').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_claim').setLabel('Claim').setEmoji(client.emoji.crown_owner.match(/\d+/)?.[0] || '👑').setStyle(ButtonStyle.Primary),
 			];
 
 			// Row 3: Management (Status Colors for Action)
 			const row3Buttons = [
-				new ButtonBuilder().setCustomId('vc_add').setLabel('Permit').setEmoji('👤').setStyle(ButtonStyle.Success),
-				new ButtonBuilder().setCustomId('vc_kick').setLabel('Kick').setEmoji('❌').setStyle(ButtonStyle.Danger),
-				new ButtonBuilder().setCustomId('vc_info').setLabel('Info').setEmoji('📊').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('vc_delete').setLabel('Terminate').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+				new ButtonBuilder().setCustomId('vc_add').setLabel('Permit').setEmoji(client.emoji.user.match(/\d+/)?.[0] || '👤').setStyle(ButtonStyle.Success),
+				new ButtonBuilder().setCustomId('vc_kick').setLabel('Kick').setEmoji(client.emoji.mod_kick.match(/\d+/)?.[0] || '❌').setStyle(ButtonStyle.Danger),
+				new ButtonBuilder().setCustomId('vc_info').setLabel('Info').setEmoji(client.emoji.system_cpu.match(/\d+/)?.[0] || '📊').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('vc_delete').setLabel('Terminate').setEmoji(client.emoji.mod_purge.match(/\d+/)?.[0] || '🗑️').setStyle(ButtonStyle.Danger),
 			];
 
 			const { ActionRowBuilder } = await import('discord.js');

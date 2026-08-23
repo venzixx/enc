@@ -80,5 +80,31 @@ export default class GuildMemberRemove extends Event {
                 }
             }
         }
+
+        // 6. Farewell / Leave Message Dispatch
+        try {
+            const guildData = await this.client.prisma.guild.findUnique({
+                where: { id: member.guild.id },
+                select: { leaveChannelId: true, leaveMessage: true }
+            });
+
+            if (guildData?.leaveChannelId) {
+                const leaveChannel = member.guild.channels.cache.get(guildData.leaveChannelId) as any;
+                if (leaveChannel && leaveChannel.isTextBased()) {
+                    const { PlaceholderManager } = await import('../utils/PlaceholderManager');
+                    const rawLeave = guildData.leaveMessage || '{user} has left the server.';
+                    const resolved = await PlaceholderManager.resolve(this.client, rawLeave, member, member.guild);
+
+                    await leaveChannel.send({
+                        content: resolved.content || undefined,
+                        embeds: resolved.embeds,
+                        components: resolved.components
+                    }).catch(() => {});
+                }
+            }
+        } catch (leaveErr) {
+            console.error('Farewell/Leave Error:', leaveErr);
+        }
     }
 }
+

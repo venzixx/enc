@@ -18,7 +18,7 @@ export default class Placeholder extends Command {
 
     public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
         return ctx.replyV2({
-            title: '🧩 Available Message Placeholders',
+            title: `${client.emoji.placeholder_puzzle} Available Message Placeholders`,
             description: `You can use these placeholders in custom messages (e.g. Welcome Messages, Greeters).\n\n` + 
                          `• \`{user}\` - Mentions the user (same as \`{mentionID}\`)\n` +
                          `• \`{server}\` - The name of the server\n` + 

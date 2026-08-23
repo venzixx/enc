@@ -11,7 +11,7 @@ export default class Mcstatus extends Command {
 				usage: 'mcstatus <ip> [type]',
 				examples: ['mcstatus mc.hypixel.net']
 			},
-			category: 'info',
+			category: 'utility',
 			cooldown: 3,
 			slashCommand: true,
 			options: [

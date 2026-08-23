@@ -21,38 +21,57 @@ import { ButtonBuilder } from "discord.js";
 function getV2SetupLayout(player: Player, client: ExtendedClient, locale: string, disabled: boolean = false) {
     const currentTrack = player?.queue?.current;
     if (!currentTrack) {
-        return V2Helper.createLayout({
-            description: t(I18N.player.setupStart.nothing_playing, { lng: locale }),
-            color: client.config.color.main as ColorResolvable,
-            buttons: getButtons(player).flatMap(b => b.components as any).map(c => {
-                const btn = ButtonBuilder.from(c as any);
+        const embed = new EmbedBuilder()
+            .setDescription(t(I18N.player.setupStart.nothing_playing, { lng: locale }))
+            .setColor(client.config.color.main as ColorResolvable);
+
+        const buttonRows = getButtons(player).map(row => {
+            const newRow = new (require('discord.js').ActionRowBuilder)();
+            for (const comp of row.components) {
+                const btn = ButtonBuilder.from(comp as any);
                 btn.setDisabled(true);
-                return btn;
-            })
+                newRow.addComponents(btn);
+            }
+            return newRow;
         });
+
+        return {
+            embeds: [embed],
+            components: buttonRows
+        };
     }
 
     const requester = currentTrack.requester as any as Requester;
-    const buttons = getButtons(player).flatMap(b => b.components as any).map(c => {
-        const btn = ButtonBuilder.from(c as any);
-        btn.setDisabled(disabled);
-        return btn;
+    const buttonRows = getButtons(player).map(row => {
+        const newRow = new (require('discord.js').ActionRowBuilder)();
+        for (const comp of row.components) {
+            const btn = ButtonBuilder.from(comp as any);
+            btn.setDisabled(disabled);
+            newRow.addComponents(btn);
+        }
+        return newRow;
     });
 
-    return V2Helper.createLayout({
-        title: t(I18N.player.setupStart.now_playing, { lng: locale }),
-        description: t(I18N.player.setupStart.description, {
+    const embed = new EmbedBuilder()
+        .setAuthor({ name: t(I18N.player.setupStart.now_playing, { lng: locale }) })
+        .setDescription(t(I18N.player.setupStart.description, {
             lng: locale,
             title: currentTrack.info.title,
             uri: currentTrack.info.uri,
             author: currentTrack.info.author,
             length: client.utils.formatTime(currentTrack.info.duration),
             requester: requester?.id || "Unknown",
-        }),
-        color: client.config.color.main as ColorResolvable,
-        thumbnail: currentTrack.info.artworkUrl || undefined,
-        buttons: buttons
-    });
+        }))
+        .setColor(client.config.color.main as ColorResolvable);
+
+    if (currentTrack.info.artworkUrl) {
+        embed.setThumbnail(currentTrack.info.artworkUrl);
+    }
+
+    return {
+        embeds: [embed],
+        components: buttonRows
+    };
 }
 
 /**
@@ -77,32 +96,24 @@ async function setupStart(
 	if (m) {
 		try {
 			if (message.inGuild()) {
-				const res = await player.search({ query }, message.author);
+				const isUrl = /^(https?:\/\/)/.test(query);
+				const res = await player.search(
+					isUrl ? { query } : { query, source: "scsearch" },
+					message.author
+				);
 
 				switch (res.loadType) {
 					case "empty":
 					case "error":
 						await message.channel
-							.send(V2Helper.createLayout({
-                                description: `${client.emoji.cross} ${t(I18N.player.setupStart.error_searching, { lng: locale })}`,
-                                isAlert: true,
-                                color: client.config.color.red as ColorResolvable
-                            }) as any)
+							.send({ embeds: [new EmbedBuilder().setDescription(`${client.emoji.cross} ${t(I18N.player.setupStart.error_searching, { lng: locale })}`).setColor(client.config.color.red as ColorResolvable)] })
 							.then((msg) => setTimeout(() => msg.delete(), 5000));
 						break;
 					case "search":
 					case "track": {
 						await player.queue.add(res.tracks[0]);
 						await message.channel
-							.send(V2Helper.createLayout({
-                                description: `${client.emoji.success} ${t(I18N.player.setupStart.added_to_queue, {
-                                    lng: locale,
-                                    title: res.tracks[0].info.title,
-                                    uri: res.tracks[0].info.uri,
-                                })}`,
-                                isAlert: true,
-                                color: client.config.color.main as ColorResolvable
-                            }) as any)
+							.send({ embeds: [new EmbedBuilder().setDescription(`${client.emoji.success} ${t(I18N.player.setupStart.added_to_queue, { lng: locale, title: res.tracks[0].info.title, uri: res.tracks[0].info.uri })}`).setColor(client.config.color.main as ColorResolvable)] })
 							.then((msg) => setTimeout(() => msg.delete(), 5000));
 						
                         await m.edit(getV2SetupLayout(player, client, locale) as any).catch(() => {});
@@ -111,14 +122,7 @@ async function setupStart(
 					case "playlist": {
 						await player.queue.add(res.tracks);
 						await message.channel
-							.send(V2Helper.createLayout({
-                                description: `${client.emoji.success} ${t(I18N.player.setupStart.added_playlist_to_queue, {
-                                    lng: locale,
-                                    length: res.tracks.length,
-                                })}`,
-                                isAlert: true,
-                                color: client.config.color.main as ColorResolvable
-                            }) as any)
+							.send({ embeds: [new EmbedBuilder().setDescription(`${client.emoji.success} ${t(I18N.player.setupStart.added_playlist_to_queue, { lng: locale, length: res.tracks.length })}`).setColor(client.config.color.main as ColorResolvable)] })
 							.then((msg) => setTimeout(() => msg.delete(), 5000));
 						
                         await m.edit(getV2SetupLayout(player, client, locale) as any).catch(() => {});
@@ -184,11 +188,9 @@ async function updateSetup(client: ExtendedClient, guild: Guild, locale: string)
 }
 
 async function buttonReply(int: any, args: string, color: ColorResolvable): Promise<void> {
-    const layout = V2Helper.createLayout({
-        description: args,
-        isAlert: true,
-        color: color
-    });
+    const layout = {
+        embeds: [new EmbedBuilder().setDescription(args).setColor(color)]
+    };
 
 	let m: Message;
 	if (int.replied) {

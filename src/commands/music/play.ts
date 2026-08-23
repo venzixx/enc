@@ -87,7 +87,11 @@ export default class Play extends Command {
 
 		if (!player.connected) await player.connect();
 
-		const response = (await player.search({ query: query }, ctx.author)) as SearchResult;
+		const isUrl = /^(https?:\/\/)/.test(query);
+		const response = (await player.search(
+			isUrl ? { query: query } : { query: query, source: "scsearch" },
+			ctx.author,
+		)) as SearchResult;
 		if (!response || response.tracks?.length === 0) {
 			return await ctx.editMessageV2({
                 title: `${client.emoji.cross} Search Error`,

@@ -54,7 +54,7 @@ export default class KillContext extends Command {
                 content: `${targetUser}`,
                 embeds: [
                     client.embed()
-                        .setDescription(`⚔️ **${ctx.author.username}** killed **${targetUser.username}**!${countText}`)
+                        .setDescription(`${client.emoji.duel_swords} **${ctx.author.username}** killed **${targetUser.username}**!${countText}`)
                         .setImage(gifUrl)
                         .setColor(client.color.main)
                 ]

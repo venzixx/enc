@@ -44,6 +44,7 @@ interface CommandOptions {
 	options?: APIApplicationCommandOption[];
 	category?: string;
 	hidden?: boolean;
+	nsfw?: boolean;
 	integration_types?: ApplicationIntegrationType[];
 	contexts?: InteractionContextType[];
 }
@@ -65,6 +66,7 @@ export default class Command {
 	public options: APIApplicationCommandOption[];
 	public category: string;
 	public hidden: boolean;
+	public nsfw: boolean;
 	public integration_types: ApplicationIntegrationType[];
 	public contexts: InteractionContextType[];
 
@@ -102,6 +104,7 @@ export default class Command {
 		this.options = options.options ?? [];
 		this.category = options.category ?? "general";
 		this.hidden = options.hidden ?? false;
+		this.nsfw = options.nsfw ?? false;
 		this.integration_types = options.integration_types ?? [ApplicationIntegrationType.GuildInstall];
 		this.contexts = options.contexts ?? [InteractionContextType.Guild];
 	}

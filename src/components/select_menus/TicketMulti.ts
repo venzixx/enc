@@ -17,10 +17,26 @@ export default class TicketMulti extends Component {
         const optionId = interaction.values[0];
 
         // Fetch panel config
-        const config = await (this.client.prisma as any).ticketConfig.findUnique({
+        let config = await (this.client.prisma as any).ticketConfig.findUnique({
             where: { guildId_panelId: { guildId: interaction.guild.id, panelId: panelId } },
             include: { options: true }
         });
+
+        // Smart Fallback 1: Match by message ID
+        if (!config && interaction.message) {
+            config = await (this.client.prisma as any).ticketConfig.findFirst({
+                where: { guildId: interaction.guild.id, messageId: interaction.message.id },
+                include: { options: true }
+            });
+        }
+
+        // Smart Fallback 2: Match any multi ticket panel for this server
+        if (!config) {
+            config = await (this.client.prisma as any).ticketConfig.findFirst({
+                where: { guildId: interaction.guild.id, isMulti: true },
+                include: { options: true }
+            });
+        }
 
         if (!config || !config.isMulti) {
             return await interaction.reply({ content: `${this.client.emoji.cross} This ticket panel is no longer configured.`, ephemeral: true });

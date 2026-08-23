@@ -1,4 +1,4 @@
-import { EmbedBuilder, PermissionFlagsBits, GuildMember, Role } from 'discord.js';
+import { EmbedBuilder, PermissionFlagsBits, GuildMember, Role, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
@@ -47,9 +47,9 @@ export default class RoleCommand extends Command {
 			name: 'role',
 			aliases: ['r'],
 			description: {
-				content: 'Manage server roles (add, remove, create, delete, color, icon, and view info).',
-				usage: 'role <add/remove/create/delete/color/icon/info> [args]',
-				examples: ['role add @Member @Admin', 'role create "New Role" #FF00FF 👑', 'role icon @Admin', 'role delete @Admin']
+				content: 'Manage server roles (add, remove, create, delete, color, icon, info, exch, rename, and strip).',
+				usage: 'role <add/remove/create/delete/color/icon/info/exch/rename/strip> [args]',
+				examples: ['role add @Member @Admin', 'role strip @User', 'role exch @RoleA , @RoleB', 'role rename @VIP VIP Member', 'role color @Admin #FF00FF']
 			},
 			category: 'tools',
 			cooldown: 3,
@@ -122,34 +122,71 @@ export default class RoleCommand extends Command {
                     options: [
                         { name: 'role', description: 'The role', type: 8, required: true }
                     ]
+                },
+                {
+                    name: 'exch',
+                    description: 'Exchange/swap members between two roles (or for a specific user)',
+                    type: 1,
+                    options: [
+                        { name: 'role1', description: 'First role', type: 8, required: true },
+                        { name: 'role2', description: 'Second role', type: 8, required: true },
+                        { name: 'user', description: 'Specific member to exchange roles on (omit for server-wide exchange)', type: 6, required: false }
+                    ]
+                },
+                {
+                    name: 'rename',
+                    description: 'Rename a role',
+                    type: 1,
+                    options: [
+                        { name: 'role', description: 'The role to rename', type: 8, required: true },
+                        { name: 'name', description: 'The new name for the role', type: 3, required: true }
+                    ]
+                },
+                {
+                    name: 'inrole',
+                    description: 'View members with a specific role',
+                    type: 1,
+                    options: [
+                        { name: 'role', description: 'The role to check', type: 8, required: true }
+                    ]
+                },
+                {
+                    name: 'strip',
+                    description: 'Strip all dangerous and staff permissions/roles from a member (Admin only)',
+                    type: 1,
+                    options: [
+                        { name: 'user', description: 'The member to strip dangerous roles from', type: 6, required: true }
+                    ]
                 }
 			]
 		});
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-		// Check authorization: User must have MANAGE_ROLES permission OR be a registered developer
-		const hasPerm = ctx.member?.permissions.has(PermissionFlagsBits.ManageRoles);
-		const developer = await isDev(client, ctx.author.id);
-		const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
-		const isOwner = BOT_OWNERS.has(ctx.author.id);
+		try {
+			// Check authorization: User must have MANAGE_ROLES permission OR be a registered developer
+			const hasPerm = ctx.member?.permissions.has(PermissionFlagsBits.ManageRoles);
+			const developer = await isDev(client, ctx.author.id);
+			const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
+			const isOwner = BOT_OWNERS.has(ctx.author.id);
+			const hasAdmin = ctx.member?.permissions.has(PermissionFlagsBits.Administrator) || ctx.author.id === ctx.guild.ownerId || isOwner;
 
-		if (!hasPerm && !developer) {
-			return ctx.reply({ content: `${client.emoji.cross} You do not have permission to use this command.` });
-		}
+			if (!hasPerm && !developer && !hasAdmin) {
+				return ctx.reply({ content: `${client.emoji.cross} You do not have permission to use this command.` });
+			}
 
-		let sub: string | null = null;
-		let target: GuildMember | null = null;
-		let role: Role | null = null;
+			let sub: string | null = null;
+			let target: GuildMember | null = null;
+			let role: Role | null = null;
 
-		if (ctx.interaction) {
-			await ctx.deferReply();
-			sub = ctx.options.getSubcommand();
-		} else {
-			sub = args[0]?.toLowerCase();
-		}
+			if (ctx.interaction) {
+				await ctx.deferReply();
+				sub = ctx.options.getSubcommand();
+			} else {
+				sub = args[0]?.toLowerCase();
+			}
 
-        if (!sub) return ctx.reply({ content: `Usage: \`${ctx.prefix}role <add/remove/create/delete/color/icon/info>\`` });
+			if (!sub) return ctx.reply({ content: `Usage: \`${ctx.prefix}role <add/remove/create/delete/color/icon/info/inrole/exch/rename>\`` });
 
         // Helper to resolve role by ID, exact name, or partial name
         const resolveRole = (query: string): Role | null => {
@@ -620,5 +657,474 @@ export default class RoleCommand extends Command {
 
             return ctx.reply({ embeds: [embed] });
         }
+
+        // Handle Exch / Swap / Exchange
+        if (sub === 'exch' || sub === 'swap' || sub === 'exchange') {
+            let targetMember: GuildMember | null = null;
+            let role1: Role | null = null;
+            let role2: Role | null = null;
+            let isServerWide = false;
+
+            if (ctx.interaction) {
+                targetMember = ctx.options.getMember('user') as GuildMember | null;
+                role1 = ctx.options.getRole('role1') as Role;
+                role2 = ctx.options.getRole('role2') as Role;
+                isServerWide = !targetMember;
+            } else {
+                // Check if first arg or user mention is a GuildMember
+                const firstArg = args[1];
+                let memberArg: GuildMember | null = null;
+
+                if (ctx.message?.mentions.members && ctx.message.mentions.members.size > 0) {
+                    memberArg = ctx.message.mentions.members.first()!;
+                } else if (firstArg && !['all', 'server', 'everyone'].includes(firstArg.toLowerCase())) {
+                    memberArg = await Resolver.resolveMember(ctx, firstArg);
+                }
+
+                if (memberArg) {
+                    targetMember = memberArg;
+                    // Filter out member mention / ID from args
+                    const rawRolesString = args.slice(1).filter(a => {
+                        const cleanA = a.replace(/[<@!>]*/g, '');
+                        return cleanA !== memberArg!.id && cleanA !== memberArg!.user.id;
+                    }).join(' ').trim();
+
+                    if (rawRolesString.includes(',')) {
+                        const parts = rawRolesString.split(',').map(p => p.trim());
+                        role1 = resolveRole(parts[0]);
+                        role2 = resolveRole(parts[1]);
+                    } else {
+                        const roleMentions = ctx.message?.mentions.roles;
+                        if (roleMentions && roleMentions.size >= 2) {
+                            const arr = Array.from(roleMentions.values());
+                            role1 = arr[0];
+                            role2 = arr[1];
+                        } else {
+                            const rArgs = rawRolesString.split(/\s+/).filter(Boolean);
+                            if (rArgs.length >= 2) {
+                                role1 = resolveRole(rArgs[0]);
+                                role2 = resolveRole(rArgs.slice(1).join(' '));
+                                if (!role1 || !role2) {
+                                    const mid = Math.floor(rArgs.length / 2);
+                                    role1 = resolveRole(rArgs.slice(0, mid).join(' '));
+                                    role2 = resolveRole(rArgs.slice(mid).join(' '));
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    const firstWord = args[1]?.toLowerCase();
+                    if (firstWord === 'all' || firstWord === 'server' || firstWord === 'everyone') {
+                        isServerWide = true;
+                        const rawAfterExch = args.slice(2).join(' ').trim();
+                        if (rawAfterExch.includes(',')) {
+                            const parts = rawAfterExch.split(',').map(p => p.trim());
+                            role1 = resolveRole(parts[0]);
+                            role2 = resolveRole(parts[1]);
+                        } else {
+                            const mentions = ctx.message?.mentions.roles;
+                            if (mentions && mentions.size >= 2) {
+                                const arr = Array.from(mentions.values());
+                                role1 = arr[0];
+                                role2 = arr[1];
+                            } else {
+                                const exchArgs = args.slice(2);
+                                if (exchArgs.length >= 2) {
+                                    role1 = resolveRole(exchArgs[0]);
+                                    role2 = resolveRole(exchArgs.slice(1).join(' '));
+                                    if (!role1 || !role2) {
+                                        const mid = Math.floor(exchArgs.length / 2);
+                                        role1 = resolveRole(exchArgs.slice(0, mid).join(' '));
+                                        role2 = resolveRole(exchArgs.slice(mid).join(' '));
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Guard: User did not specify member and did not type 'all'
+                        return ctx.reply({
+                            content: `${client.emoji.cross} **Please specify a target member or use \`all\` for a server-wide exchange:**\n\n` +
+                                `• **Single User Swap:** \`${ctx.prefix}role exch @User <role1> , <role2>\`\n` +
+                                `• **Entire Server Swap:** \`${ctx.prefix}role exch all <role1> , <role2>\``
+                        });
+                    }
+                }
+            }
+
+            if (!role1 || !role2) {
+                return ctx.reply({ content: `${client.emoji.cross} Please specify two valid roles to exchange.\n**Usage:** \`${ctx.prefix}role exch @User <role1> , <role2>\` or \`${ctx.prefix}role exch all <role1> , <role2>\`` });
+            }
+
+            if (role1.id === role2.id) {
+                return ctx.reply({ content: `${client.emoji.cross} Cannot exchange a role with itself.` });
+            }
+
+            // Developer / Hierarchy checks
+            if (developer && !hasPerm && !isOwner && (role1.permissions.has(PermissionFlagsBits.Administrator) || role2.permissions.has(PermissionFlagsBits.Administrator))) {
+                return ctx.reply({ content: `${client.emoji.cross} Developer bypass is not allowed to manage roles with Administrator permissions.` });
+            }
+
+            const isGuildOwnerExch = ctx.author.id === ctx.guild.ownerId;
+            if (!isGuildOwnerExch && !isOwner) {
+                if (role1.position >= ctx.member!.roles.highest.position) {
+                    return ctx.reply({ content: `${client.emoji.cross} You cannot exchange role **${role1.name}** because it is higher than or equal to your highest role.` });
+                }
+                if (role2.position >= ctx.member!.roles.highest.position) {
+                    return ctx.reply({ content: `${client.emoji.cross} You cannot exchange role **${role2.name}** because it is higher than or equal to your highest role.` });
+                }
+            }
+
+            const mePosExch = (ctx.guild.members.me as GuildMember).roles.highest.position;
+            if (role1.position >= mePosExch || role2.position >= mePosExch) {
+                return ctx.reply({ content: `${client.emoji.cross} My role is too low to manage one of these roles.` });
+            }
+
+            if (targetMember) {
+                // Exchange roles on target member
+                const hasRole1 = targetMember.roles.cache.has(role1.id);
+                const hasRole2 = targetMember.roles.cache.has(role2.id);
+
+                if (hasRole1) {
+                    await targetMember.roles.remove(role1).catch(() => {});
+                    await targetMember.roles.add(role2).catch(() => {});
+                } else if (hasRole2) {
+                    await targetMember.roles.remove(role2).catch(() => {});
+                    await targetMember.roles.add(role1).catch(() => {});
+                } else {
+                    await targetMember.roles.add(role2).catch(() => {});
+                }
+
+                const embed = new EmbedBuilder()
+                    .setTitle('Member Roles Exchanged')
+                    .setDescription(`${client.emoji.success} Successfully exchanged roles for **${targetMember.user.tag}**:\nSwapped **${role1.name}** (<@&${role1.id}>) ➔ **${role2.name}** (<@&${role2.id}>).`)
+                    .setColor(client.color.main)
+                    .setTimestamp();
+
+                return ctx.reply({ embeds: [embed] });
+            } else {
+                // Server-wide member swap between role1 and role2
+                await ctx.guild.members.fetch().catch(() => {});
+
+                const members1 = Array.from(role1.members.values());
+                const members2 = Array.from(role2.members.values());
+
+                let count = 0;
+                for (const m of members1) {
+                    if (!m.roles.cache.has(role2.id)) {
+                        await m.roles.add(role2).catch(() => {});
+                        await m.roles.remove(role1).catch(() => {});
+                        count++;
+                    }
+                }
+                for (const m of members2) {
+                    if (!m.roles.cache.has(role1.id)) {
+                        await m.roles.add(role1).catch(() => {});
+                        await m.roles.remove(role2).catch(() => {});
+                        count++;
+                    }
+                }
+
+                const embed = new EmbedBuilder()
+                    .setTitle('Server Roles Exchanged')
+                    .setDescription(`${client.emoji.success} Successfully exchanged members between **${role1.name}** (<@&${role1.id}>) and **${role2.name}** (<@&${role2.id}>).\nUpdated **${count}** members.`)
+                    .setColor(client.color.main)
+                    .setTimestamp();
+
+                return ctx.reply({ embeds: [embed] });
+            }
+        }
+
+        // Handle Rename / Name
+        if (sub === 'rename' || sub === 'name') {
+            let roleToRename: Role | null = null;
+            let newName = '';
+
+            if (ctx.interaction) {
+                roleToRename = ctx.options.getRole('role') as Role;
+                newName = ctx.options.getString('name')!;
+            } else {
+                const rawAfterRename = args.slice(1).join(' ').trim();
+                if (rawAfterRename.includes(',')) {
+                    const parts = rawAfterRename.split(',').map(p => p.trim());
+                    roleToRename = resolveRole(parts[0]);
+                    newName = parts.slice(1).join(', ').trim();
+                } else {
+                    const mentions = ctx.message?.mentions.roles;
+                    if (mentions && mentions.size > 0) {
+                        roleToRename = mentions.first()!;
+                        newName = args.slice(1).filter(a => !a.includes(roleToRename!.id)).join(' ').trim();
+                    } else if (args.length >= 3) {
+                        roleToRename = resolveRole(args[1]);
+                        newName = args.slice(2).join(' ').trim();
+                    } else if (args.length === 2) {
+                        roleToRename = resolveRole(args[1]);
+                    }
+                }
+            }
+
+            if (!roleToRename || !newName) {
+                return ctx.reply({ content: `${client.emoji.cross} Usage: \`${ctx.prefix}role rename <role> <new_name>\` or \`${ctx.prefix}r rename @Role , New Name\`` });
+            }
+
+            if (developer && !hasPerm && !isOwner && roleToRename.permissions.has(PermissionFlagsBits.Administrator)) {
+                return ctx.reply({ content: `${client.emoji.cross} Developer bypass is not allowed to manage roles with Administrator permissions.` });
+            }
+
+            const isGuildOwnerRename = ctx.author.id === ctx.guild.ownerId;
+            if (!isGuildOwnerRename && !isOwner && roleToRename.position >= ctx.member!.roles.highest.position) {
+                return ctx.reply({ content: `${client.emoji.cross} You cannot rename a role higher than or equal to your highest role.` });
+            }
+            if (roleToRename.position >= (ctx.guild.members.me as GuildMember).roles.highest.position) {
+                return ctx.reply({ content: `${client.emoji.cross} My role is too low to rename this role.` });
+            }
+
+            const oldName = roleToRename.name;
+            try {
+                await roleToRename.setName(newName, `Renamed by ${ctx.author.tag}`);
+                return ctx.reply({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setTitle('Role Renamed')
+                            .setDescription(`${client.emoji.success} Renamed role **${oldName}** to **${newName}** (<@&${roleToRename.id}>).`)
+                            .setColor(roleToRename.color || client.color.main)
+                            .setTimestamp()
+                    ]
+                });
+            } catch (err: any) {
+                return ctx.reply({ content: `${client.emoji.cross} Failed to rename role: ${err.message}` });
+            }
+        }
+
+        // Handle Inrole / Members
+        if (sub === 'inrole' || sub === 'members') {
+            let roleToCheck: Role | null = null;
+            if (ctx.interaction) {
+                roleToCheck = ctx.options.getRole('role') as Role;
+            } else {
+                const roleQuery = args.slice(1).join(' ');
+                roleToCheck = resolveRole(roleQuery);
+            }
+
+            if (!roleToCheck) {
+                return ctx.reply({ content: `${client.emoji.cross} Could not find that role. Usage: \`${ctx.prefix}role inrole <role>\`` });
+            }
+
+            await ctx.guild.members.fetch().catch(() => {});
+            const members = roleToCheck.members.sort((a, b) => a.displayName.localeCompare(b.displayName));
+            const count = members.size;
+
+            if (count === 0) {
+                const embed = new EmbedBuilder()
+                    .setTitle(`Members with ${roleToCheck.name} [0]`)
+                    .setDescription('No members have this role.')
+                    .setColor(roleToCheck.color || client.color.main)
+                    .setTimestamp();
+                return ctx.reply({ embeds: [embed] });
+            }
+
+            const membersArray = [...members.values()];
+            const perPage = 30;
+            const totalPages = Math.ceil(membersArray.length / perPage);
+            let currentPage = 0;
+
+            const buildEmbed = (page: number) => {
+                const start = page * perPage;
+                const end = Math.min(start + perPage, membersArray.length);
+                const pageMembers = membersArray.slice(start, end);
+                const lines = pageMembers.map((m: any) => `<@${m.user.id}> (${m.user.username})`);
+
+                return new EmbedBuilder()
+                    .setTitle(`Members with ${roleToCheck.name} [${count}]`)
+                    .setDescription(lines.join('\n'))
+                    .setColor(roleToCheck.color || client.color.main)
+                    .setFooter({ text: `Page ${page + 1} of ${totalPages} • Total: ${count} members` })
+                    .setTimestamp();
+            };
+
+            const buildButtons = (page: number) => {
+                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder().setCustomId("inrole_first").setEmoji("⏮").setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+                    new ButtonBuilder().setCustomId("inrole_prev").setEmoji("◀").setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+                    new ButtonBuilder().setCustomId("inrole_page").setLabel(`${page + 1}/${totalPages}`).setStyle(ButtonStyle.Primary).setDisabled(true),
+                    new ButtonBuilder().setCustomId("inrole_next").setEmoji("▶").setStyle(ButtonStyle.Secondary).setDisabled(page === totalPages - 1),
+                    new ButtonBuilder().setCustomId("inrole_last").setEmoji("⏭").setStyle(ButtonStyle.Secondary).setDisabled(page === totalPages - 1)
+                );
+                return [row];
+            };
+
+            const embed = buildEmbed(currentPage);
+            const components = totalPages > 1 ? buildButtons(currentPage) : [];
+
+            await ctx.reply({ embeds: [embed], components });
+
+            if (totalPages > 1 && ctx.channel && 'createMessageComponentCollector' in ctx.channel) {
+                const collector = ctx.channel.createMessageComponentCollector({
+                    componentType: ComponentType.Button,
+                    time: 120000,
+                    filter: (i: any) => i.user.id === ctx.author.id && i.customId.startsWith('inrole_')
+                });
+
+                collector.on('collect', async (i: any) => {
+                    await i.deferUpdate().catch(() => {});
+                    if (i.customId === "inrole_first") currentPage = 0;
+                    else if (i.customId === "inrole_prev") currentPage = Math.max(0, currentPage - 1);
+                    else if (i.customId === "inrole_next") currentPage = Math.min(totalPages - 1, currentPage + 1);
+                    else if (i.customId === "inrole_last") currentPage = totalPages - 1;
+
+                    await ctx.editMessage({
+                        embeds: [buildEmbed(currentPage)],
+                        components: buildButtons(currentPage),
+                    }).catch(() => {});
+                });
+            }
+
+            return;
+        }
+
+        // Handle Strip (Admin only)
+        if (sub === 'strip') {
+            const isAdmin = ctx.member?.permissions.has(PermissionFlagsBits.Administrator) || ctx.author.id === ctx.guild.ownerId || isOwner || developer;
+            if (!isAdmin) {
+                return ctx.reply({ content: `${client.emoji.cross} Only administrators can use the \`role strip\` command.` });
+            }
+
+            if (ctx.interaction) {
+                target = ctx.options.getMember('user') as GuildMember;
+            } else {
+                target = await Resolver.resolveMember(ctx, args[1]);
+            }
+
+            if (!target) {
+                return ctx.reply({ content: `${client.emoji.cross} Could not find that member in this server. Usage: \`${ctx.prefix}role strip <user>\`` });
+            }
+
+            if (target.id === ctx.guild.ownerId) {
+                return ctx.reply({ content: `${client.emoji.cross} You cannot strip roles from the server owner.` });
+            }
+
+            if (target.id === ctx.author.id && !isOwner) {
+                return ctx.reply({ content: `${client.emoji.cross} You cannot strip roles from yourself.` });
+            }
+
+            const isCallerGuildOwner = ctx.author.id === ctx.guild.ownerId;
+            if (!isCallerGuildOwner && !isOwner && target.roles.highest.position >= ctx.member!.roles.highest.position) {
+                return ctx.reply({ content: `${client.emoji.cross} Hierarchy Violation: You cannot strip roles from someone with an equal or higher role than you.` });
+            }
+
+            const DANGEROUS_PERMS = [
+                { flag: PermissionFlagsBits.Administrator, label: 'Administrator' },
+                { flag: PermissionFlagsBits.ManageGuild, label: 'Manage Server' },
+                { flag: PermissionFlagsBits.ManageRoles, label: 'Manage Roles' },
+                { flag: PermissionFlagsBits.ManageChannels, label: 'Manage Channels' },
+                { flag: PermissionFlagsBits.KickMembers, label: 'Kick Members' },
+                { flag: PermissionFlagsBits.BanMembers, label: 'Ban Members' },
+                { flag: PermissionFlagsBits.ModerateMembers, label: 'Timeout/Mute' },
+                { flag: PermissionFlagsBits.ManageMessages, label: 'Manage Messages' },
+                { flag: PermissionFlagsBits.ManageWebhooks, label: 'Manage Webhooks' },
+                { flag: PermissionFlagsBits.ManageGuildExpressions, label: 'Manage Emojis/Stickers' },
+                { flag: PermissionFlagsBits.MentionEveryone, label: 'Mention Everyone' },
+                { flag: PermissionFlagsBits.ViewAuditLog, label: 'View Audit Log' },
+                { flag: PermissionFlagsBits.ManageEvents, label: 'Manage Events' },
+                { flag: PermissionFlagsBits.ManageThreads, label: 'Manage Threads' },
+                { flag: PermissionFlagsBits.MuteMembers, label: 'Voice Mute' },
+                { flag: PermissionFlagsBits.DeafenMembers, label: 'Voice Deafen' },
+                { flag: PermissionFlagsBits.MoveMembers, label: 'Voice Move' },
+            ];
+
+            const botMember = ctx.guild.members.me as GuildMember;
+            const botHighest = botMember.roles.highest.position;
+
+            const dangerousRolesToRemove: { role: Role; perms: string[] }[] = [];
+            const unmanageableDangerousRoles: { role: Role; perms: string[] }[] = [];
+            const safeRolesKept: Role[] = [];
+
+            for (const [, memberRole] of target.roles.cache) {
+                if (memberRole.id === ctx.guild.id) continue; // skip @everyone
+
+                const permsFound = DANGEROUS_PERMS
+                    .filter(p => memberRole.permissions.has(p.flag))
+                    .map(p => p.label);
+
+                if (permsFound.length > 0) {
+                    if (memberRole.managed || memberRole.position >= botHighest) {
+                        unmanageableDangerousRoles.push({ role: memberRole, perms: permsFound });
+                    } else {
+                        dangerousRolesToRemove.push({ role: memberRole, perms: permsFound });
+                    }
+                } else {
+                    safeRolesKept.push(memberRole);
+                }
+            }
+
+            if (dangerousRolesToRemove.length === 0 && unmanageableDangerousRoles.length === 0) {
+                return ctx.reply({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setTitle('🛡️ Role Strip Check')
+                            .setDescription(`**${target.user.tag}** has no dangerous or staff permissions.\n\nAll **${safeRolesKept.length}** normal role(s) remain untouched.`)
+                            .setColor(client.color.main)
+                            .setFooter({ text: `Requested by ${ctx.author.tag}` })
+                            .setTimestamp()
+                    ]
+                });
+            }
+
+            if (dangerousRolesToRemove.length > 0) {
+                await target.roles.remove(
+                    dangerousRolesToRemove.map(r => r.role),
+                    `Dangerous roles stripped by admin ${ctx.author.tag}`
+                );
+            }
+
+            const embed = new EmbedBuilder()
+                .setTitle('🛡️ Dangerous Roles Stripped')
+                .setDescription(`Processed role strip for **${target.user.tag}** (${target.id})`)
+                .setColor(dangerousRolesToRemove.length > 0 ? client.color.main : client.color.red)
+                .setFooter({ text: `Stripped by ${ctx.author.tag}` })
+                .setTimestamp();
+
+            if (dangerousRolesToRemove.length > 0) {
+                const removedText = dangerousRolesToRemove
+                    .map(r => `• <@&${r.role.id}> (\`${r.perms.slice(0, 3).join(', ')}${r.perms.length > 3 ? ` +${r.perms.length - 3} more` : ''}\`)`)
+                    .join('\n');
+                embed.addFields({
+                    name: `❌ Stripped Roles (${dangerousRolesToRemove.length})`,
+                    value: removedText.length > 1024 ? removedText.slice(0, 1020) + '...' : removedText
+                });
+            }
+
+            if (unmanageableDangerousRoles.length > 0) {
+                const unmanagedText = unmanageableDangerousRoles
+                    .map(r => `• <@&${r.role.id}> (${r.role.managed ? 'Managed Role' : 'Above Bot Role'})`)
+                    .join('\n');
+                embed.addFields({
+                    name: `⚠️ Could Not Remove (${unmanageableDangerousRoles.length})`,
+                    value: unmanagedText.length > 1024 ? unmanagedText.slice(0, 1020) + '...' : unmanagedText
+                });
+            }
+
+            const keptText = safeRolesKept.length > 0
+                ? safeRolesKept.map(r => `<@&${r.id}>`).join(', ')
+                : 'None';
+            embed.addFields({
+                name: `✅ Kept Normal Roles (${safeRolesKept.length})`,
+                value: keptText.length > 1024 ? keptText.slice(0, 1020) + '...' : keptText
+            });
+
+            return ctx.reply({ embeds: [embed] });
+        }
+
+        return ctx.reply({ content: `${client.emoji.cross} Unknown subcommand \`${sub}\`. Usage: \`${ctx.prefix}role <add/remove/create/delete/color/icon/info/inrole/exch/rename/strip>\`` });
+    } catch (err: any) {
+        console.error('[RoleCommand Error]:', err);
+        return ctx.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle('Error Executing Command')
+                    .setDescription(`${client.emoji.cross} An error occurred: \`${err.message || err}\``)
+                    .setColor(client.color.red)
+            ]
+        }).catch(() => {});
+    }
 	}
 }

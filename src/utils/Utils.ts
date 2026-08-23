@@ -40,6 +40,47 @@ export default class Utils {
 	}
 }
 
+export function formatToMathematicalScript(text: string): string {
+    if (!text) return text;
+
+    const mathScriptMap: Record<number, string> = {
+        0x0282: "\u{1D4C8}", // ʂ -> 𝓈
+        0x0196: "\u{1D4C1}", // Ɩ -> 𝓁
+        0x025B: "\u{212F}", // ɛ -> ℯ (Mathematical Script Small e)
+        0x01A5: "\u{1D4C5}", // ƥ -> 𝓅
+        0x01B4: "\u{1D4CE}", // ყ -> 𝓎
+        0x10E7: "\u{1D4CE}", // ყ -> 𝓎
+        0x2118: "\u{1D4C5}", // ℘ -> 𝓅
+        0x03B1: "\u{1D4B6}", // α -> 𝒶
+        0x03B2: "\u{1D4B7}", // β -> 𝒷
+        0x03B4: "\u{1D4B9}", // δ -> 𝒹
+        0x03B7: "\u{1D4C3}", // η -> 𝓃
+        0x03B8: "\u{1D4C4}", // θ -> ℴ
+        0x03B9: "\u{1D4BE}", // ι -> 𝒾
+        0x03BA: "\u{1D4C0}", // κ -> 𝓀
+        0x03BC: "\u{1D4CA}", // μ -> 𝓊
+        0x03BD: "\u{1D4CB}", // ν -> 𝓋
+        0x03C1: "\u{1D4C5}", // ρ -> 𝓅
+        0x03C3: "\u{1D4C8}", // σ -> 𝓈
+        0x03C4: "\u{1D4C9}", // τ -> 𝓉
+        0x03C5: "\u{1D4CA}", // υ -> 𝓊
+        0x03C9: "\u{1D4CC}", // ω -> 𝓌
+    };
+
+    let result = '';
+    for (const char of text) {
+        const code = char.codePointAt(0);
+        if (code === undefined) continue;
+        if (code >= 0x13000 && code <= 0x1342F) continue; // Egyptian Hieroglyphs
+        if (mathScriptMap[code]) {
+            result += mathScriptMap[code];
+        } else {
+            result += char;
+        }
+    }
+    return result;
+}
+
 export function cleanFancyText(text: string): string {
 	if (!text) return text;
 	
@@ -160,14 +201,52 @@ export function cleanFancyText(text: string): string {
 		0x0422: 'T', // Т
 		0x0425: 'X', // Х
 		0x0423: 'Y', // У
+
+		// Latin Extended-A/B & IPA Extensions lookalikes
+		0x0282: 's', // ʂ
+		0x0196: 'l', // Ɩ
+		0x025B: 'e', // ɛ
+		0x01A5: 'p', // ƥ
+		0x01B4: 'y', // ყ
+		0x10E7: 'y', // ყ (Georgian Yan)
+		0x2308: '[', // ⌈
+		0x2309: ']', // ⌉
+		0x230A: '[', // ⌊
+		0x230B: ']', // ⌋
+		0x0289: 'u', // ʉ
+		0x028A: 'u', // ʊ
+		0x028B: 'v', // ʋ
+		0x028C: 'v', // ʌ
+		0x028D: 'w', // ʍ
+		0x028E: 'y', // ʎ
+		0x028F: 'y', // ʏ
+		0x0290: 'z', // ʐ
+		0x0291: 'z', // ʑ
+		0x0292: 'z', // ʒ
 	};
 
 	let result = '';
 	for (const char of text) {
 		const code = char.codePointAt(0);
 		if (code === undefined) {
-			result += char;
 			continue;
+		}
+
+		// Skip obscure Unicode symbol blocks that lack glyphs in canvas (Egyptian Hieroglyphs, Cuneiform, Glagolitic, etc.)
+		if (
+			(code >= 0x10000 && code <= 0x1F2FF && !(code >= 0x1D400 && code <= 0x1D7FF)) ||
+			(code >= 0x1F000 && code <= 0x1F02F)
+		) {
+			// Allow standard Emoji ranges
+			const isEmoji = (
+				(code >= 0x1F300 && code <= 0x1F9FF) ||
+				(code >= 0x1FA00 && code <= 0x1FAFF) ||
+				(code >= 0x2600 && code <= 0x27BF) ||
+				(code >= 0x2300 && code <= 0x23FF)
+			);
+			if (!isEmoji) {
+				continue;
+			}
 		}
 
 		// Check the custom charMap first for Letterlike / Greek / Cyrillic lookalikes

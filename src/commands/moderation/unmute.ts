@@ -8,6 +8,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
+import { CaseManager } from '../../utils/CaseManager';
 
 export default class Unmute extends Command {
 	constructor(client: ExtendedClient) {
@@ -58,23 +59,46 @@ export default class Unmute extends Command {
 			return await ctx.reply({ content: `${client.emoji.cross} You cannot unmute someone with a higher or equal role.`, flags: [64] });
 		}
 
-		if (!target.communicationDisabledUntilTimestamp) {
-			return await ctx.reply({ content: `${client.emoji.cross} This user is not timed out.`, flags: [64] });
-		}
+		const hasTimeout = Boolean(target.communicationDisabledUntilTimestamp);
 
 		try {
-			await target.timeout(null, `Unmuted by ${ctx.author.tag}: ${reason}`);
+            // 1. Remove timeout if active
+			if (hasTimeout) {
+                await target.timeout(null, `Unmuted by ${ctx.author.tag}: ${reason}`);
+            }
 			
+            // 2. Restore any admin roles that were temporarily removed during force mute
+            const restoredRoles = await CaseManager.restoreMutedRoles(client, ctx.guild!, target.id);
+
+            if (!hasTimeout && restoredRoles.length === 0) {
+                return await ctx.reply({ content: `${client.emoji.cross} This user is not timed out and has no pending roles to restore.`, flags: [64] });
+            }
+
+            // 3. Create moderation case
+            const newCase = await CaseManager.createCase(client, {
+                guild: ctx.guild!,
+                type: 'UNMUTE',
+                target: target.user,
+                moderator: ctx.author,
+                reason
+            });
+
+            const restoredText = restoredRoles.length > 0
+                ? `\n**Restored Role(s):** ${restoredRoles.map(r => `\`${r}\``).join(', ')}`
+                : '';
+
 			const embed = new EmbedBuilder()
 				.setTitle(`${client.emoji.volmore} Member Unmuted`)
-				.setDescription(`**${target.user.tag}**'s timeout has been removed.`)
-				.addFields({ name: `${client.emoji.mic} Reason`, value: reason })
+				.setDescription(`**${target.user.tag}** has been unmuted.${restoredText}`)
+				.addFields(
+                    { name: 'Case', value: `\`#${newCase.caseNumber}\``, inline: true },
+                    { name: `${client.emoji.mic} Reason`, value: reason }
+                )
 				.setColor(client.color.main)
+                .setFooter({ text: `Case #${newCase.caseNumber}` })
 				.setTimestamp();
 
 			await ctx.reply({ embeds: [embed] });
-
-            await logModerationAction(client, ctx.guild, 'UNMUTE', ctx.author, target.user, reason);
 		} catch (error: any) {
 			await ctx.reply({ content: `${client.emoji.cross} Failed to unmute: ${error.message}`, flags: [64] });
 		}

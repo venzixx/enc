@@ -53,8 +53,8 @@ export default class Help extends Command {
 		const lines: string[] = [
 			command.description.content,
 			'',
-			`${client.emoji.edit} **Module** · \`${command.category}\`　　${client.emoji.clock} **Cooldown** · \`${command.cooldown}s\``,
-			`${client.emoji.info} **Usage** · \`/${command.name} ${command.description.usage}\``,
+			`${client.emoji.tool_wrench} **Module** · \`${command.category}\`　　${client.emoji.clock_time} **Cooldown** · \`${command.cooldown}s\``,
+			`${client.emoji.system_info} **Usage** · \`/${command.name} ${command.description.usage}\``,
 		];
 
 		// Subcommands
@@ -94,7 +94,7 @@ export default class Help extends Command {
 			buttons: [
 				new ButtonBuilder()
 					.setCustomId('help_back')
-					.setEmoji(client.emoji.page.back)
+					.setEmoji(client.emoji.page.back.match(/\d+/)?.[0] || '⬅️')
 					.setLabel('Back')
 					.setStyle(ButtonStyle.Secondary)
 			]
@@ -116,19 +116,22 @@ export default class Help extends Command {
 			const count = visibleCommands.filter(c => c.category === cat).size;
 			const emoji = Help.getCategoryEmoji(cat, client);
 			const name = cat.charAt(0).toUpperCase() + cat.slice(1);
-			return `${emoji} **${name}** · ${count} commands`;
+			return `${emoji} **${name}** · \`${count} cmds\``;
 		});
 
 		const menu = new StringSelectMenuBuilder()
 			.setCustomId('help_category')
-			.setPlaceholder('📂 Browse a module...')
+			.setPlaceholder('Browse a module...')
 			.addOptions(
-				categories.map(cat => ({
-					label: cat.charAt(0).toUpperCase() + cat.slice(1),
-					value: cat,
-					description: `View ${visibleCommands.filter(c => c.category === cat).size} commands`,
-					emoji: Help.getCategoryEmoji(cat, client)
-				}))
+				categories.map(cat => {
+					const emojiResolvable = Help.getCategoryMenuEmoji(cat, client);
+					return {
+						label: cat.charAt(0).toUpperCase() + cat.slice(1),
+						value: cat,
+						description: `Explore ${visibleCommands.filter(c => c.category === cat).size} commands in ${cat}`,
+						emoji: emojiResolvable
+					};
+				})
 			);
 
 		const buttons = [
@@ -139,10 +142,10 @@ export default class Help extends Command {
 		];
 
 		return {
-			title: `**Enc** · Command Hub`,
+			title: `${client.emoji.system_bot} Enc · Command Hub`,
 			description: [
-				`Browse **${totalCommands}** commands across **${categories.length}** modules.`,
-				`Select a module below or use \`/help <command>\` for details.`,
+				`Explore **${totalCommands}** commands across **${categories.length}** modules.`,
+				`Select a module below or use \`/help <command>\` for detailed syntax.`,
 				'',
 				categoryLines.join('\n'),
 			].join('\n'),
@@ -202,7 +205,7 @@ export default class Help extends Command {
 			buttons: [
 				new ButtonBuilder()
 					.setCustomId('help_back')
-					.setEmoji(client.emoji.page.back)
+					.setEmoji(client.emoji.page.back.match(/\d+/)?.[0] || '⬅️')
 					.setLabel('Back')
 					.setStyle(ButtonStyle.Secondary)
 			]
@@ -211,25 +214,31 @@ export default class Help extends Command {
 
 	public static getCategoryEmoji(category: string, client: ExtendedClient): string {
 		switch(category.toLowerCase()) {
-			case 'general': return client.emoji.info;
-			case 'info': return client.emoji.info;
-			case 'moderation': return client.emoji.shield;
-			case 'music': return client.emoji.music;
-			case 'fun': return client.emoji.random;
-			case 'tools': return client.emoji.edit;
-			case 'systems': return client.emoji.edit;
-			case 'voice': return client.emoji.mic;
-			case 'config': return client.emoji.edit;
+			case 'general': return client.emoji.system_info;
+			case 'info': return client.emoji.system_info;
+			case 'moderation': return client.emoji.mod_ban;
+			case 'music': return client.emoji.music_headphones;
+			case 'fun': return client.emoji.fun_game;
+			case 'tools': return client.emoji.tool_wrench;
+			case 'systems': return client.emoji.system_cpu;
+			case 'voice': return client.emoji.vc_create;
+			case 'config': return client.emoji.vc_settings;
 			case 'management': return client.emoji.user;
-			case 'utility': return client.emoji.edit;
-			case 'social': return client.emoji.user;
-			case 'owner': return client.emoji.rank;
-			case 'tickets': return client.emoji.edit;
-			case 'leveling': return client.emoji.rank;
-			case 'giveaway': return client.emoji.random;
-			case 'marriage': return client.emoji.user;
-			case 'dev': return client.emoji.hammer;
-			default: return client.emoji.info;
+			case 'utility': return client.emoji.search_glass;
+			case 'social': return client.emoji.marriage_heart;
+			case 'owner': return client.emoji.crown_owner;
+			case 'tickets': return client.emoji.ticket_pass;
+			case 'leveling': return client.emoji.level_trophy;
+			case 'giveaway': return client.emoji.giveaway_gift;
+			case 'marriage': return client.emoji.marriage_ring;
+			case 'dev': return client.emoji.system_bot;
+			default: return client.emoji.folder_module;
 		}
+	}
+
+	public static getCategoryMenuEmoji(category: string, client: ExtendedClient): string {
+		const str = Help.getCategoryEmoji(category, client);
+		const idMatch = str.match(/\d+/)?.[0];
+		return idMatch || str;
 	}
 }

@@ -71,7 +71,11 @@ export default class Search extends Command {
 
 		if (!player.connected) await player.connect();
 
-		const res = await (player as any).search({ query }, ctx.author);
+		const isUrl = /^(https?:\/\/)/.test(query);
+		const res = await (player as any).search(
+			isUrl ? { query } : { query, source: "scsearch" },
+			ctx.author,
+		);
 
 		if (res.loadType === "empty" || res.loadType === "error") {
 			return await ctx.sendMessage({

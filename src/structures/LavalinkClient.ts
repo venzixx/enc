@@ -25,6 +25,7 @@ export class LavalinkClient extends LavalinkManager {
 				clientData: {
 					name: client.user?.username || "Enc",
 				},
+				defaultSearchPlatform: "scsearch",
 			} as any,
 		} as any);
 		this.client = client;

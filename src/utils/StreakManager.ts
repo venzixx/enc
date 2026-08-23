@@ -164,9 +164,9 @@ export class StreakManager {
                             if (tierAny.message) {
                                 content = resolveTemplate(tierAny.message);
                             } else if (isNew) {
-                                content = `🔥 **${user.username}** started a **${tier.name}** streak! (Threshold: ${tier.threshold} msgs/day)`;
+                                content = `${client.emoji.streak_fire} **${user.username}** started a **${tier.name}** streak! (Threshold: ${tier.threshold} msgs/day)`;
                             } else if (isMaintained) {
-                                content = `🔥 **${user.username}** maintained their **${tier.name}** streak for **${newStreakCount} days**!`;
+                                content = `${client.emoji.streak_fire} **${user.username}** maintained their **${tier.name}** streak for **${newStreakCount} days**!`;
                             } else {
                                 continue;
                             }

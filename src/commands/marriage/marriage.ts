@@ -1,7 +1,8 @@
-import { ApplicationCommandOptionType } from 'discord.js';
+import { ApplicationCommandOptionType, ApplicationIntegrationType, InteractionContextType } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { marriageHelper } from './marriageHelper';
+import { Resolver } from '../../utils/Resolver';
 
 export default class Marriage extends Command {
     constructor(client: ExtendedClient) {
@@ -25,6 +26,8 @@ export default class Marriage extends Command {
             category: 'marriage',
             cooldown: 3,
             slashCommand: true,
+            integration_types: [ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall],
+            contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],
             options: [
                 {
                     name: 'marry',
@@ -179,14 +182,14 @@ export default class Marriage extends Command {
 
         switch (sub) {
             case 'marry': {
-                const user = ctx.options.getUser('user') || ctx.options.getUser('user', 0);
+                const user = await Resolver.resolveUser(ctx, ctx.options.getUser('user') || args[1]);
                 return await marriageHelper.marry(client, ctx, user);
             }
             case 'divorce': {
                 return await marriageHelper.divorce(client, ctx);
             }
             case 'partner': {
-                const user = ctx.options.getUser('user') || ctx.options.getUser('user', 0);
+                const user = await Resolver.resolveUser(ctx, ctx.options.getUser('user') || args[1]);
                 return await marriageHelper.partner(client, ctx, user);
             }
             case 'setring': {
@@ -194,11 +197,11 @@ export default class Marriage extends Command {
                 return await marriageHelper.setring(client, ctx, ring);
             }
             case 'adopt': {
-                const user = ctx.options.getUser('user') || ctx.options.getUser('user', 0);
+                const user = await Resolver.resolveUser(ctx, ctx.options.getUser('user') || args[1]);
                 return await marriageHelper.adopt(client, ctx, user);
             }
             case 'disown': {
-                const user = ctx.options.getUser('user') || ctx.options.getUser('user', 0);
+                const user = await Resolver.resolveUser(ctx, ctx.options.getUser('user') || args[1]);
                 return await marriageHelper.disown(client, ctx, user);
             }
             case 'abandon': {

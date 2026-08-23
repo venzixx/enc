@@ -20,6 +20,8 @@ export default class Ready extends Event {
 		logger.success(`${this.client.user?.tag} is ready!`);
 		await startGiveawayScheduler(this.client);
 		await startRainbowScheduler(this.client);
+		const { VoteReminderManager } = await import("../../utils/VoteReminderManager");
+		VoteReminderManager.init(this.client);
 
 		await this.client.updateMaintenancePresence();
 

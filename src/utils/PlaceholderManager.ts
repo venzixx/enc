@@ -1,9 +1,9 @@
-import { Guild, GuildMember, MessagePayload, MessageReplyOptions } from 'discord.js';
+import { Guild, GuildMember } from 'discord.js';
 import { ExtendedClient } from '../client';
 
 export class PlaceholderManager {
     /**
-     * Resolves placeholders in a text string and returns the final content and any associated embeds/components.
+     * Resolves placeholders in a text string or raw JSON payload and returns the final content and any associated embeds/components.
      */
     public static async resolve(
         client: ExtendedClient,
@@ -13,31 +13,68 @@ export class PlaceholderManager {
     ): Promise<any> {
         if (!text) return { content: '', embeds: [], components: [] };
 
-        let content = text;
+        const trimmed = text.trim();
+
+        // 1. Direct JSON / Discohook Payload Handling
+        if (trimmed.startsWith('{') && (trimmed.includes('"embeds"') || trimmed.includes('"content"'))) {
+            try {
+                let parsed = JSON.parse(trimmed);
+                if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+
+                let rawContent = parsed.content ? this.simpleResolve(parsed.content, member, guild) : '';
+                const embeds: any[] = [];
+                const components: any[] = [];
+
+                if (Array.isArray(parsed.embeds)) {
+                    for (const em of parsed.embeds) {
+                        const embed: any = {};
+                        if (em.title) embed.title = this.simpleResolve(em.title, member, guild);
+                        if (em.description) embed.description = this.simpleResolve(em.description, member, guild);
+                        if (em.url) embed.url = em.url;
+                        if (em.color !== undefined) {
+                            if (typeof em.color === 'string') {
+                                embed.color = parseInt(em.color.replace('#', ''), 16);
+                            } else {
+                                embed.color = em.color;
+                            }
+                        }
+                        if (Array.isArray(em.fields)) {
+                            embed.fields = em.fields.map((f: any) => ({
+                                name: this.simpleResolve(f.name || '', member, guild) || '\u200b',
+                                value: this.simpleResolve(f.value || '', member, guild) || '\u200b',
+                                inline: !!f.inline
+                            }));
+                        }
+                        if (em.image?.url) embed.image = { url: em.image.url };
+                        if (em.thumbnail?.url) embed.thumbnail = { url: em.thumbnail.url };
+                        if (em.author?.name) {
+                            embed.author = {
+                                name: this.simpleResolve(em.author.name, member, guild),
+                                url: em.author.url,
+                                icon_url: em.author.icon_url || em.author.iconURL
+                            };
+                        }
+                        if (em.footer?.text) {
+                            embed.footer = {
+                                text: this.simpleResolve(em.footer.text, member, guild),
+                                icon_url: em.footer.icon_url || em.footer.iconURL
+                            };
+                        }
+                        if (em.timestamp) embed.timestamp = new Date().toISOString();
+                        embeds.push(embed);
+                    }
+                }
+
+                return { content: rawContent || '', embeds, components, flags: 0 };
+            } catch (jsonErr) {
+                // If invalid JSON, fallback to standard text replacement
+            }
+        }
+
+        let content = this.simpleResolve(text, member, guild) || '';
         const embeds: any[] = [];
         const components: any[] = [];
         let flags = 0;
-
-        // Standard replacements
-        content = content
-            .replace(/{user}/g, member.toString())
-            .replace(/{user\.name}/g, member.user.username)
-            .replace(/{user\.id}/g, member.id)
-            .replace(/{user\.mention}/g, member.toString())
-            .replace(/{user\.tag}/g, member.user.tag || member.user.username)
-            .replace(/{user\.avatar}/g, member.user.displayAvatarURL({ extension: 'png', size: 256 }))
-            .replace(/{user\.created}/g, `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`)
-            .replace(/{user\.joined}/g, member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Unknown')
-            .replace(/{user\.level}/g, '{user.level}') // Preserved for leveling system to resolve later
-            .replace(/{server}/g, guild.name)
-            .replace(/{server\.id}/g, guild.id)
-            .replace(/{server\.name}/g, guild.name)
-            .replace(/{server\.member_count}/g, guild.memberCount.toString())
-            .replace(/{server\.icon}/g, guild.iconURL({ extension: 'png', size: 256 }) || '')
-            .replace(/{server\.boost_count}/g, (guild.premiumSubscriptionCount || 0).toString())
-            .replace(/{server\.boost_tier}/g, guild.premiumTier.toString())
-            .replace(/{member\.count}/g, guild.memberCount.toString())
-            .replace(/{mentionID}/g, `<@${member.id}>`);
 
         // Find all tags in { }
         const tags = content.match(/{[a-zA-Z0-9_]+}/g) || [];
@@ -46,7 +83,7 @@ export class PlaceholderManager {
             const tagName = tag.slice(1, -1);
             
             // Skip standard placeholders already handled
-            if (['user', 'server', 'mentionID'].includes(tagName)) continue;
+            if (['user', 'server', 'count', 'tag', 'inviter', 'mentionID'].includes(tagName)) continue;
 
             // Check if this is a saved embed
             const savedEmbed = await client.prisma.savedEmbed.findUnique({
@@ -71,12 +108,7 @@ export class PlaceholderManager {
                         embedData = embedData[0];
                     }
                     
-                    // The dashboard sends a specific structure: { content, title, description, url, color, footer, thumbnail, image, author, fields, buttons, selectMenus, isV2, ephemeral }
-                    // We need to transform this into Discord.js structure or use it as is if it's already compatible.
-                    
                     if (embedData.isV2) {
-                        // V2 layout handling (Matches dashboard/src/app/dashboard/[guildId]/messages/page.tsx handleDispatch)
-                        // This logic should ideally be shared, but for now I'll implement the resolve-time transform.
                         const { V2Helper } = await import('./V2Helper');
                         const v2Layout = V2Helper.createLayout({
                             title: this.simpleResolve(embedData.title, member, guild),
@@ -98,11 +130,9 @@ export class PlaceholderManager {
                             ephemeral: embedData.ephemeral
                         });
                         
-                        // Merge V2 components
                         if (v2Layout.components) components.push(...v2Layout.components);
                         if (v2Layout.flags) flags |= v2Layout.flags;
                     } else {
-                        // V1 Standard Embed
                         const embed: any = {
                             title: this.simpleResolve(embedData.title, member, guild),
                             description: this.simpleResolve(embedData.description, member, guild),
@@ -127,9 +157,6 @@ export class PlaceholderManager {
                             timestamp: embedData.timestamp ? new Date().toISOString() : undefined
                         };
                         embeds.push(embed);
-                        
-                        // Add buttons/selects for V1 if present
-                        // Note: Logic for V1 components in PlaceholderManager might need more work if they have actions.
                     }
                 } catch (e) {
                     console.error(`Failed to parse saved embed ${tagName}:`, e);
@@ -140,7 +167,7 @@ export class PlaceholderManager {
         return { content: content.trim(), embeds, components, flags };
     }
 
-    private static simpleResolve(text: string | undefined, member: GuildMember, guild: Guild): string | undefined {
+    public static simpleResolve(text: string | undefined, member: GuildMember, guild: Guild): string | undefined {
         if (!text) return undefined;
         return text
             .replace(/{user}/g, member.toString())
@@ -151,6 +178,7 @@ export class PlaceholderManager {
             .replace(/{user\.avatar}/g, member.user.displayAvatarURL({ extension: 'png', size: 256 }))
             .replace(/{user\.created}/g, `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`)
             .replace(/{user\.joined}/g, member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Unknown')
+            .replace(/{user\.level}/g, '{user.level}')
             .replace(/{server}/g, guild.name)
             .replace(/{server\.id}/g, guild.id)
             .replace(/{server\.name}/g, guild.name)
@@ -158,6 +186,8 @@ export class PlaceholderManager {
             .replace(/{server\.icon}/g, guild.iconURL({ extension: 'png', size: 256 }) || '')
             .replace(/{server\.boost_count}/g, (guild.premiumSubscriptionCount || 0).toString())
             .replace(/{server\.boost_tier}/g, guild.premiumTier.toString())
+            .replace(/{count}/g, guild.memberCount.toString())
+            .replace(/{tag}/g, member.user.tag || member.user.username)
             .replace(/{member\.count}/g, guild.memberCount.toString())
             .replace(/{mentionID}/g, `<@${member.id}>`);
     }

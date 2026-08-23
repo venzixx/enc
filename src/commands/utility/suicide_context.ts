@@ -31,7 +31,7 @@ export default class SuicideContext extends Command {
             await ctx.sendMessage({
                 embeds: [
                     client.embed()
-                        .setDescription(`💀 **${ctx.author.username}** committed suicide!`)
+                        .setDescription(`${client.emoji.skull_death} **${ctx.author.username}** committed suicide!`)
                         .setImage(gifUrl)
                         .setColor(client.color.main)
                 ]

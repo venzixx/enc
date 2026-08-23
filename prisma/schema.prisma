@@ -195,6 +195,7 @@ model Guild {
   uwuLocks              UwuLock[]
   forcedNicknames       ForcedNickname[]
   assets               Asset[]
+  roleRules            RoleRule[]
 }
 
 model CommandAlias {
@@ -226,9 +227,11 @@ model Appeal {
 }
 
 model UserConfig {
-  userId      String  @id
-  snipeOptOut Boolean @default(false)
-  timezone    String?
+  userId        String    @id
+  snipeOptOut   Boolean   @default(false)
+  timezone      String?
+  nsfwConsent   Boolean   @default(false)
+  nsfwConsentAt DateTime?
 }
 
 model TimezoneSession {
@@ -715,6 +718,18 @@ model RoleConnection {
   @@unique([guildId, triggerRoleId, connectedRoleId])
 }
 
+model RoleRule {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  mainRoleId String
+  mode       String   @default("OR") // "OR" | "AND"
+  conditions Json     // Array of { type: "HAS" | "DOES_NOT_HAVE", roleId: string }
+  action     String   @default("ASSIGN_OR_REMOVE") // "ASSIGN_OR_REMOVE" | "REMOVE_WHEN_MATCH"
+  guild      Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, mainRoleId])
+}
+
 model StreakTier {
   id        Int      @id @default(autoincrement())
   guildId   String
@@ -945,4 +960,39 @@ model DevAntiNuke {
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
 }
+
+model Case {
+  id           Int       @id @default(autoincrement())
+  guildId      String
+  caseNumber   Int
+  type         String    // "WARN", "BAN", "KICK", "MUTE", "TIMEOUT", "UNBAN", "UNMUTE"
+  targetId     String
+  targetTag    String?
+  moderatorId  String
+  moderatorTag String?
+  reason       String
+  duration     String?
+  removedRoles String?
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([guildId, caseNumber])
+  @@index([guildId, targetId])
+  @@index([guildId, type])
+  @@index([guildId, active])
+}
+
+model UserVote {
+  userId        String    @id
+  totalVotes    Int       @default(0)
+  lastVotedAt   DateTime?
+  remindMe      Boolean   @default(true)
+  reminderSent  Boolean   @default(false)
+  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+}
+
 

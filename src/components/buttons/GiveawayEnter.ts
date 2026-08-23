@@ -1,7 +1,7 @@
-import { type ButtonInteraction } from "discord.js";
+import { ButtonInteraction, EmbedBuilder } from "discord.js";
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
-import { V2Helper } from "../../utils/V2Helper";
+import { GiveawayManager } from "../../utils/GiveawayManager";
 
 export default class GiveawayEnter extends Component {
 	constructor(client: ExtendedClient) {
@@ -11,58 +11,52 @@ export default class GiveawayEnter extends Component {
 	}
 
 	public async run(interaction: ButtonInteraction): Promise<any> {
-        // Find giveaway
+        // 1. Find giveaway by message ID
 		const giveaway = await this.client.prisma.giveaway.findUnique({
-			where: { messageId: interaction.message.id }
+			where: { messageId: interaction.message.id },
+            include: { entries: true }
 		});
 
 		if (!giveaway || !giveaway.isActive) {
+            const endedEmbed = new EmbedBuilder()
+                .setTitle('❌ Giveaway Ended')
+                .setDescription('This giveaway is no longer active.')
+                .setColor(this.client.color.red || 0xef4444);
+
 			return await interaction.reply({
-				...V2Helper.createLayout({
-					title: `${this.client.emoji.cross} Giveaway Ended`,
-					description: 'This giveaway is no longer active.',
-					isAlert: true,
-					color: this.client.color.red,
-					ephemeral: true
-				}) as any
+				embeds: [endedEmbed],
+                ephemeral: true
 			});
 		}
 
-        // Check if already entered
-		const exists = await this.client.prisma.giveawayEntry.findUnique({
-			where: { giveawayId_userId: { giveawayId: giveaway.id, userId: interaction.user.id } }
-		});
-
-		if (exists) {
-			return await interaction.reply({
-				...V2Helper.createLayout({
-					title: `${this.client.emoji.cross} Already Entered`,
-					description: 'You have already joined this giveaway!',
-					isAlert: true,
-					color: this.client.color.red,
-					ephemeral: true
-				}) as any
-			});
-		}
-
-        const member = await interaction.guild!.members.fetch(interaction.user.id);
-        const guildConf = await this.client.prisma.guild.findUnique({ where: { id: interaction.guild!.id } });
-
-        // 1. Blacklist Check
+        // 2. Check Blacklist
         const blacklisted = await this.client.prisma.giveawayBlacklist.findUnique({
             where: { guildId_userId: { guildId: interaction.guild!.id, userId: interaction.user.id } }
         });
         if (blacklisted) {
-            return await interaction.reply({ content: 'You are blacklisted from joining giveaways.', ephemeral: true });
+            const blEmbed = new EmbedBuilder()
+                .setTitle('🚫 Blacklisted')
+                .setDescription('You are blacklisted from joining giveaways in this server.')
+                .setColor(this.client.color.red || 0xef4444);
+
+            return await interaction.reply({ embeds: [blEmbed], ephemeral: true });
         }
 
-        // 2. Bypass Check
+        const member = await interaction.guild!.members.fetch(interaction.user.id);
+        const guildConf = await this.client.prisma.guild.findUnique({ where: { id: interaction.guild!.id } });
+
+        // 3. Bypass Check
         const hasBypass = guildConf?.giveawayBypassRoleId && member.roles.cache.has(guildConf.giveawayBypassRoleId);
 
-        // 3. Requirements
+        // 4. Requirements Check (if no bypass)
         if (!hasBypass) {
             if (giveaway.reqRoleId && !member.roles.cache.has(giveaway.reqRoleId)) {
-                return await interaction.reply({ content: `You need the <@&${giveaway.reqRoleId}> role to enter this giveaway.`, ephemeral: true });
+                const reqRoleEmbed = new EmbedBuilder()
+                    .setTitle('🔒 Role Requirement')
+                    .setDescription(`You need the <@&${giveaway.reqRoleId}> role to enter this giveaway.`)
+                    .setColor(this.client.color.red || 0xef4444);
+
+                return await interaction.reply({ embeds: [reqRoleEmbed], ephemeral: true });
             }
 
             if (giveaway.reqInvites && giveaway.reqInvites > 0) {
@@ -74,49 +68,85 @@ export default class GiveawayEnter extends Component {
                 }
                 
                 if (inviteCount < giveaway.reqInvites) {
-                    return await interaction.reply({ content: `You need at least **${giveaway.reqInvites}** invites to enter this giveaway. You currently have **${inviteCount}**.`, ephemeral: true });
+                    const reqInvEmbed = new EmbedBuilder()
+                        .setTitle('✉️ Invite Requirement')
+                        .setDescription(`You need at least **${giveaway.reqInvites}** invites to enter this giveaway. You currently have **${inviteCount}**.`)
+                        .setColor(this.client.color.red || 0xef4444);
+
+                    return await interaction.reply({ embeds: [reqInvEmbed], ephemeral: true });
                 }
             }
         }
 
-        // 4. Calculate entries count
-        let entriesToCreate = 1;
+        // 5. Check if user already entered -> Toggle Leave / Join
+		const existingEntry = await this.client.prisma.giveawayEntry.findUnique({
+			where: { giveawayId_userId: { giveawayId: giveaway.id, userId: interaction.user.id } }
+		});
 
-        const bonusEntriesMap = await (this.client.prisma as any).giveawayBonusEntry.findMany({
-            where: { guildId: interaction.guild!.id }
-        });
+		if (existingEntry) {
+            // Remove entry (Leave giveaway)
+            await this.client.prisma.giveawayEntry.delete({
+                where: { id: existingEntry.id }
+            });
 
-        for (const bonus of bonusEntriesMap) {
-            if (bonus.type === 'ROLE' && member.roles.cache.has(bonus.targetId)) {
-                entriesToCreate += Math.max(0, bonus.entries);
-            } else if (bonus.type === 'USER' && interaction.user.id === bonus.targetId) {
-                entriesToCreate += Math.max(0, bonus.entries);
-            }
-        }
+            const newCount = Math.max(0, giveaway.entries.length - 1);
+            
+            // Update button label on message
+            await interaction.message.edit({
+                components: [GiveawayManager.buildButtons(newCount, false)]
+            }).catch(() => null);
 
-        // Create main entry + bonus copies internally using `entriesToCreate` inside our logic.
-        // Wait, the schema `giveawayEntry` is a unique constraint on (giveawayId, userId). So we can't create multiple.
-        // How does the reroll algorithm pick someone multiple times? We can add a `weight` column to `giveawayEntry`.
-        // Let's just create the entry. We don't have weight yet, but we'll adapt reroll logic to fetch weights or we just add `weight` to Entry table later.
+            const leaveEmbed = new EmbedBuilder()
+                .setTitle('👋 Entry Removed')
+                .setDescription(`You have left the giveaway for **${giveaway.prize}**. You can click Enter again anytime before it ends.`)
+                .setColor(this.client.color.red || 0xef4444);
 
-        // Wait, creating multiple entries breaks Unique constraint.
-        // Let's modify the upsert logic if it already has duplicate check.
-		await (this.client.prisma as any).giveawayEntry.create({
+			return await interaction.reply({
+				embeds: [leaveEmbed],
+                ephemeral: true
+			});
+		}
+
+        // 6. Create Entry
+		await this.client.prisma.giveawayEntry.create({
 			data: {
 				giveawayId: giveaway.id,
-				userId: interaction.user.id,
-                weight: entriesToCreate
+				userId: interaction.user.id
 			}
 		});
 
+        // 7. Check for bonus entries
+        const bonusEntriesMap = await this.client.prisma.giveawayBonusEntry.findMany({
+            where: { guildId: interaction.guild!.id }
+        });
+
+        let bonusCount = 0;
+        for (const bonus of bonusEntriesMap) {
+            if (bonus.type === 'ROLE' && member.roles.cache.has(bonus.targetId)) {
+                bonusCount += Math.max(0, bonus.entries);
+            } else if (bonus.type === 'USER' && interaction.user.id === bonus.targetId) {
+                bonusCount += Math.max(0, bonus.entries);
+            }
+        }
+
+        const totalEntries = giveaway.entries.length + 1;
+
+        // Update button label on message
+        await interaction.message.edit({
+            components: [GiveawayManager.buildButtons(totalEntries, false)]
+        }).catch(() => null);
+
+        const joinEmbed = new EmbedBuilder()
+            .setTitle('🎉 Entry Confirmed!')
+            .setDescription(
+                `You have successfully entered the giveaway for **${giveaway.prize}**! Good luck!\n\n` +
+                (bonusCount > 0 ? `✨ *You have **+${bonusCount} bonus entries** (${bonusCount + 1}x total chance).*` : '')
+            )
+            .setColor(this.client.color.main || 0x22c55e);
+
 		await interaction.reply({
-			...V2Helper.createLayout({
-				title: `${this.client.emoji.success} Entry Confirmed`,
-				description: `You have successfully entered the giveaway! Good luck!${entriesToCreate > 1 ? `\n*(You received **${entriesToCreate}** total entries due to your roles)*` : ''}`,
-				isAlert: true,
-				color: this.client.color.main,
-				ephemeral: true
-			}) as any
+			embeds: [joinEmbed],
+            ephemeral: true
 		});
 	}
 }

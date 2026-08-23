@@ -73,17 +73,22 @@ export async function updatePlayerMessage(
 
 	// Otherwise, edit the current message (normal player)
 	const track = player.queue.current!;
-    const layout = V2Helper.createLayout({
-        title: t(I18N.player.trackStart.now_playing, { lng: locale }),
-        description: `**[${track.info.title}](${track.info.uri})**\n` +
-                     `-# ${text}\n` +
-                     `${t(I18N.player.trackStart.author, { lng: locale })}: ${track.info.author}\n` +
-                     `${t(I18N.player.trackStart.duration, { lng: locale })}: ${track.info.isStream ? "LIVE" : client.utils.formatTime(track.info.duration)}`,
-        color: client.config.color.main as ColorResolvable,
-        thumbnail: track.info.artworkUrl || undefined,
-        buttons: getButtons(player).flatMap(b => b.components as any).map(c => ButtonBuilder.from(c as any))
-    });
+    const embed = new EmbedBuilder()
+        .setAuthor({ name: t(I18N.player.trackStart.now_playing, { lng: locale }) })
+        .setDescription(
+            `**[${track.info.title}](${track.info.uri})**\n` +
+            `-# ${text}\n` +
+            `${t(I18N.player.trackStart.author, { lng: locale })}: ${track.info.author}\n` +
+            `${t(I18N.player.trackStart.duration, { lng: locale })}: ${track.info.isStream ? "LIVE" : client.utils.formatTime(track.info.duration)}`
+        )
+        .setColor(client.config.color.main as ColorResolvable);
 
-	await interaction.message.edit(layout as any);
+    if (track.info.artworkUrl) {
+        embed.setThumbnail(track.info.artworkUrl);
+    }
+
+    const buttonRows = getButtons(player);
+
+	await interaction.message.edit({ embeds: [embed], components: buttonRows });
 }
 

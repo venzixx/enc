@@ -7,6 +7,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
+import { CaseManager } from '../../utils/CaseManager';
 
 export default class Unban extends Command {
 	constructor(client: ExtendedClient) {
@@ -59,16 +60,27 @@ export default class Unban extends Command {
 
 			await ctx.guild.bans.remove(user.id, `Unbanned by ${ctx.author.tag}: ${reason}`);
 			
+            // Create moderation case
+            const newCase = await CaseManager.createCase(client, {
+                guild: ctx.guild!,
+                type: 'UNBAN',
+                target: user,
+                moderator: ctx.author,
+                reason
+            });
+
 			const embed = new EmbedBuilder()
 				.setTitle(`${client.emoji.volmore} Member Unbanned`)
 				.setDescription(`**${user.tag}** (\`${user.id}\`) has been unbanned.`)
-				.addFields({ name: `${client.emoji.mic} Reason`, value: reason })
+				.addFields(
+                    { name: 'Case', value: `\`#${newCase.caseNumber}\``, inline: true },
+                    { name: `${client.emoji.mic} Reason`, value: reason }
+                )
 				.setColor(client.color.main)
+                .setFooter({ text: `Case #${newCase.caseNumber}` })
 				.setTimestamp();
 
 			await ctx.reply({ embeds: [embed] });
-
-            await logModerationAction(client, ctx.guild, 'UNBAN', ctx.author, user, reason);
 		} catch (error: any) {
 			await ctx.reply({ content: `${client.emoji.cross} Failed to unban: ${error.message}`, flags: [64] });
 		}

@@ -7,6 +7,7 @@ import {
 } from "../../utils/Permissions";
 import { ExtendedClient } from "../../client";
 import { getAIResponse } from "../../handlers/aiHandler";
+import { ApplicationIntegrationType, InteractionContextType } from "discord.js";
 
 export default class AskCommand extends Command {
 	constructor(client: ExtendedClient) {
@@ -38,6 +39,8 @@ export default class AskCommand extends Command {
 				user: [],
 			},
 			slashCommand: true,
+			integration_types: [ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall],
+			contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],
 			options: [
 				{
 					name: "question",
@@ -67,24 +70,34 @@ export default class AskCommand extends Command {
 		}
 
 		// Defer reply since AI model call can take a few seconds
-		await ctx.deferReply();
+		if (!ctx.deferred && !ctx.replied) {
+			await ctx.deferReply();
+		}
 
 		try {
-			// Get AI configuration settings for this guild
-			const guildSettings = await client.prisma.guild.findUnique({
-				where: { id: ctx.guild.id },
-				select: {
-					aiPersonality: true,
-					aiCustomPrompt: true,
-					aiSearchEnabled: true,
-				},
-			});
-
-			const settings = {
-				aiPersonality: guildSettings?.aiPersonality || "CASUAL",
-				aiCustomPrompt: guildSettings?.aiCustomPrompt || null,
-				aiSearchEnabled: guildSettings?.aiSearchEnabled || false,
+			// Get AI configuration settings for this guild (or default for DMs)
+			const guildId = ctx.guild?.id;
+			let settings = {
+				aiPersonality: "CASUAL",
+				aiCustomPrompt: null as string | null,
+				aiSearchEnabled: false,
 			};
+
+			if (guildId) {
+				const guildSettings = await client.prisma.guild.findUnique({
+					where: { id: guildId },
+					select: {
+						aiPersonality: true,
+						aiCustomPrompt: true,
+						aiSearchEnabled: true,
+					},
+				});
+				if (guildSettings) {
+					settings.aiPersonality = guildSettings.aiPersonality || "CASUAL";
+					settings.aiCustomPrompt = guildSettings.aiCustomPrompt || null;
+					settings.aiSearchEnabled = guildSettings.aiSearchEnabled || false;
+				}
+			}
 
 			const response = await getAIResponse(prompt, settings, true);
 
@@ -98,13 +111,12 @@ export default class AskCommand extends Command {
 				color: client.color.main,
 				footer: `Asked by ${ctx.author.username} \u2022 Powered by ${provider}`,
 			});
-		} catch (error) {
-			console.error("[ASK_COMMAND_ERROR]", error);
+		} catch (error: any) {
 			return await ctx.replyV2({
-				title: `${client.emoji.cross} AI Error`,
-				description: "Something went wrong while processing your AI request.",
+				title: `${client.emoji.cross} Error`,
+				description: `Failed to process AI query: ${error.message}`,
 				isAlert: true,
-				color: client.color.main,
+				color: client.color.red,
 			});
 		}
 	}

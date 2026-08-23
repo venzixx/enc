@@ -15,6 +15,7 @@ import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
 import { Appeals } from '../../utils/Appeals';
 import { V2Helper } from '../../utils/V2Helper';
+import { CaseManager } from '../../utils/CaseManager';
 import ms from 'ms';
 
 export default class Mute extends Command {
@@ -101,16 +102,28 @@ export default class Mute extends Command {
             
 			await target.timeout(time as any, `Muted by ${ctx.author.tag}: ${reason}`);
 			
+            // Create moderation case
+            const newCase = await CaseManager.createCase(client, {
+                guild: ctx.guild!,
+                type: 'MUTE',
+                target: target.user,
+                moderator: ctx.author,
+                reason,
+                duration: durationStr
+            });
+
 			const embed = new EmbedBuilder()
-				.setTitle(' Member Muted')
+				.setTitle(`${client.emoji.mod_mute} Member Muted`)
 				.setDescription(`**${target.user.tag}** has been timed out for **${durationStr}**.`)
-				.addFields({ name: `${client.emoji.mic} Reason`, value: reason })
+				.addFields(
+                    { name: 'Case', value: `\`#${newCase.caseNumber}\``, inline: true },
+                    { name: `${client.emoji.mic} Reason`, value: reason }
+                )
 				.setColor(client.color.main)
+                .setFooter({ text: `Case #${newCase.caseNumber}` })
 				.setTimestamp();
 
 			await ctx.reply({ embeds: [embed] });
-
-            await logModerationAction(client, ctx.guild, 'MUTE', ctx.author, target.user, reason, durationStr);
 		} catch (error: any) {
             if (isGuildOwner && (error.message.includes('Permissions') || error.code === 50013)) {
                 return await this.askForceMute(client, ctx, target, time, reason, durationStr);
@@ -132,9 +145,12 @@ export default class Mute extends Command {
 
         const row = new ActionRowBuilder<ButtonBuilder>().addComponents(confirmBtn, cancelBtn);
 
+        const adminRoles = target.roles.cache.filter(r => r.id !== ctx.guild!.id && r.editable && r.permissions.has(PermissionFlagsBits.Administrator));
+        const adminRoleNames = adminRoles.map(r => `\`${r.name}\``).join(', ') || 'Admin Roles';
+
         const response = await ctx.replyV2({
-            title: ' Force Mute Required',
-            description: `The user ${target} has administrative permissions or a role structure that prevents a direct timeout. \n\n**Force Mute will:**\n1. Strip all manageable roles from the user.\n2. Apply the **${durationStr}** timeout.\n\nDo you wish to proceed?`,
+            title: '⚠️ Force Mute Required',
+            description: `${target} has administrative permissions that prevent a standard timeout.\n\n**Force Mute will:**\n1. Temporarily remove only the admin role(s): ${adminRoleNames}\n2. Apply the **${durationStr}** timeout.\n3. **Automatically restore** the admin role(s) upon unmute.\n\nDo you wish to proceed?`,
             color: client.color.orange,
             buttons: [confirmBtn, cancelBtn]
         }) as any;
@@ -146,12 +162,12 @@ export default class Mute extends Command {
 
         collector.on('collect', async (i: ButtonInteraction) => {
             if (i.user.id !== ctx.author.id) {
-                return i.reply({ content: 'Only the server owner can confirm this.', ephemeral: true });
+                return i.reply({ content: 'Only the command author can confirm this.', ephemeral: true });
             }
 
             if (i.customId === 'cancel_force_mute') {
                 await i.update({ 
-                    ...V2Helper.createLayout({ title: 'Operation Cancelled', description: 'Force mute was aborted by the owner.', color: client.color.main }) 
+                    ...V2Helper.createLayout({ title: 'Operation Cancelled', description: 'Force mute was cancelled.', color: client.color.main }) 
                 } as any);
                 return collector.stop();
             }
@@ -159,26 +175,41 @@ export default class Mute extends Command {
             await i.deferUpdate();
 
             try {
-                // 1. Strip Roles
-                const rolesToKeep = target.roles.cache.filter(r => !r.editable || r.name === '@everyone');
-                await target.roles.set(rolesToKeep).catch(() => {});
+                // 1. Remove ONLY the specific admin roles that prevent timeout
+                const rolesToRemove = target.roles.cache.filter(r => r.id !== ctx.guild!.id && r.editable && r.permissions.has(PermissionFlagsBits.Administrator));
+                const removedRoleIds = rolesToRemove.map(r => r.id);
 
-                // 2. Timeout
+                if (removedRoleIds.length > 0) {
+                    await target.roles.remove(removedRoleIds, `Force Mute: Temporarily removed admin role by ${ctx.author.tag}`);
+                }
+
+                // 2. Apply Timeout
                 const finalTime = time || ms(durationStr as any);
-                await target.timeout(finalTime as number, `FORCE MUTE by Owner: ${reason}`);
+                await target.timeout(finalTime as number, `FORCE MUTE: ${reason}`);
+
+                // 3. Create Case with removedRoles stored
+                const newCase = await CaseManager.createCase(client, {
+                    guild: ctx.guild!,
+                    type: 'MUTE',
+                    target: target.user,
+                    moderator: ctx.author,
+                    reason: `[Force Mute] ${reason}`,
+                    duration: durationStr,
+                    removedRoles: removedRoleIds
+                });
+
+                const removedNames = rolesToRemove.map(r => `\`${r.name}\``).join(', ') || 'None';
 
                 await i.editReply({
                     ...V2Helper.createLayout({ 
                         title: `${client.emoji.success} Force Mute Executed`, 
-                        description: `Successfully stripped roles and timed out ${target} for **${durationStr}**.`, 
+                        description: `Successfully timed out ${target} for **${durationStr}**.\n\n**Temporarily Removed Role(s):** ${removedNames}\n*These role(s) will be automatically restored upon unmute (Case #${newCase.caseNumber}).*`, 
                         color: client.color.main 
                     })
                 } as any);
-
-                await logModerationAction(client, ctx.guild, 'FORCE_MUTE', ctx.author, target.user, reason, durationStr);
             } catch (err: any) {
                 await i.editReply({
-                    ...V2Helper.createLayout({ title: 'Force Mute Failed', description: `Critical failure during role stripping or timeout: ${err.message}`, color: client.color.red, isAlert: true })
+                    ...V2Helper.createLayout({ title: 'Force Mute Failed', description: `Critical failure during force mute: ${err.message}`, color: client.color.red, isAlert: true })
                 } as any);
             }
             collector.stop();

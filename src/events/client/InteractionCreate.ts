@@ -317,6 +317,22 @@ export default class InteractionCreate extends Event {
 		) {
 			const customId = (interaction as any).customId;
             logger.info(`[DEBUG] Received component interaction: ${customId} from ${interaction.user.tag}`);
+
+			if (customId && customId.startsWith('vote_remind_off_')) {
+				const targetUserId = customId.replace('vote_remind_off_', '');
+				if (interaction.user.id === targetUserId) {
+					await this.client.prisma.userVote.update({
+						where: { userId: targetUserId },
+						data: { remindMe: false }
+					}).catch(() => {});
+
+					return await (interaction as any).reply({
+						content: '✅ 12-hour vote reminders have been disabled for your account. You can re-enable them anytime using `,vote`!',
+						flags: MessageFlags.Ephemeral
+					});
+				}
+			}
+
 			let component = this.client.components.get(customId);
 
 			if (!component) {

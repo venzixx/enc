@@ -23,6 +23,7 @@ import { ExtendedClient } from "../../client";
 import { getAIResponse } from "../../handlers/aiHandler";
 import { StreakManager } from "../../utils/StreakManager";
 import { isDev } from "../../utils/devCheck";
+import { AfkManager } from "../../utils/AfkManager";
 
 export default class MessageCreate extends Event {
 	constructor(client: ExtendedClient, file: string) {
@@ -33,7 +34,31 @@ export default class MessageCreate extends Event {
 	}
 
 	public async run(message: Message): Promise<any> {
-		if (!message.guild || message.author.bot) return;
+		if (message.author.bot) return;
+
+		// --- DIRECT MESSAGE (DM) COMMAND HANDLING ---
+		if (!message.guild) {
+			const prefix = ','; // default bot prefix
+			if (!message.content.startsWith(prefix)) return;
+			const args = message.content.slice(prefix.length).trim().split(/\s+/);
+			const cmd = args.shift()?.toLowerCase();
+			if (!cmd) return;
+
+			const command = this.client.commands.get(cmd) || this.client.commands.get(this.client.aliases.get(cmd) as string);
+			if (!command) return;
+
+			(message as any).args = args;
+			const ctx = new Context(this.client, message);
+			ctx.prefix = prefix;
+			ctx.command = command;
+			(ctx as any).args = args;
+			try {
+				await command.run(this.client, ctx, args);
+			} catch (err) {
+				logger.error(`Error executing command ${command.name} in DM:`, err);
+			}
+			return;
+		}
 
 		console.log(`[DEBUG] Message from ${message.author.tag} in ${message.guild.name}: "${message.content}"`);
 
@@ -157,99 +182,142 @@ export default class MessageCreate extends Event {
 
 		// UPDATE STREAKS
 		StreakManager.processMessage(this.client, message.guild.id, message.author.id, message.channelId).catch(err => console.error("Streak Error:", err));
+		
+		const formatAfkDuration = (ms: number): string => {
+			const totalSeconds = Math.floor(ms / 1000);
+			const days = Math.floor(totalSeconds / 86400);
+			const hours = Math.floor((totalSeconds % 86400) / 3600);
+			const minutes = Math.floor((totalSeconds % 3600) / 60);
+			const seconds = totalSeconds % 60;
 
-		//  AFK SYSTEM 
-		// 1) If the message author is AFK  remove their AFK and show missed mentions
-		const authorAfk = await (this.client.prisma as any).afk.findUnique({
-			where: { userId: message.author.id },
-			include: { mentions: true }
-		});
+			const parts: string[] = [];
+			if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
+			if (hours > 0) parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+			if (minutes > 0) parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
+			if (seconds > 0 || parts.length === 0) parts.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
 
-		if (authorAfk) {
-			// Don't un-AFK if they just set AFK (within 5 seconds grace period)
-			const timeSinceAfk = Date.now() - authorAfk.timestamp.getTime();
+			return parts.join(', ');
+		};
+
+		// 1) If the message author is AFK (Global or Server AFK in this guild) -> remove AFK & show mentions
+		const authorGlobalAfk = await AfkManager.getGlobalAfk(this.client, message.author.id);
+		const authorServerAfk = message.guildId ? AfkManager.getServerAfk(message.guildId, message.author.id) : undefined;
+
+		if (authorGlobalAfk) {
+			const timeSinceAfk = Date.now() - authorGlobalAfk.timestamp.getTime();
 			if (timeSinceAfk > 5000) {
-				// Build mentions summary
 				let mentionSummary = '';
-				if (authorAfk.mentions.length > 0) {
-					const mentionLines = authorAfk.mentions.slice(-10).map((m: any) => {
+				if (authorGlobalAfk.mentions && authorGlobalAfk.mentions.length > 0) {
+					const mentionLines = authorGlobalAfk.mentions.slice(-10).map((m: any) => {
 						const link = `https://discord.com/channels/${m.guildId}/${m.channelId}/${m.messageId}`;
-						return ` **${m.userTag}**  [Jump to message](${link}) <t:${Math.floor(m.createdAt.getTime() / 1000)}:R>`;
+						return `• **${m.userTag}** • [Jump to message](${link}) <t:${Math.floor(m.createdAt.getTime() / 1000)}:R>`;
 					});
-					mentionSummary = `\n\n **You were mentioned ${authorAfk.mentions.length} time(s) while AFK:**\n${mentionLines.join('\n')}`;
-					if (authorAfk.mentions.length > 10) {
-						mentionSummary += `\n... and ${authorAfk.mentions.length - 10} more`;
+					mentionSummary = `\n\n💬 **You were mentioned ${authorGlobalAfk.mentions.length} time(s) while AFK:**\n${mentionLines.join('\n')}`;
+					if (authorGlobalAfk.mentions.length > 10) {
+						mentionSummary += `\n... and ${authorGlobalAfk.mentions.length - 10} more`;
 					}
 				}
 
-				// Delete AFK + all mentions
-				await (this.client.prisma as any).afk.delete({ where: { userId: message.author.id } });
+				await AfkManager.removeGlobalAfk(this.client, message.author.id);
 
-				// Remove [AFK] prefix from server nickname
-				if (message.member) {
-					const currentNickname = message.member.nickname;
-					if (currentNickname && currentNickname.startsWith('[AFK]')) {
-						const cleanedName = currentNickname.replace(/^\[AFK\]\s*/, '').trim();
-						const shouldReset = cleanedName === message.author.username || cleanedName === message.author.displayName || !cleanedName;
-						await message.member.setNickname(shouldReset ? null : cleanedName).catch(() => {});
-					}
-				}
+				const durationText = formatAfkDuration(timeSinceAfk);
+				const afkTime = Math.floor(authorGlobalAfk.timestamp.getTime() / 1000);
 
 				const embed = new EmbedBuilder()
 					.setColor(this.client.color.main)
-					.setDescription(` Welcome back **${message.author.displayName || message.author.username}**! Your AFK has been removed.${mentionSummary}`)
+					.setDescription(`👋 Welcome back **${message.author.displayName || message.author.username}**!\nYou were AFK for **${durationText}** (<t:${afkTime}:R>). Your global AFK status has been removed.${mentionSummary}`)
+					.setTimestamp();
+
+				await message.reply({ embeds: [embed] }).catch(() => { });
+			}
+		} else if (authorServerAfk && message.guildId) {
+			const timeSinceAfk = Date.now() - authorServerAfk.timestamp;
+			if (timeSinceAfk > 5000) {
+				let mentionSummary = '';
+				if (authorServerAfk.mentions && authorServerAfk.mentions.length > 0) {
+					const mentionLines = authorServerAfk.mentions.slice(-10).map((m) => {
+						const link = `https://discord.com/channels/${m.guildId}/${m.channelId}/${m.messageId}`;
+						return `• **${m.userTag}** • [Jump to message](${link}) <t:${Math.floor(m.createdAt / 1000)}:R>`;
+					});
+					mentionSummary = `\n\n💬 **You were mentioned ${authorServerAfk.mentions.length} time(s) while Server AFK:**\n${mentionLines.join('\n')}`;
+					if (authorServerAfk.mentions.length > 10) {
+						mentionSummary += `\n... and ${authorServerAfk.mentions.length - 10} more`;
+					}
+				}
+
+				await AfkManager.removeServerAfk(this.client, message.guildId, message.author.id);
+
+				const durationText = formatAfkDuration(timeSinceAfk);
+				const afkTime = Math.floor(authorServerAfk.timestamp / 1000);
+
+				const embed = new EmbedBuilder()
+					.setColor(this.client.color.main)
+					.setDescription(`👋 Welcome back **${message.author.displayName || message.author.username}**!\nYou were Server AFK for **${durationText}** (<t:${afkTime}:R>). Your Server AFK status in this server has been removed.${mentionSummary}`)
 					.setTimestamp();
 
 				await message.reply({ embeds: [embed] }).catch(() => { });
 			}
 		}
 
-		// 2) If someone mentions an AFK user  notify the mentioner
+		// 2) If someone mentions an AFK user (Global or Server AFK in this guild) -> notify mentioner
 		if (message.mentions.users.size > 0) {
 			for (const [mentionedId] of message.mentions.users) {
 				if (mentionedId === message.author.id) continue; // Don't trigger on self-mention
 
-				const mentionedAfk = await (this.client.prisma as any).afk.findUnique({
-					where: { userId: mentionedId }
-				});
+				const mentionedGlobal = await AfkManager.getGlobalAfk(this.client, mentionedId);
+				const mentionedServer = message.guildId ? AfkManager.getServerAfk(message.guildId, mentionedId) : undefined;
+				const activeAfk = mentionedGlobal || (mentionedServer ? {
+					timestamp: new Date(mentionedServer.timestamp),
+					reason: mentionedServer.reason,
+					isServerAfk: true
+				} : null);
 
-				if (mentionedAfk) {
-					// Save this mention for when they come back
-					await (this.client.prisma as any).afkMention.create({
-						data: {
-							afkId: mentionedAfk.id,
+				if (activeAfk) {
+					if (mentionedGlobal) {
+						await (this.client.prisma as any).afkMention.create({
+							data: {
+								afkId: mentionedGlobal.id,
+								userId: message.author.id,
+								userTag: message.author.tag,
+								guildId: message.guildId,
+								channelId: message.channelId,
+								messageId: message.id
+							}
+						}).catch(() => {});
+					} else if (mentionedServer && message.guildId) {
+						AfkManager.addServerAfkMention(message.guildId, mentionedId, {
 							userId: message.author.id,
 							userTag: message.author.tag,
 							guildId: message.guildId,
 							channelId: message.channelId,
-							messageId: message.id
-						}
-					});
+							messageId: message.id,
+							createdAt: Date.now()
+						});
+					}
 
 					const mentionedUser = message.mentions.users.get(mentionedId);
 					const displayName = mentionedUser ? (mentionedUser.displayName || mentionedUser.username) : 'User';
-
-					const afkTimestamp = Math.floor(mentionedAfk.timestamp.getTime() / 1000);
-					const fullReason = mentionedAfk.reason;
+					const afkTimestamp = Math.floor(activeAfk.timestamp.getTime() / 1000);
+					const fullReason = activeAfk.reason;
 					const [displayReason, directUrl] = fullReason.includes('|') ? fullReason.split('|') : [fullReason, fullReason];
 					const isUrl = /^(https?:\/\/[^\s]+)$/.test(displayReason);
 					const isMediaReason = fullReason.includes('|') || (isUrl && (displayReason.includes('giphy.com') || displayReason.includes('tenor.com') || displayReason.match(/\.(gif|jpe?g|png|webp)$/i)));
-					
+					const afkLabel = (activeAfk as any).isServerAfk ? 'Server AFK' : 'AFK';
+
 					if (isMediaReason) {
 						const afkEmbed = new EmbedBuilder()
 							.setColor(this.client.color.main)
-							.setDescription(` **${displayName}** is AFK: [Media] <t:${afkTimestamp}:R>`)
+							.setDescription(` **${displayName}** is ${afkLabel}: [Media] <t:${afkTimestamp}:R>`)
 							.setImage(directUrl);
-						
+
 						await message.reply({ embeds: [afkEmbed], allowedMentions: { repliedUser: false } }).catch(() => { });
 					} else {
 						const finalReason = isUrl ? displayReason : `**${displayReason}**`;
 						await message.reply({
-							content: ` **${displayName}** is AFK: ${finalReason}  <t:${afkTimestamp}:R>`,
+							content: ` **${displayName}** is ${afkLabel}: ${finalReason}  <t:${afkTimestamp}:R>`,
 							allowedMentions: { repliedUser: false }
 						}).catch(() => { });
 					}
-
 				}
 			}
 		}
@@ -638,16 +706,31 @@ export default class MessageCreate extends Event {
 
 				const calcLevelXP = (lvl: number) => Math.floor((18 * Math.pow(lvl, 2) + 200 * lvl) * (guild.xpFormulaMultiplier ?? 1.0));
 				
-				let newLevel = memberData.level;
-				while (memberData.xp >= calcLevelXP(newLevel + 1)) {
+				// Re-fetch current member data to ensure we have the latest XP and level
+				const freshMember = await (this.client.prisma as any).member.findUnique({
+					where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } }
+				});
+				if (!freshMember) return;
+
+				const currentXP = freshMember.xp;
+				const currentLevel = freshMember.level;
+				let newLevel = currentLevel;
+				let iterations = 0;
+				while (currentXP >= calcLevelXP(newLevel + 1) && iterations < 500) {
 					newLevel++;
+					iterations++;
 				}
 
-				if (newLevel > memberData.level) {
-					await (this.client.prisma as any).member.update({
-						where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } },
-						data: { level: newLevel }
-					});
+				if (newLevel > currentLevel) {
+					try {
+						await (this.client.prisma as any).member.update({
+							where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } },
+							data: { level: newLevel }
+						});
+					} catch (err) {
+						console.error(`[Level] Failed to update level for ${message.author.id} in ${message.guildId}:`, err);
+						return;
+					}
 
 					if (guild.levelRoles && guild.levelRoles.length > 0) {
 						const rolesToAdd = guild.levelRoles.filter((lr: any) => lr.level <= newLevel).map((lr: any) => lr.roleId);

@@ -54,7 +54,7 @@ export default class MentionCommand extends Command {
                 const globalIndex = start + i + 1;
                 const timeStr = `<t:${Math.floor(new Date(m.createdAt).getTime() / 1000)}:R>`;
                 const jumpUrl = `https://discord.com/channels/${m.guildId}/${m.channelId}/${m.messageId}`;
-                const typeText = m.isReply ? '💬 Replied to you' : '🔔 Mentioned you';
+                const typeText = m.isReply ? `${client.emoji.mention_reply} Replied to you` : `${client.emoji.mention_bell} Mentioned you`;
                 const snippet = m.content ? `\n> ${m.content}` : '';
                 return `**${globalIndex}.** ${typeText} in <#${m.channelId}> by **${m.authorTag}** ${timeStr}\n[Jump to message](${jumpUrl})${snippet}`;
             });

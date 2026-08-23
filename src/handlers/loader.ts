@@ -70,15 +70,20 @@ export async function loadCommands(client: ExtendedClient) {
                 }
 
                 if (command.type === ApplicationCommandType.ChatInput) {
-                    // Sanitize options: sort required first and ensure descriptions exist
+                    // Sanitize options: sort required first and ensure descriptions exist and <= 100 chars
                     const sanitizedOptions = command.options?.map(opt => ({
                         ...opt,
-                        description: opt.description || `The ${opt.name} parameter`
+                        description: (opt.description || `The ${opt.name} parameter`).substring(0, 100)
                     })).sort((a, b) => (a.required === b.required ? 0 : a.required ? -1 : 1)) || [];
+
+                    let description = command.description.content || 'No description provided';
+                    if (description.length > 100) {
+                        description = description.substring(0, 97) + '...';
+                    }
 
                     slashCommands.push({
                         name: command.name,
-                        description: command.description.content,
+                        description,
                         type: command.type,
                         options: sanitizedOptions,
                         default_member_permissions: defaultMemberPermissions,

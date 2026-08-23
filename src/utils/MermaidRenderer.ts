@@ -1,4 +1,5 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
+import fs from 'fs';
 
 export interface MermaidRenderOptions {
     theme?: 'dark' | 'default' | 'forest' | 'neutral';
@@ -28,13 +29,25 @@ export class MermaidRenderer {
             return this.launching;
         }
 
+        const possiblePaths = [
+            '/usr/bin/google-chrome',
+            '/usr/bin/google-chrome-stable',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/chromium',
+            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+        ];
+        const executablePath = possiblePaths.find(p => fs.existsSync(p));
+
         this.launching = puppeteer.launch({
             headless: true,
+            ...(executablePath ? { executablePath } : {}),
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
+                '--disable-web-security',
                 '--no-first-run',
                 '--no-zygote',
                 '--disable-extensions'
@@ -151,54 +164,53 @@ export class MermaidRenderer {
             display: none !important;
         }
     </style>
-    <script type="module">
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-        
-        mermaid.initialize({
-            startOnLoad: false,
-            theme: '${theme}',
-            themeVariables: {
-                darkMode: false,
-                background: '${backgroundColor}',
-                primaryColor: '#000000',
-                primaryTextColor: '#ffffff',
-                primaryBorderColor: '#000000',
-                lineColor: '#666666',
-                secondaryColor: '#0000ff',
-                tertiaryColor: '#ffffff',
-                fontFamily: '${fontFamily}',
-                fontSize: '14px',
-                nodeBorder: '#000000',
-                mainBkg: '#000000',
-                clusterBkg: 'rgba(0,0,0,0.02)',
-                clusterBorder: 'rgba(0,0,0,0.1)',
-                edgeLabelBackground: 'transparent',
-                nodeTextColor: '#ffffff'
-            },
-            flowchart: {
-                htmlLabels: true,
-                curve: 'basis',
-                rankSpacing: 80,
-                nodeSpacing: 50,
-                padding: 15,
-                useMaxWidth: false
-            },
-            securityLevel: 'loose'
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                mermaid.initialize({
+                    startOnLoad: false,
+                    theme: '${theme}',
+                    themeVariables: {
+                        darkMode: false,
+                        background: '${backgroundColor}',
+                        primaryColor: '#000000',
+                        primaryTextColor: '#ffffff',
+                        primaryBorderColor: '#000000',
+                        lineColor: '#666666',
+                        secondaryColor: '#0000ff',
+                        tertiaryColor: '#ffffff',
+                        fontFamily: '${fontFamily}',
+                        fontSize: '14px',
+                        nodeBorder: '#000000',
+                        mainBkg: '#000000',
+                        clusterBkg: 'rgba(0,0,0,0.02)',
+                        clusterBorder: 'rgba(0,0,0,0.1)',
+                        edgeLabelBackground: 'transparent',
+                        nodeTextColor: '#ffffff'
+                    },
+                    flowchart: {
+                        htmlLabels: true,
+                        curve: 'basis',
+                        rankSpacing: 80,
+                        nodeSpacing: 50,
+                        padding: 15,
+                        useMaxWidth: false
+                    },
+                    securityLevel: 'loose'
+                });
+
+                const definition = decodeURIComponent("${encodeURIComponent(definition)}");
+                const { svg } = await mermaid.render('mermaid-diagram', definition);
+                document.getElementById('mermaid-container').innerHTML = svg;
+                window.__mermaidReady = true;
+            } catch (err) {
+                document.getElementById('mermaid-container').innerHTML = 
+                    '<div style="color: red; padding: 20px; font-size: 18px;">Mermaid render error: ' + err.message + '</div>';
+                window.__mermaidReady = true;
+                window.__mermaidError = err.message;
+            }
         });
-        
-        try {
-            const definition = decodeURIComponent("${encodeURIComponent(definition)}");
-            const { svg } = await mermaid.render('mermaid-diagram', definition);
-            document.getElementById('mermaid-container').innerHTML = svg;
-            
-            // Signal ready
-            window.__mermaidReady = true;
-        } catch (err) {
-            document.getElementById('mermaid-container').innerHTML = 
-                '<div style="color: red; padding: 20px; font-size: 18px;">Mermaid render error: ' + err.message + '</div>';
-            window.__mermaidReady = true;
-            window.__mermaidError = err.message;
-        }
     </script>
 </head>
 <body>
@@ -206,7 +218,7 @@ export class MermaidRenderer {
 </body>
 </html>`;
 
-            await page.setContent(html, { timeout: 30000 });
+            await page.setContent(html, { waitUntil: 'networkidle0' as any, timeout: 30000 });
 
             // Wait for mermaid to finish rendering
             await page.waitForFunction('window.__mermaidReady === true', { timeout: 20000 });

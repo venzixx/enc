@@ -77,18 +77,29 @@ export default class TrackStart extends Event {
 				await updateSetupTrackStart(setup.messageId, textChannel, player, track, this.client, locale);
 			}
 		} else {
-            const layout = V2Helper.createLayout({
-                title: t(I18N.player.trackStart.now_playing, { lng: locale }),
-                description: `**[${track.info.title}](${track.info.uri})**\n` +
-                             `-# ${t(I18N.player.trackStart.author, { lng: locale })}: ${track.info.author}\n` +
-                             `-# ${t(I18N.player.trackStart.duration, { lng: locale })}: ${track.info.isStream ? "LIVE" : this.client.utils.formatTime(track.info.duration)}\n` +
-                             `-# ${t(I18N.player.trackStart.requested_by, { lng: locale, user: requester.username })}`,
-                color: this.client.config.color.main as ColorResolvable,
-                thumbnail: track.info.artworkUrl || undefined,
-                buttons: getButtons(player).flatMap(b => b.components as any).map(c => ButtonBuilder.from(c as any))
-            });
+            const embed = new EmbedBuilder()
+                .setAuthor({
+                    name: t(I18N.player.trackStart.now_playing, { lng: locale }),
+                    iconURL: iconURL || undefined,
+                })
+                .setDescription(
+                    `**[${track.info.title}](${track.info.uri})**\n` +
+                    `-# ${t(I18N.player.trackStart.author, { lng: locale })}: ${track.info.author}\n` +
+                    `-# ${t(I18N.player.trackStart.duration, { lng: locale })}: ${track.info.isStream ? "LIVE" : this.client.utils.formatTime(track.info.duration)}\n` +
+                    `-# ${t(I18N.player.trackStart.requested_by, { lng: locale, user: requester.username })}`,
+                )
+                .setColor(this.client.config.color.main as ColorResolvable);
 
-			const message = await channel.send(layout as any);
+            if (track.info.artworkUrl) {
+                embed.setThumbnail(track.info.artworkUrl);
+            }
+
+            const buttonRows = getButtons(player);
+
+			const message = await channel.send({
+                embeds: [embed],
+                components: buttonRows
+            });
 			player.set("messageId", message.id);
 		}
 	}

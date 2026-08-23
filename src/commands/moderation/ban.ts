@@ -9,6 +9,7 @@ import { ExtendedClient } from '../../client';
 import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
 import { Appeals } from '../../utils/Appeals';
+import { CaseManager } from '../../utils/CaseManager';
 
 export default class Ban extends Command {
 	constructor(client: ExtendedClient) {
@@ -73,16 +74,27 @@ export default class Ban extends Command {
             
 			await target.ban({ reason: `Banned by ${ctx.author.tag}: ${reason}` });
 			
+            // Create moderation case
+            const newCase = await CaseManager.createCase(client, {
+                guild: ctx.guild!,
+                type: 'BAN',
+                target: target.user,
+                moderator: ctx.author,
+                reason
+            });
+
 			const embed = new EmbedBuilder()
 				.setTitle(`${client.emoji.hammer} Member Banned`)
 				.setDescription(`**${target.user.tag}** has been banned from the server.`)
-				.addFields({ name: `${client.emoji.mic} Reason`, value: reason })
+				.addFields(
+                    { name: 'Case', value: `\`#${newCase.caseNumber}\``, inline: true },
+                    { name: `${client.emoji.mic} Reason`, value: reason }
+                )
 				.setColor(client.color.main)
+                .setFooter({ text: `Case #${newCase.caseNumber}` })
 				.setTimestamp();
 
 			await ctx.reply({ embeds: [embed] });
-
-            await logModerationAction(client, ctx.guild, 'BAN', ctx.author, target.user, reason);
 		} catch (error: any) {
 			await ctx.replyV2({ title: 'Execution Error', description: `Failed to execute ban: ${error.message}`, color: client.color.red, isAlert: true });
 		}

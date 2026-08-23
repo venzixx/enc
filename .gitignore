@@ -1,34 +1,60 @@
-# --- Sovereign Exclusion Grid ---
-
-# Node Dependencies
-node_modules/
-dist/
-.npm/
-
-# Environment Protocols (CRITICAL)
+# --- Security & Credentials (CRITICAL) ---
 **/.env*
+.env
+.env.*
+*.env
+*.env.*
+test_bot.env
+cookies.txt
+*.cookies*
+cookies/
 *.pem
 *.key
 *.p12
 *.pfx
 **/*.pem
+**/*.key
 
-# Sovereign Database (Clinical)
+# --- VPS & Deployment Artifacts ---
+scratch/
+scratch*
+.agents/
+.gemini/
+rainbowRoles.json
+nginx_*.conf
+remote_env*
+dashboard.env*
+
+# --- Dependencies & Build Artifacts ---
+node_modules/
+dist/
+.npm/
+.next/
+/out/
+/build/
+/dashboard/build/
+*.tsbuildinfo
+next-env.d.ts
+
+# --- Databases & Migrations ---
 *.db
 *.db-journal
 *.sqlite
 *.sqlite-journal
 /prisma/migrations/
 /dashboard/prisma/migrations/
+prisma/backups/
+prisma/schema*.tmp
+prisma/schema_*debug*
 
-# Python Virtual Environments
+# --- Python Virtual Environments ---
 .venv/
 .venv.zip
 env/
 venv/
 ENV/
 
-# OS / Clinical Fragments
+# --- Operating System & Logs ---
 .DS_Store
 .DS_Store?
 ._*
@@ -36,16 +62,6 @@ ENV/
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# Build & Velocity Artifacts
-.next/
-/out/
-/build
-/dashboard/build
-*.tsbuildinfo
-next-env.d.ts
-
-# Log Archives
 logs/
 *.log
 npm-debug.log*
@@ -56,16 +72,7 @@ tsc_errors.txt
 tsc_output.txt
 errors.txt
 
-# Nexus Internal
-.gemini/
-scratch/
-.vercel
-.agents/
-
-# Fonts Cache
-src/assets/fonts/cached/
-
-# Archives & Temporary Artifacts
+# --- Temporary Archives & Files ---
 *.tar.gz
 *.tar
 *.zip
@@ -74,21 +81,18 @@ src/assets/fonts/cached/
 *.bak
 *.tmp
 *.restore
-prisma/backups/
-prisma/schema*.tmp
-prisma/schema_*debug*
-remote_env*
-dashboard.env*
+files_to_compress.txt
+app/
+test_latin.cjs
 
-# Debug Images & Temporary Folders
+# --- Fonts Cache & Clones ---
+src/assets/fonts/cached/
+src/assets/fonts-repo/
+
+# --- Debug & Temporary Media ---
 *_debug*.png
 quote_light_*.png
 test_*.png
 verify_circle*.png
 Video Frame Extractor*
 year-wrapped-template*
-files_to_compress.txt
-app/
-test_latin.cjs
-
-

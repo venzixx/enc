@@ -17,7 +17,7 @@ export default class TicketOpen extends Component {
 		const optionId = parts[3];
 
         // Fetch config from DB
-        const config = await (this.client.prisma as any).ticketConfig.findUnique({
+        let config = await (this.client.prisma as any).ticketConfig.findUnique({
             where: {
                 guildId_panelId: {
                     guildId: interaction.guild.id,
@@ -25,6 +25,25 @@ export default class TicketOpen extends Component {
                 }
             }
         });
+
+        // Smart Fallback 1: Match by panel message ID
+        if (!config && interaction.message) {
+            config = await (this.client.prisma as any).ticketConfig.findFirst({
+                where: {
+                    guildId: interaction.guild.id,
+                    messageId: interaction.message.id
+                }
+            });
+        }
+
+        // Smart Fallback 2: Match any configured ticket panel for this server
+        if (!config) {
+            config = await (this.client.prisma as any).ticketConfig.findFirst({
+                where: {
+                    guildId: interaction.guild.id
+                }
+            });
+        }
 
         if (!config) {
             return await interaction.reply({ content: `${this.client.emoji.cross} This ticket panel is no longer configured.`, ephemeral: true });

@@ -1,35 +1,125 @@
 import { fetch } from 'undici';
-import { createCanvas, loadImage, GlobalFonts, Image, SKRSContext2D } from '@napi-rs/canvas';
+import { GlobalFonts } from '@napi-rs/canvas';
 import path from 'path';
 import fs from 'fs';
 import GIFEncoder from 'gif-encoder-2';
 
-// Register Fonts
+// Import makeitaquote engine
+// @ts-ignore
+import { MiQ, fonts, useFont } from 'makeitaquote';
+
+// Register all local font files from assets/fonts directory with makeitaquote
 const fontPath = path.join(process.cwd(), 'src', 'assets', 'fonts');
-if (fs.existsSync(path.join(fontPath, 'Inter-Regular.ttf'))) {
-    GlobalFonts.registerFromPath(path.join(fontPath, 'Inter-Regular.ttf'), 'Inter');
+if (fs.existsSync(fontPath)) {
+    try {
+        fonts.registerFromDir(fontPath);
+    } catch (err) {
+        console.error('Error registering fonts from dir:', err);
+    }
 }
-if (fs.existsSync(path.join(fontPath, 'PlayfairDisplay-Regular.ttf'))) {
-    GlobalFonts.registerFromPath(path.join(fontPath, 'PlayfairDisplay-Regular.ttf'), 'Playfair');
+
+// Register specific font family aliases for universal fallback support
+const fallbackFontMap: Record<string, string> = {
+    'NotoSansMath-Regular.ttf': 'Noto Sans Math',
+    'code2000.ttf': 'Code2000',
+    'code2001.ttf': 'Code2001',
+    'code2002.ttf': 'Code2002',
+    'newgardiner.ttf': 'NewGardiner',
+    'chirongoround.ttf': 'Chiron Hei HK',
+    'rhrcn.ttf': 'RHR CN',
+    'rhrcn-bold.ttf': 'RHR CN Bold',
+    'schinese.otf': 'Simplified Chinese',
+    'arabic.ttf': 'Arabic',
+    'korean.ttf': 'Korean',
+    'maokentangyuan.ttf': 'Chinese',
+    'openhuninn.ttf': 'Open Huninn',
+};
+
+for (const [file, family] of Object.entries(fallbackFontMap)) {
+    const fullPath = path.join(fontPath, file);
+    if (fs.existsSync(fullPath)) {
+        try {
+            fonts.registerFromPath(fullPath, family);
+        } catch { }
+    }
+}
+
+// Friendly display name mapping to font file and family
+export const FONT_REGISTRY: Record<string, { file: string; family: string }> = {
+    'Inter': { file: 'Inter-Regular.ttf', family: 'Inter' },
+    'Playfair': { file: 'PlayfairDisplay-Regular.ttf', family: 'Playfair' },
+    'Great Vibes': { file: 'GreatVibes-Regular.ttf', family: 'Great Vibes' },
+    'Bruno': { file: 'bruno.ttf', family: 'Bruno' },
+    'Castoro': { file: 'castoro.ttf', family: 'Castoro' },
+    'Exo 2': { file: 'exo2.ttf', family: 'Exo 2' },
+    'Inconsolata': { file: 'inconsolata.ttf', family: 'Inconsolata' },
+    'Poltawski': { file: 'poltawski.ttf', family: 'Poltawski' },
+    'Script': { file: 'script.ttf', family: 'Script' },
+    'Vina': { file: 'vina.ttf', family: 'Vina' },
+    'Dela': { file: 'dela.ttf', family: 'Dela' },
+    'Dot': { file: 'dot.ttf', family: 'Dot' },
+    'Jiyu': { file: 'jiyu.ttf', family: 'Jiyu' },
+    'M Plus': { file: 'mplus.ttf', family: 'M Plus' },
+    'M Plus Bold': { file: 'mplus-bold.ttf', family: 'M Plus Bold' },
+    'Pop': { file: 'pop.ttf', family: 'Pop' },
+    'Rampart': { file: 'rampart.ttf', family: 'Rampart' },
+    'Reggae': { file: 'reggae.ttf', family: 'Reggae' },
+    'RocknRoll': { file: 'rocknroll.ttf', family: 'RocknRoll' },
+    'Serif JP': { file: 'serif.ttf', family: 'Serif JP' },
+    'Yuji': { file: 'yuji.ttf', family: 'Yuji' },
+    'Yusei': { file: 'yusei.ttf', family: 'Yusei' },
+    'Arabic': { file: 'arabic.ttf', family: 'Arabic' },
+    'Korean': { file: 'korean.ttf', family: 'Korean' },
+    'Chinese': { file: 'maokentangyuan.ttf', family: 'Chinese' },
+    'Open Huninn': { file: 'openhuninn.ttf', family: 'Open Huninn' },
+};
+
+// Explicitly register family aliases for all custom fonts
+for (const [_, info] of Object.entries(FONT_REGISTRY)) {
+    const fullPath = path.join(fontPath, info.file);
+    if (fs.existsSync(fullPath)) {
+        try {
+            fonts.registerFromPath(fullPath, info.family);
+        } catch { }
+    }
 }
 if (fs.existsSync(path.join(fontPath, 'NotoColorEmoji.ttf'))) {
-    GlobalFonts.registerFromPath(path.join(fontPath, 'NotoColorEmoji.ttf'), 'Noto Color Emoji');
+    try {
+        GlobalFonts.registerFromPath(path.join(fontPath, 'NotoColorEmoji.ttf'), 'Noto Color Emoji');
+    } catch { }
+}
+
+const CUSTOM_FALLBACK_FAMILIES = [
+    'Noto Sans Math',
+    'Code2000',
+    'Code2001',
+    'Code2002',
+    'NewGardiner',
+    'Chiron Hei HK',
+    'RHR CN',
+    'M PLUS Rounded 1c',
+    'Noto Sans JP'
+];
+
+import { formatToMathematicalScript } from './Utils';
+
+/** Strip non-renderable symbol blocks like Egyptian Hieroglyphs (0x13000-0x1342F), while formatting lookalikes into Mathematical Script for Noto Sans Math */
+function stripUnrenderableSymbols(text: string): string {
+    return formatToMathematicalScript(text);
 }
 
 export interface QuoteOptions {
     color: boolean;
-    theme: 'dark' | 'light';
-    reverse: boolean;
-    blur: boolean;
-    gif: boolean;
+    theme: 'dark' | 'light' | 'color' | 'portrait' | 'portrait-light' | string;
+    reverse?: boolean;
+    blur?: boolean;
+    gif?: boolean;
     font?: string;
 }
 
 export class QuoteGenerator {
-    private static readonly API_URL = 'https://api.voids.top/fakequote';
-
+    /** Dynamically download and register Google Fonts if missing locally */
     public static async loadGoogleFont(fontName: string): Promise<boolean> {
-        const fontPath = path.join(process.cwd(), 'src', 'assets', 'fonts');
         const cachedDir = path.join(fontPath, 'cached');
         if (!fs.existsSync(cachedDir)) {
             fs.mkdirSync(cachedDir, { recursive: true });
@@ -40,10 +130,10 @@ export class QuoteGenerator {
 
         if (fs.existsSync(targetPath)) {
             try {
-                GlobalFonts.registerFromPath(targetPath, fontName);
+                fonts.registerFromPath(targetPath, fontName);
                 return true;
             } catch {
-                return true; // Already registered
+                return true;
             }
         }
 
@@ -62,8 +152,7 @@ export class QuoteGenerator {
             const buffer = Buffer.from(await fontRes.arrayBuffer());
             fs.writeFileSync(targetPath, buffer);
 
-            GlobalFonts.registerFromPath(targetPath, fontName);
-            console.log(`Successfully downloaded and registered Google Font: ${fontName}`);
+            fonts.registerFromPath(targetPath, fontName);
             return true;
         } catch (err) {
             console.error(`Error loading Google Font ${fontName}:`, err);
@@ -71,271 +160,95 @@ export class QuoteGenerator {
         }
     }
 
-    public static async generate(
-        content: string,
-        username: string,
-        displayName: string,
-        avatarUrl: string,
+    /** Generate a quote directly from a Discord Message object using makeitaquote engine */
+    public static async generateFromMessage(
+        message: any,
         options: QuoteOptions
     ): Promise<Buffer> {
-        // Try to load custom google font if it's not one of our local defaults
-        const selectedFont = options.font || 'Inter';
-        if (selectedFont !== 'Inter' && selectedFont !== 'Playfair' && selectedFont !== 'sans-serif') {
-            await this.loadGoogleFont(selectedFont);
+        const fontName = options.font || 'Inter';
+        let family = FONT_REGISTRY[fontName]?.family || fontName;
+        if (!fonts.has(family) && family !== 'sans-serif') {
+            await this.loadGoogleFont(family);
         }
 
-        // 1. Fetch base image (use a placeholder text to get the layout)
-        const baseBuffer = await this.fetchBaseImage(' ', username, displayName, avatarUrl, options.color);
+        const fontStack = `Noto Sans Math, ${family}, Code2000, Code2001, Code2002, NewGardiner, Chiron Hei HK, RHR CN, M PLUS Rounded 1c, Noto Sans JP, sans-serif`;
 
-        // 2. Setup Canvas
-        let canvas = createCanvas(1200, 630);
-        const ctx = canvas.getContext('2d');
-        ctx.font = '500 44px "Inter"';
-        console.log("Width 'Hello' right after canvas creation:", ctx.measureText("Hello").width);
+        const baseTheme: any = options.theme === 'light' ? 'light' : 
+                               options.theme === 'portrait' ? 'portrait' :
+                               options.theme === 'portrait-light' ? 'portrait-light' :
+                               options.color ? 'color' : 'dark';
 
-        const img = await loadImage(baseBuffer);
-        console.log("Base image loaded, dimensions:", img.width, "x", img.height);
+        const themeConfig: any = {
+            extends: baseTheme,
+            text: { font: fontStack },
+            displayName: { font: fontStack },
+            username: { font: fontStack }
+        };
 
-        const bgColor = options.theme === 'light' ? '#FFFFFF' : '#000000';
-        const textColor = options.theme === 'light' ? '#000000' : '#FFFFFF';
-
-        // Draw Background
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, 1200, 630);
-
-        // Draw Image (with optional inversion for theme)
-        if (options.theme === 'light') {
-            ctx.filter = 'invert(100%) hue-rotate(180deg)';
-            ctx.drawImage(img, 0, 0);
-            ctx.filter = 'none';
-
-            // Apply a soft white gradient overlay on the left side to keep the background light and clean
-            const overlayGrad = ctx.createLinearGradient(0, 0, 550, 0);
-            overlayGrad.addColorStop(0, 'rgba(255, 255, 255, 0.82)');
-            overlayGrad.addColorStop(1, 'rgba(255, 255, 255, 0.55)');
-            ctx.fillStyle = overlayGrad;
-            ctx.fillRect(0, 0, 550, 630);
-
-            // Fetch the avatar separately from Discord CDN and draw as a clean circle.
-            // This avoids artifacts from clipping the inverted base image (the API anti-aliases
-            // the avatar boundary against a dark background, causing dark halos when inverted).
-            const avCx = 225;
-            const avCy = 265;
-            const avR = 160;
-
-            try {
-                const avatarRes = await fetch(avatarUrl);
-                if (avatarRes.ok) {
-                    const avatarBuf = Buffer.from(await avatarRes.arrayBuffer());
-                    const avatarImg = await loadImage(avatarBuf);
-
-                    // Draw a white filled circle behind the avatar to cover any inverted artifacts
-                    ctx.beginPath();
-                    ctx.arc(avCx, avCy, avR + 6, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
-                    ctx.fill();
-
-                    // Draw the clean avatar as a circle
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(avCx, avCy, avR, 0, Math.PI * 2);
-                    ctx.clip();
-                    ctx.drawImage(avatarImg, avCx - avR, avCy - avR, avR * 2, avR * 2);
-                    ctx.restore();
-
-                    // Subtle border ring for definition
-                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.05)';
-                    ctx.lineWidth = 1.5;
-                    ctx.beginPath();
-                    ctx.arc(avCx, avCy, avR, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-            } catch (err) {
-                console.error('Failed to fetch avatar for light theme, falling back:', err);
-                // Fallback: draw the original (non-inverted) base image clipped as a circle
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(avCx, avCy, avR - 5, 0, Math.PI * 2);
-                ctx.clip();
-                ctx.drawImage(img, 0, 0);
-                ctx.restore();
-            }
-        } else {
-            ctx.drawImage(img, 0, 0);
-        }
-        console.log("Width 'Hello' after drawImage:", ctx.measureText("Hello").width);
-
-        // Overwrite Text Area with solid color to clear API text
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(550, 0, 650, 630);
-
-        // Handle Reverse (before drawing text)
         if (options.reverse) {
-            const reversedCanvas = createCanvas(1200, 630);
-            const rCtx = reversedCanvas.getContext('2d');
-            rCtx.drawImage(canvas, 0, 0, 450, 630, 750, 0, 450, 630); // Avatar side to right
-            rCtx.drawImage(canvas, 450, 0, 750, 630, 0, 0, 750, 630); // Text side to left
-            canvas = reversedCanvas;
+            themeConfig.avatar = { position: 'right' };
         }
 
-        const finalCtx = canvas.getContext('2d');
-        finalCtx.font = '500 44px "Inter"';
-        console.log("Width 'Hello' after finalCtx setup:", finalCtx.measureText("Hello").width);
+        const rawDisplayName = message.member?.displayName || message.member?.nickname || message.author?.globalName || message.author?.global_name || message.author?.username || 'User';
+        const rawUsername = message.author?.username || 'user';
 
-        // Apply Blur if needed
-        if (options.blur) {
-            finalCtx.save();
-            finalCtx.filter = 'blur(20px)';
-            const r = 160;
-            const cx = 225;
-            const cy = 265;
-            const avatarX = options.reverse ? (cx - r + 750) : (cx - r);
-            const avatarY = cy - r;
-            const avatarSize = r * 2;
-            finalCtx.drawImage(canvas, avatarX, avatarY, avatarSize, avatarSize, avatarX, avatarY, avatarSize, avatarSize);
-            finalCtx.restore();
+        console.log('[QUOTE DEBUG] rawDisplayName:', JSON.stringify(rawDisplayName));
+        for (const ch of rawDisplayName) {
+            console.log('[QUOTE DEBUG] char:', ch, 'codePoint: 0x' + ch.codePointAt(0)?.toString(16));
         }
 
-        // Draw Custom Text
-        const textX = options.reverse ? 70 : 580;
-        const maxWidth = 550;
+        const cleanedDisplayName = stripUnrenderableSymbols(rawDisplayName) || rawUsername;
+        const cleanedUsername = stripUnrenderableSymbols(rawUsername) || 'user';
 
-        finalCtx.textAlign = 'left';
-        
-        let quoteFontSize = 44;
-        let quoteLineHeight = 56;
-        const displayNameFontSize = 30;
-        const usernameFontSize = 24;
-        const spacing = 32;
-        const spacing2 = 12;
+        const cleanMsg = {
+            ...message,
+            author: {
+                ...message.author,
+                username: cleanedUsername,
+                globalName: cleanedDisplayName,
+                global_name: cleanedDisplayName,
+                displayAvatarURL: typeof message.author?.displayAvatarURL === 'function' ? message.author.displayAvatarURL.bind(message.author) : () => null
+            },
+            member: message.member ? {
+                ...message.member,
+                displayName: cleanedDisplayName,
+                nickname: cleanedDisplayName,
+                displayAvatarURL: typeof message.member?.displayAvatarURL === 'function' ? message.member.displayAvatarURL.bind(message.member) : () => null
+            } : null
+        };
 
-        const emojiMap = new Map<string, Image>();
-        const emojiRegex = /<a?:([a-zA-Z0-9_]+):([0-9]+)>/g;
-        let match;
-        const matches: { id: string; name: string }[] = [];
-        while ((match = emojiRegex.exec(content)) !== null) {
-            matches.push({ id: match[2], name: match[1] });
-        }
-
-        for (const m of matches) {
-            if (!emojiMap.has(m.id)) {
-                try {
-                    const emojiUrl = `https://cdn.discordapp.com/emojis/${m.id}.png?size=96`;
-                    const res = await fetch(emojiUrl);
-                    if (res.ok) {
-                        const buffer = Buffer.from(await res.arrayBuffer());
-                        const emojiImg = await loadImage(buffer);
-                        emojiMap.set(m.id, emojiImg);
-                    }
-                } catch (err) {
-                    console.error(`Failed to load custom emoji ${m.id}:`, err);
-                }
+        const miq = new MiQ({
+            theme: themeConfig,
+            autoFont: {
+                families: CUSTOM_FALLBACK_FAMILIES
             }
+        })
+            .setFromMessage(cleanMsg)
+            .setDisplayName(cleanedDisplayName)
+            .setUsername(cleanedUsername)
+            .setWatermark('enc');
+
+        // Resolve real avatar URL from message member or author
+        const avatarUrl = (typeof message.member?.displayAvatarURL === 'function' ? message.member.displayAvatarURL({ extension: 'png', size: 512 }) : null) ||
+                          (typeof message.author?.displayAvatarURL === 'function' ? message.author.displayAvatarURL({ extension: 'png', size: 512 }) : null);
+        if (avatarUrl) {
+            miq.setAvatar(avatarUrl);
         }
 
-        // Tokenize and Wrap text with emoji support
-        const paragraphs = content.split('\n');
-        let wrappedLines: any[] = [];
-        let quoteTextHeight = 0;
-        let totalHeight = 0;
-
-        // Loop to scale down font size until it fits within the 630px height card
-        while (quoteFontSize >= 18) {
-            const currentFontList = `500 ${quoteFontSize}px "${selectedFont}", sans-serif`;
-            finalCtx.font = currentFontList;
-
-            wrappedLines = [];
-            for (const para of paragraphs) {
-                const tokens = this.tokenizeParagraph(para);
-                const lines = this.wrapTokens(finalCtx, tokens, maxWidth, quoteFontSize);
-                wrappedLines.push(...lines);
-            }
-
-            quoteTextHeight = (wrappedLines.length - 1) * quoteLineHeight + quoteFontSize;
-            totalHeight = quoteTextHeight + spacing + displayNameFontSize + spacing2 + usernameFontSize;
-
-            // 520px leaves 55px top/bottom padding (630 - 520 = 110px total padding)
-            if (totalHeight <= 520 || quoteFontSize === 18) {
-                break;
-            }
-
-            quoteFontSize -= 2;
-            quoteLineHeight = Math.round(quoteFontSize * 1.27);
+        if (options.color && baseTheme !== 'light' && baseTheme !== 'portrait-light') {
+            miq.setTheme('color');
         }
 
-        const fontList = `500 ${quoteFontSize}px "${selectedFont}", sans-serif`;
-        finalCtx.font = fontList;
-
-        const topY = (630 - totalHeight) / 2;
-        let currentY = topY + quoteFontSize - 4;
-
-        console.log("Scaled QuoteFontSize:", quoteFontSize, "QuoteLineHeight:", quoteLineHeight);
-        console.log("QuoteTextHeight:", quoteTextHeight, "TotalHeight:", totalHeight, "TopY:", topY, "Initial currentY:", currentY);
-        console.log("fontList:", fontList);
-        console.log("textColor:", textColor);
-
-        // Draw quote lines with inline custom emojis
-        finalCtx.fillStyle = textColor;
-        finalCtx.font = fontList;
-        console.log("finalCtx.font set to:", finalCtx.font);
-
-        for (const line of wrappedLines) {
-            let currentX = textX;
-            console.log("Drawing line tokens:", line.tokens, "at Y:", currentY);
-            for (const token of line.tokens) {
-                if (token.type === 'word') {
-                    console.log(`Drawing word: "${token.text}" at X: ${currentX}, Y: ${currentY}`);
-                    finalCtx.fillText(token.text, currentX, currentY);
-                    currentX += finalCtx.measureText(token.text).width;
-                } else if (token.type === 'emoji') {
-                    const img = emojiMap.get(token.id);
-                    if (img) {
-                        finalCtx.drawImage(img, currentX, currentY - quoteFontSize + 6, quoteFontSize, quoteFontSize);
-                        currentX += quoteFontSize + 4;
-                    } else {
-                        const fallback = `:${token.name}:`;
-                        finalCtx.fillText(fallback, currentX, currentY);
-                        currentX += finalCtx.measureText(fallback).width;
-                    }
-                }
-            }
-            currentY += quoteLineHeight;
-        }
-        
-        // Draw Display Name
-        const displayNameY = (currentY - quoteLineHeight) + spacing + displayNameFontSize;
-        finalCtx.font = `italic 30px "${selectedFont}", sans-serif`;
-        finalCtx.fillStyle = textColor;
-        finalCtx.fillText(`- ${displayName}`, textX, displayNameY);
-
-        // Draw Username (Author handle)
-        const usernameY = displayNameY + spacing2 + usernameFontSize;
-        finalCtx.font = `24px "${selectedFont}", sans-serif`;
-        finalCtx.fillStyle = options.theme === 'light' ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.35)';
-        finalCtx.fillText(username, textX, usernameY);
-
-        // Draw Watermark "enc"
-        finalCtx.font = `24px "${selectedFont}"`;
-        finalCtx.fillStyle = options.theme === 'light' ? 'rgba(0, 0, 0, 0.22)' : 'rgba(255, 255, 255, 0.18)';
-        if (options.reverse) {
-            finalCtx.textAlign = 'left';
-            finalCtx.fillText('enc', 45, 630 - 40);
-        } else {
-            finalCtx.textAlign = 'right';
-            finalCtx.fillText('enc', 1200 - 45, 630 - 40);
-        }
+        const canvas = await miq.render();
 
         if (options.gif) {
-            const encoder = new GIFEncoder(1200, 630);
+            const encoder = new GIFEncoder(canvas.width, canvas.height);
             encoder.start();
             encoder.setRepeat(0);
             encoder.setDelay(500);
             encoder.setQuality(10);
-            
-            // Add two identical frames to make it a valid loopable GIF
             encoder.addFrame(canvas.getContext('2d') as any);
             encoder.addFrame(canvas.getContext('2d') as any);
-            
             encoder.finish();
             return encoder.out.getData();
         }
@@ -343,179 +256,71 @@ export class QuoteGenerator {
         return canvas.toBuffer('image/png');
     }
 
-    private static tokenizeParagraph(paragraph: string): any[] {
-        const regex = /<a?:([a-zA-Z0-9_]+):([0-9]+)>/g;
-        const tokens: any[] = [];
-        let lastIndex = 0;
-        let match;
-
-        while ((match = regex.exec(paragraph)) !== null) {
-            const textBefore = paragraph.slice(lastIndex, match.index);
-            if (textBefore) {
-                const words = textBefore.split(/(\s+)/);
-                for (const word of words) {
-                    if (word) {
-                        tokens.push({ type: 'word', text: word });
-                    }
-                }
-            }
-            tokens.push({ type: 'emoji', id: match[2], name: match[1] });
-            lastIndex = regex.lastIndex;
-        }
-
-        const textAfter = paragraph.slice(lastIndex);
-        if (textAfter) {
-            const words = textAfter.split(/(\s+)/);
-            for (const word of words) {
-                if (word) {
-                    tokens.push({ type: 'word', text: word });
-                }
-            }
-        }
-
-        return tokens;
-    }
-
-    private static wrapTokens(ctx: SKRSContext2D, tokens: any[], maxWidth: number, emojiSize: number): any[] {
-        const lines: any[] = [];
-        let currentLineTokens: any[] = [];
-        let currentLineWidth = 0;
-
-        for (const token of tokens) {
-            let tokenWidth = 0;
-            if (token.type === 'word') {
-                tokenWidth = ctx.measureText(token.text).width;
-            } else if (token.type === 'emoji') {
-                tokenWidth = emojiSize + 4;
-            }
-
-            if (token.type === 'emoji') {
-                if (currentLineWidth + tokenWidth > maxWidth && currentLineTokens.length > 0) {
-                    lines.push({ tokens: this.trimLineTokens(currentLineTokens) });
-                    currentLineTokens = [token];
-                    currentLineWidth = tokenWidth;
-                } else {
-                    currentLineTokens.push(token);
-                    currentLineWidth += tokenWidth;
-                }
-            } else {
-                if (currentLineWidth + tokenWidth <= maxWidth) {
-                    currentLineTokens.push(token);
-                    currentLineWidth += tokenWidth;
-                } else {
-                    if (tokenWidth <= maxWidth && currentLineTokens.length > 0) {
-                        lines.push({ tokens: this.trimLineTokens(currentLineTokens) });
-                        currentLineTokens = [token];
-                        currentLineWidth = tokenWidth;
-                    } else {
-                        let remainingText = token.text;
-                        while (remainingText.length > 0) {
-                            const availableWidth = maxWidth - currentLineWidth;
-                            let low = 0;
-                            let high = remainingText.length;
-                            let fitCount = 0;
-
-                            while (low <= high) {
-                                const mid = Math.floor((low + high) / 2);
-                                const testSub = remainingText.slice(0, mid);
-                                const testWidth = ctx.measureText(testSub).width;
-                                if (testWidth <= availableWidth) {
-                                    fitCount = mid;
-                                    low = mid + 1;
-                                } else {
-                                    high = mid - 1;
-                                }
-                            }
-
-                            if (fitCount === 0 && currentLineTokens.length > 0) {
-                                lines.push({ tokens: this.trimLineTokens(currentLineTokens) });
-                                currentLineTokens = [];
-                                currentLineWidth = 0;
-                                continue;
-                            }
-
-                            if (fitCount === 0) {
-                                fitCount = 1;
-                            }
-
-                            const fitText = remainingText.slice(0, fitCount);
-                            currentLineTokens.push({ type: 'word', text: fitText });
-                            currentLineWidth += ctx.measureText(fitText).width;
-                            remainingText = remainingText.slice(fitCount);
-
-                            if (remainingText.length > 0) {
-                                lines.push({ tokens: this.trimLineTokens(currentLineTokens) });
-                                currentLineTokens = [];
-                                currentLineWidth = 0;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (currentLineTokens.length > 0) {
-            lines.push({ tokens: this.trimLineTokens(currentLineTokens) });
-        }
-
-        return lines;
-    }
-
-    private static trimLineTokens(tokens: any[]): any[] {
-        let start = 0;
-        let end = tokens.length - 1;
-        while (start <= end && tokens[start].type === 'word' && tokens[start].text.trim() === '') {
-            start++;
-        }
-        while (end >= start && tokens[end].type === 'word' && tokens[end].text.trim() === '') {
-            end--;
-        }
-        return tokens.slice(start, end + 1);
-    }
-
-    private static readonly API_URL_BETA = 'https://api.voids.top/fakequotebeta';
-
-    private static async fetchBaseImage(
+    /** Generate a quote from explicit text, username, display name, and avatar URL */
+    public static async generate(
         content: string,
         username: string,
         displayName: string,
         avatarUrl: string,
-        color: boolean
+        options: QuoteOptions
     ): Promise<Buffer> {
-        const payload = {
-            text: content,
-            avatar: avatarUrl,
-            username: username.startsWith('@') ? username.slice(1) : username,
-            display_name: displayName,
-            color: color ? 'true' : 'false',
-            watermark: 'enceladus'
-        };
-
-        // Try beta API first (returns image buffer directly, one less HTTP roundtrip)
-        try {
-            const betaResponse = await fetch(this.API_URL_BETA, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (betaResponse.ok) {
-                return Buffer.from(await betaResponse.arrayBuffer());
-            }
-        } catch (err) {
-            console.warn('Beta API failed, falling back to regular API:', err);
+        const fontName = options.font || 'Inter';
+        let family = FONT_REGISTRY[fontName]?.family || fontName;
+        if (!fonts.has(family) && family !== 'sans-serif') {
+            await this.loadGoogleFont(family);
         }
 
-        // Fallback to regular API
-        const response = await fetch(this.API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        const fontStack = `Noto Sans Math, ${family}, Code2000, Code2001, Code2002, NewGardiner, Chiron Hei HK, RHR CN, M PLUS Rounded 1c, Noto Sans JP, sans-serif`;
 
-        if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
-        const data = await response.json() as { url: string };
-        const imageRes = await fetch(data.url);
-        return Buffer.from(await imageRes.arrayBuffer());
+        const baseTheme: any = options.theme === 'light' ? 'light' : 
+                               options.theme === 'portrait' ? 'portrait' :
+                               options.theme === 'portrait-light' ? 'portrait-light' :
+                               options.color ? 'color' : 'dark';
+
+        const themeConfig: any = {
+            extends: baseTheme,
+            text: { font: fontStack },
+            displayName: { font: fontStack },
+            username: { font: fontStack }
+        };
+
+        if (options.reverse) {
+            themeConfig.avatar = { position: 'right' };
+        }
+
+        const cleanedDisplayName = stripUnrenderableSymbols(displayName || username) || username || 'User';
+        const cleanedUsername = stripUnrenderableSymbols(username) || 'user';
+
+        const miq = new MiQ({
+            theme: themeConfig,
+            autoFont: {
+                families: CUSTOM_FALLBACK_FAMILIES
+            }
+        })
+            .setText(content)
+            .setAvatar(avatarUrl)
+            .setUsername(cleanedUsername)
+            .setDisplayName(cleanedDisplayName)
+            .setWatermark('enc');
+
+        if (options.color && baseTheme !== 'light' && baseTheme !== 'portrait-light') {
+            miq.setTheme('color');
+        }
+
+        const canvas = await miq.render();
+
+        if (options.gif) {
+            const encoder = new GIFEncoder(canvas.width, canvas.height);
+            encoder.start();
+            encoder.setRepeat(0);
+            encoder.setDelay(500);
+            encoder.setQuality(10);
+            encoder.addFrame(canvas.getContext('2d') as any);
+            encoder.addFrame(canvas.getContext('2d') as any);
+            encoder.finish();
+            return encoder.out.getData();
+        }
+
+        return canvas.toBuffer('image/png');
     }
 }

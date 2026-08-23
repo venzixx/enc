@@ -7,10 +7,18 @@ export default class ChannelManager extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'channel',
+            aliases: ['ch', 'channels'],
             description: {
-                content: 'Manage channels: create, move, clone, or nuke.',
-                usage: 'channel <create|move|clone|nuke>',
-                examples: ['channel create general', 'channel nuke']
+                content: 'Manage channels: create, move, clone, nuke, rename, lock, unlock, hide, unhide.',
+                usage: 'channel <create|move|clone|nuke|rename|lock|unlock|hide|unhide>',
+                examples: [
+                    'channel clone',
+                    'ch clone #general',
+                    'ch nuke',
+                    'ch create lounge',
+                    'ch rename chat',
+                    'ch lock'
+                ]
             },
             category: 'moderation',
             cooldown: 5,
@@ -94,18 +102,72 @@ export default class ChannelManager extends Command {
                     options: [
                         { name: 'channel', description: 'Channel to unhide (defaults to current)', type: 7, required: false }
                     ]
+                },
+                {
+                    name: 'nsfw',
+                    description: 'Sets or toggles the channel to Age-Restricted (NSFW)',
+                    type: 1,
+                    options: [
+                        { name: 'enable', description: 'Enable or disable NSFW mode (defaults to toggle)', type: 5, required: false },
+                        { name: 'channel', description: 'Channel to modify (defaults to current)', type: 7, required: false }
+                    ]
                 }
             ]
         });
     }
 
-    public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
+    public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+        let sub: string | null = null;
+        try {
+            sub = ctx.isInteraction ? ctx.options.getSubcommand() : (args[0]?.toLowerCase() || null);
+        } catch {
+            sub = args[0]?.toLowerCase() || null;
+        }
+
+        if (!sub) {
+            return ctx.replyV2({
+                title: 'Channel Management Commands',
+                description: 'Usage: `,ch <subcommand> [options]` or `,channel <subcommand>`\n\n' +
+                    ' `nsfw [on/off] [#channel]` - Sets or toggles channel Age-Restricted (NSFW) status\n' +
+                    ' `clone [channel]` - Duplicates the channel with exact settings\n' +
+                    ' `nuke [channel]` - Deletes and recreates the channel clean\n' +
+                    ' `create <name> [category]` - Creates a new text channel\n' +
+                    ' `rename <new-name> [channel]` - Renames the channel\n' +
+                    ' `move <category> [channel]` - Moves channel to a category\n' +
+                    ' `lock [channel]` - Locks channel for @everyone\n' +
+                    ' `unlock [channel]` - Unlocks channel for @everyone\n' +
+                    ' `hide [channel]` - Hides channel from @everyone\n' +
+                    ' `unhide [channel]` - Unhides channel for @everyone',
+                color: client.color.main
+            });
+        }
+
         await ctx.deferReply();
-        const sub = ctx.options.getSubcommand();
+
+        const resolveTargetChannel = (argIndex: number = 1): TextChannel | VoiceChannel | null => {
+            if (ctx.isInteraction) {
+                return (ctx.options.getChannel('channel') || ctx.channel) as TextChannel | VoiceChannel;
+            }
+            const rawArg = args[argIndex];
+            if (!rawArg) return ctx.channel as TextChannel | VoiceChannel;
+            const channelId = rawArg.replace(/[<#>]/g, '');
+            const found = ctx.guild?.channels.cache.get(channelId) as TextChannel | VoiceChannel;
+            return found || (ctx.channel as TextChannel | VoiceChannel);
+        };
 
         if (sub === 'create') {
-            const name = ctx.options.getString('name');
-            let category = ctx.options.getChannel('category') as CategoryChannel | null;
+            const name = ctx.isInteraction ? ctx.options.getString('name') : args[1];
+            if (!name) {
+                return ctx.replyV2({ title: 'Error', description: 'Please provide a channel name. Usage: `,ch create <name>`', color: client.color.red });
+            }
+
+            let category: CategoryChannel | null = null;
+            if (ctx.isInteraction) {
+                category = ctx.options.getChannel('category') as CategoryChannel | null;
+            } else if (args[2]) {
+                const catId = args[2].replace(/[<#>]/g, '');
+                category = ctx.guild.channels.cache.get(catId) as CategoryChannel | null;
+            }
 
             // default to current category
             if (!category && ctx.channel && !ctx.channel.isDMBased()) {
@@ -142,10 +204,20 @@ export default class ChannelManager extends Command {
         }
 
         if (sub === 'move') {
-            const category = ctx.options.getChannel('category') as CategoryChannel;
-            const targetChannel = (ctx.options.getChannel('channel') || ctx.channel) as TextChannel | VoiceChannel;
+            let category: CategoryChannel | null = null;
+            if (ctx.isInteraction) {
+                category = ctx.options.getChannel('category') as CategoryChannel;
+            } else if (args[1]) {
+                const catId = args[1].replace(/[<#>]/g, '');
+                category = ctx.guild.channels.cache.get(catId) as CategoryChannel | null;
+            }
 
-            if (targetChannel.isDMBased()) return;
+            if (!category) {
+                return ctx.replyV2({ title: 'Error', description: 'Please specify a category. Usage: `,ch move <category-id> [#channel]`', color: client.color.red });
+            }
+
+            const targetChannel = resolveTargetChannel(2);
+            if (!targetChannel || targetChannel.isDMBased()) return;
 
             await targetChannel.setParent(category.id, { lockPermissions: true });
 
@@ -157,8 +229,8 @@ export default class ChannelManager extends Command {
         }
 
         if (sub === 'clone') {
-            const targetChannel = (ctx.options.getChannel('channel') || ctx.channel) as TextChannel | VoiceChannel;
-            if (targetChannel.isDMBased()) return;
+            const targetChannel = resolveTargetChannel(1);
+            if (!targetChannel || targetChannel.isDMBased()) return;
 
             const cloned = await targetChannel.clone();
 
@@ -176,8 +248,8 @@ export default class ChannelManager extends Command {
         }
 
         if (sub === 'nuke') {
-            const targetChannel = (ctx.options.getChannel('channel') || ctx.channel) as TextChannel | VoiceChannel;
-            if (targetChannel.isDMBased()) return;
+            const targetChannel = resolveTargetChannel(1);
+            if (!targetChannel || targetChannel.isDMBased()) return;
 
             const name = targetChannel.name;
             const isCurrentChannel = targetChannel.id === ctx.channel.id;
@@ -198,10 +270,7 @@ export default class ChannelManager extends Command {
 
             await cloned.send({ embeds: [nukeEmbed] }).catch(() => {});
 
-            // If we just deleted the channel the interaction was executed in, we can't reply to the interaction!
             if (isCurrentChannel) {
-                // Since the interaction payload is gone (channel deleted), it will naturally fail or timeout. 
-                // We're good just returning.
                 return;
             } else {
                 return ctx.replyV2({
@@ -213,9 +282,13 @@ export default class ChannelManager extends Command {
         }
 
         if (sub === 'rename') {
-            const newName = ctx.options.getString('name')!;
-            const targetChannel = (ctx.options.getChannel('channel') || ctx.channel) as TextChannel | VoiceChannel;
-            if (targetChannel.isDMBased()) return;
+            const newName = ctx.isInteraction ? ctx.options.getString('name')! : args[1];
+            if (!newName) {
+                return ctx.replyV2({ title: 'Error', description: 'Please specify a new channel name. Usage: `,ch rename <new-name> [#channel]`', color: client.color.red });
+            }
+
+            const targetChannel = ctx.isInteraction ? resolveTargetChannel(1) : (args[2] ? resolveTargetChannel(2) : (ctx.channel as TextChannel | VoiceChannel));
+            if (!targetChannel || targetChannel.isDMBased()) return;
 
             const oldName = targetChannel.name;
             await targetChannel.setName(newName);
@@ -227,7 +300,7 @@ export default class ChannelManager extends Command {
                 executorTag: ctx.author.tag,
                 targetId: targetChannel.id,
                 targetName: newName,
-                details: `Renamed channel from #${oldName} to #${newName} (via /channel rename)`,
+                details: `Renamed channel from #${oldName} to #${newName} (via channel rename)`,
                 color: client.color.main
             });
 
@@ -239,8 +312,8 @@ export default class ChannelManager extends Command {
         }
 
         if (sub === 'lock' || sub === 'unlock') {
-            const targetChannel = (ctx.options.getChannel('channel') || ctx.channel) as TextChannel | VoiceChannel;
-            if (targetChannel.isDMBased()) return;
+            const targetChannel = resolveTargetChannel(1);
+            if (!targetChannel || targetChannel.isDMBased()) return;
 
             const isLock = sub === 'lock';
             await targetChannel.permissionOverwrites.edit(ctx.guild.roles.everyone, {
@@ -266,8 +339,8 @@ export default class ChannelManager extends Command {
         }
 
         if (sub === 'hide' || sub === 'unhide') {
-            const targetChannel = (ctx.options.getChannel('channel') || ctx.channel) as TextChannel | VoiceChannel;
-            if (targetChannel.isDMBased()) return;
+            const targetChannel = resolveTargetChannel(1);
+            if (!targetChannel || targetChannel.isDMBased()) return;
 
             const isHide = sub === 'hide';
             await targetChannel.permissionOverwrites.edit(ctx.guild.roles.everyone, {
@@ -289,6 +362,62 @@ export default class ChannelManager extends Command {
                 title: `${client.emoji.success} Channel ${isHide ? 'Hidden' : 'Unhidden'}`,
                 description: `Successfully ${isHide ? 'hidden' : 'unhidden'} ${targetChannel} from everyone.`,
                 color: isHide ? client.color.red : client.color.main
+            });
+        }
+
+        if (sub === 'nsfw') {
+            const targetChannel = ctx.isInteraction 
+                ? resolveTargetChannel(1) 
+                : (args[2] ? resolveTargetChannel(2) : (ctx.channel as TextChannel | VoiceChannel));
+
+            if (!targetChannel || targetChannel.isDMBased()) {
+                return ctx.replyV2({
+                    title: 'Error',
+                    description: 'Invalid channel or cannot be executed in DMs.',
+                    color: client.color.red
+                });
+            }
+
+            if (!('setNSFW' in targetChannel)) {
+                return ctx.replyV2({
+                    title: 'Error',
+                    description: 'This channel type does not support Age-Restricted (NSFW) settings.',
+                    color: client.color.red
+                });
+            }
+
+            let newState: boolean;
+            if (ctx.isInteraction) {
+                const explicitEnable = ctx.options.getBoolean('enable');
+                newState = explicitEnable !== null ? explicitEnable : !(targetChannel as TextChannel).nsfw;
+            } else {
+                const arg = args[1]?.toLowerCase();
+                if (arg === 'on' || arg === 'enable' || arg === 'true' || arg === 'yes') {
+                    newState = true;
+                } else if (arg === 'off' || arg === 'disable' || arg === 'false' || arg === 'no') {
+                    newState = false;
+                } else {
+                    newState = !(targetChannel as TextChannel).nsfw;
+                }
+            }
+
+            await (targetChannel as TextChannel).setNSFW(newState, `Modified by ${ctx.author.tag}`);
+
+            await AuditLogger.log(client, ctx.guild, {
+                type: AuditLogType.MODERATION,
+                event: newState ? 'Channel Marked NSFW' : 'Channel Unmarked NSFW',
+                executorId: ctx.author.id,
+                executorTag: ctx.author.tag,
+                targetId: targetChannel.id,
+                targetName: targetChannel.name,
+                details: `${newState ? 'Enabled' : 'Disabled'} Age-Restricted (NSFW) mode on #${targetChannel.name}`,
+                color: newState ? client.color.red : client.color.main
+            });
+
+            return ctx.replyV2({
+                title: `${client.emoji.success} Channel Updated`,
+                description: `Successfully ${newState ? 'marked' : 'unmarked'} ${targetChannel} as **Age-Restricted (NSFW)**.`,
+                color: newState ? 0xef4444 : client.color.main
             });
         }
     }

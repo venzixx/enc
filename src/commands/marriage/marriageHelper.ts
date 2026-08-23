@@ -463,7 +463,10 @@ export const marriageHelper = {
 
     // 8. TREE
     async drawTree(client: ExtendedClient, ctx: Context, targetUser: User | null, page = 1, fontName = 'Inter'): Promise<any> {
-        
+        if (ctx.interaction && !ctx.deferred) {
+            await ctx.deferReply();
+        }
+
         const user = targetUser || ctx.author;
 
         // ═══════════════════════════════════════════════════
@@ -560,222 +563,308 @@ export const marriageHelper = {
         // Pagination for children (max 4 per page due to spouse pairs)
         const itemsPerPage = 4;
         const totalPages = Math.max(1, Math.ceil(childIds.length / itemsPerPage));
-        if (page > totalPages) page = totalPages;
-        const paginatedChildIds = childIds.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+        let currentPage = page;
+        if (currentPage < 1) currentPage = 1;
+        if (currentPage > totalPages) currentPage = totalPages;
 
-        // ═══════════════════════════════════════════════════
-        // FETCH ALL USERS + AVATARS
-        // ═══════════════════════════════════════════════════
-        const allUserIds = new Set<string>([user.id]);
-        if (spouseId) allUserIds.add(spouseId);
-        for (const pc of parentCouples) {
-            allUserIds.add(pc.id1);
-            if (pc.id2) allUserIds.add(pc.id2);
-        }
-        for (const sid of siblings) {
-            allUserIds.add(sid);
-            const ss = siblingSpouseMap.get(sid);
-            if (ss) allUserIds.add(ss);
-        }
-        for (const cid of paginatedChildIds) {
-            allUserIds.add(cid);
-            const cs = childSpouseMap.get(cid);
-            if (cs) allUserIds.add(cs);
-        }
+        const renderTreePage = async (pageToRender: number): Promise<Buffer> => {
+            const paginatedChildIds = childIds.slice((pageToRender - 1) * itemsPerPage, pageToRender * itemsPerPage);
 
-        const fetchedUsers = await Promise.all(
-            Array.from(allUserIds).map(async (id) => {
-                try { return await client.users.fetch(id); } catch { return null; }
-            })
-        );
-        const userMap = new Map<string, User>(fetchedUsers.filter(Boolean).map(u => [u!.id, u!]));
-
-        // ═══════════════════════════════════════════════════
-        // BUILD MERMAID DEFINITION
-        // ═══════════════════════════════════════════════════
-        const getName = (id: string): string => {
-            const u = userMap.get(id);
-            return sanitizeMermaidLabel(u ? u.username : 'Unknown');
-        };
-
-        const nodeId = (id: string): string => `u${id.substring(0, 8)}`;
-
-        const lines: string[] = [];
-        lines.push('graph TD');
-        lines.push('');
-
-        // Stats for title
-        const stats = [
-            spouseId ? '💍 Married' : '💔 Single',
-            `👥 ${siblings.length} sibling${siblings.length !== 1 ? 's' : ''}`,
-            `👶 ${childIds.length} child${childIds.length !== 1 ? 'ren' : ''}`,
-            `👨‍👩‍👧 ${parentIds.length} parent${parentIds.length !== 1 ? 's' : ''}`
-        ].join(' · ');
-        
-        // Title node (dark text for white background)
-        lines.push(`    TITLE["👑 ${getName(user.id)}'s Family Tree<br/><small>${stats}</small>"]`);
-        lines.push(`    style TITLE fill:transparent,stroke:none,color:#000000,font-size:18px`);
-        lines.push('');
-
-        // ── PARENT NODES ──
-        const parentNodeIds: string[] = [];
-        const parentJunctions = new Map<string, string>();
-        for (const pc of parentCouples) {
-            const p1 = nodeId(pc.id1);
-            const p1Name = getName(pc.id1);
-            lines.push(`    ${p1}["${p1Name}"]`);
-            parentNodeIds.push(p1);
-
-            if (pc.id2) {
-                const p2 = nodeId(pc.id2);
-                const p2Name = getName(pc.id2);
-                lines.push(`    ${p2}["${p2Name}"]`);
-                parentNodeIds.push(p2);
-                
-                // Create junction for parent couple
-                const pJuncId = `j_${p1}_${p2}`;
-                lines.push(`    ${pJuncId}(( ))`);
-                lines.push(`    class ${pJuncId} junctionNode`);
-                
-                lines.push(`    ${p1} --- ${pJuncId}`);
-                lines.push(`    ${p2} --- ${pJuncId}`);
-                parentJunctions.set(pc.id1, pJuncId);
-                parentJunctions.set(pc.id2, pJuncId);
-            }
-        }
-        lines.push('');
-
-        // ── SELF NODE ──
-        const selfId = nodeId(user.id);
-        lines.push(`    ${selfId}["${getName(user.id)}"]`);
-
-        // Self marriage
-        let selfJunctionId: string | null = null;
-        if (spouseId) {
-            const spId = nodeId(spouseId);
-            lines.push(`    ${spId}["${getName(spouseId)}"]`);
-            
-            selfJunctionId = `j_${selfId}_${spId}`;
-            lines.push(`    ${selfJunctionId}(( ))`);
-            lines.push(`    class ${selfJunctionId} junctionNode`);
-            
-            lines.push(`    ${selfId} --- ${selfJunctionId}`);
-            lines.push(`    ${spId} --- ${selfJunctionId}`);
-        }
-
-        // ── SIBLING NODES ──
-        const siblingNodeIds: string[] = [];
-        for (const sid of siblings) {
-            const sId = nodeId(sid);
-            lines.push(`    ${sId}["${getName(sid)}"]`);
-            siblingNodeIds.push(sId);
-
-            const ss = siblingSpouseMap.get(sid);
-            if (ss) {
-                const ssId = nodeId(ss);
-                lines.push(`    ${ssId}["${getName(ss)}"]`);
-                lines.push(`    ${sId} --- ${ssId}`);
-            }
-        }
-        lines.push('');
-
-        // ── PARENT → SELF/SIBLINGS CONNECTIONS ──
-        if (parentCouples.length > 0) {
-            // Connect each parent couple/single parent to self and siblings
+            const allUserIds = new Set<string>([user.id]);
+            if (spouseId) allUserIds.add(spouseId);
             for (const pc of parentCouples) {
-                const pJuncId = parentJunctions.get(pc.id1);
-                if (pJuncId) {
-                    // Connect junction to self
-                    lines.push(`    ${pJuncId} --> ${selfId}`);
-                    // Connect junction to siblings
-                    for (const sNodeId of siblingNodeIds) {
-                        lines.push(`    ${pJuncId} --> ${sNodeId}`);
-                    }
-                } else {
-                    const p1 = nodeId(pc.id1);
-                    // Connect parent directly to self
-                    lines.push(`    ${p1} --> ${selfId}`);
-                    // Connect parent to siblings
-                    for (const sNodeId of siblingNodeIds) {
-                        lines.push(`    ${p1} --> ${sNodeId}`);
+                allUserIds.add(pc.id1);
+                if (pc.id2) allUserIds.add(pc.id2);
+            }
+            for (const sid of siblings) {
+                allUserIds.add(sid);
+                const ss = siblingSpouseMap.get(sid);
+                if (ss) allUserIds.add(ss);
+            }
+            for (const cid of paginatedChildIds) {
+                allUserIds.add(cid);
+                const cs = childSpouseMap.get(cid);
+                if (cs) allUserIds.add(cs);
+            }
+
+            const fetchedUsers = await Promise.all(
+                Array.from(allUserIds).map(async (id) => {
+                    try { return await client.users.fetch(id); } catch { return null; }
+                })
+            );
+            const userMap = new Map<string, User>(fetchedUsers.filter(Boolean).map(u => [u!.id, u!]));
+
+            const getName = (id: string): string => {
+                const u = userMap.get(id);
+                return sanitizeMermaidLabel(u ? u.username : 'Unknown');
+            };
+
+            const nodeId = (id: string): string => `u${id.substring(0, 8)}`;
+
+            const lines: string[] = [];
+            lines.push('graph TD');
+            lines.push('');
+
+            const stats = [
+                spouseId ? '💍 Married' : '💔 Single',
+                `👥 ${siblings.length} sibling${siblings.length !== 1 ? 's' : ''}`,
+                `👶 ${childIds.length} child${childIds.length !== 1 ? 'ren' : ''}`,
+                `👨‍👩‍👧 ${parentIds.length} parent${parentIds.length !== 1 ? 's' : ''}`
+            ].join(' · ');
+            
+            lines.push(`    TITLE["👑 ${getName(user.id)}'s Family Tree<br/><small>${stats}</small>"]`);
+            lines.push(`    style TITLE fill:transparent,stroke:none,color:#000000,font-size:18px`);
+            lines.push('');
+
+            // Parent Nodes
+            const parentNodeIds: string[] = [];
+            const parentJunctions = new Map<string, string>();
+            for (const pc of parentCouples) {
+                const p1 = nodeId(pc.id1);
+                const p1Name = getName(pc.id1);
+                lines.push(`    ${p1}["${p1Name}"]`);
+                parentNodeIds.push(p1);
+
+                if (pc.id2) {
+                    const p2 = nodeId(pc.id2);
+                    const p2Name = getName(pc.id2);
+                    lines.push(`    ${p2}["${p2Name}"]`);
+                    parentNodeIds.push(p2);
+                    
+                    const pJuncId = `j_${p1}_${p2}`;
+                    lines.push(`    ${pJuncId}(( ))`);
+                    lines.push(`    class ${pJuncId} junctionNode`);
+                    
+                    lines.push(`    ${p1} --- ${pJuncId}`);
+                    lines.push(`    ${p2} --- ${pJuncId}`);
+                    parentJunctions.set(pc.id1, pJuncId);
+                    parentJunctions.set(pc.id2, pJuncId);
+                }
+            }
+            lines.push('');
+
+            // Self Node
+            const selfId = nodeId(user.id);
+            lines.push(`    ${selfId}["${getName(user.id)}"]`);
+
+            let selfJunctionId: string | null = null;
+            if (spouseId) {
+                const spId = nodeId(spouseId);
+                lines.push(`    ${spId}["${getName(spouseId)}"]`);
+                
+                selfJunctionId = `j_${selfId}_${spId}`;
+                lines.push(`    ${selfJunctionId}(( ))`);
+                lines.push(`    class ${selfJunctionId} junctionNode`);
+                
+                lines.push(`    ${selfId} --- ${selfJunctionId}`);
+                lines.push(`    ${spId} --- ${selfJunctionId}`);
+            }
+
+            // Siblings
+            const siblingNodeIds: string[] = [];
+            for (const sid of siblings) {
+                const sId = nodeId(sid);
+                lines.push(`    ${sId}["${getName(sid)}"]`);
+                siblingNodeIds.push(sId);
+
+                const ss = siblingSpouseMap.get(sid);
+                if (ss) {
+                    const ssId = nodeId(ss);
+                    lines.push(`    ${ssId}["${getName(ss)}"]`);
+                    lines.push(`    ${sId} --- ${ssId}`);
+                }
+            }
+            lines.push('');
+
+            // Parent connections
+            if (parentCouples.length > 0) {
+                for (const pc of parentCouples) {
+                    const pJuncId = parentJunctions.get(pc.id1);
+                    if (pJuncId) {
+                        lines.push(`    ${pJuncId} --> ${selfId}`);
+                        for (const sNodeId of siblingNodeIds) {
+                            lines.push(`    ${pJuncId} --> ${sNodeId}`);
+                        }
+                    } else {
+                        const p1 = nodeId(pc.id1);
+                        lines.push(`    ${p1} --> ${selfId}`);
+                        for (const sNodeId of siblingNodeIds) {
+                            lines.push(`    ${p1} --> ${sNodeId}`);
+                        }
                     }
                 }
             }
-        }
 
-        // ── CHILDREN NODES ──
-        for (const cid of paginatedChildIds) {
-            const cNodeId = nodeId(cid);
-            lines.push(`    ${cNodeId}["${getName(cid)}"]`);
-            
-            const cs = childSpouseMap.get(cid);
-            if (cs) {
-                const csId = nodeId(cs);
-                lines.push(`    ${csId}["${getName(cs)}"]`);
-                lines.push(`    ${cNodeId} --- ${csId}`);
+            // Children
+            for (const cid of paginatedChildIds) {
+                const cNodeId = nodeId(cid);
+                lines.push(`    ${cNodeId}["${getName(cid)}"]`);
+                
+                const cs = childSpouseMap.get(cid);
+                if (cs) {
+                    const csId = nodeId(cs);
+                    lines.push(`    ${csId}["${getName(cs)}"]`);
+                    lines.push(`    ${cNodeId} --- ${csId}`);
+                }
+
+                if (selfJunctionId) {
+                    lines.push(`    ${selfJunctionId} --> ${cNodeId}`);
+                } else {
+                    lines.push(`    ${selfId} --> ${cNodeId}`);
+                }
             }
+            lines.push('');
 
-            // Connect parent(s) to child
-            if (selfJunctionId) {
-                lines.push(`    ${selfJunctionId} --> ${cNodeId}`);
+            if (parentNodeIds.length > 0) {
+                lines.push(`    TITLE ~~~ ${parentNodeIds[0]}`);
             } else {
-                lines.push(`    ${selfId} --> ${cNodeId}`);
+                lines.push(`    TITLE ~~~ ${selfId}`);
             }
-        }
-        lines.push('');
+            lines.push('');
 
-        // ── TITLE → Parents / Self connection (invisible, for layout ordering) ──
-        if (parentNodeIds.length > 0) {
-            lines.push(`    TITLE ~~~ ${parentNodeIds[0]}`);
-        } else {
-            lines.push(`    TITLE ~~~ ${selfId}`);
-        }
-        lines.push('');
-
-        // ── PAGINATION FOOTER NODE (dark text for white background) ──
-        if (childIds.length > itemsPerPage) {
-            lines.push(`    FOOTER["<small>Children Page ${page}/${totalPages} · ${childIds.length} total · Use .tree [page] to browse</small>"]`);
-            lines.push(`    style FOOTER fill:transparent,stroke:none,color:#888888,font-size:11px`);
-            // Connect footer after children
-            if (paginatedChildIds.length > 0) {
-                const lastChildId = nodeId(paginatedChildIds[paginatedChildIds.length - 1]);
-                lines.push(`    ${lastChildId} ~~~ FOOTER`);
+            if (childIds.length > itemsPerPage) {
+                lines.push(`    FOOTER["<small>Children Page ${pageToRender}/${totalPages} · ${childIds.length} total</small>"]`);
+                lines.push(`    style FOOTER fill:transparent,stroke:none,color:#888888,font-size:11px`);
+                if (paginatedChildIds.length > 0) {
+                    const lastChildId = nodeId(paginatedChildIds[paginatedChildIds.length - 1]);
+                    lines.push(`    ${lastChildId} ~~~ FOOTER`);
+                }
             }
-        }
-        lines.push('');
+            lines.push('');
 
-        // Apply classes
-        for (const pc of parentCouples) {
-            lines.push(`    class ${nodeId(pc.id1)} parentNode`);
-            if (pc.id2) lines.push(`    class ${nodeId(pc.id2)} parentNode`);
-        }
-        for (const sid of siblings) {
-            lines.push(`    class ${nodeId(sid)} siblingNode`);
-            const ss = siblingSpouseMap.get(sid);
-            if (ss) lines.push(`    class ${nodeId(ss)} siblingNode`);
-        }
-        for (const cid of paginatedChildIds) {
-            lines.push(`    class ${nodeId(cid)} childNode`);
-            const cs = childSpouseMap.get(cid);
-            if (cs) lines.push(`    class ${nodeId(cs)} childNode`);
-        }
-        lines.push(`    class ${selfId} selfNode`);
-        if (spouseId) lines.push(`    class ${nodeId(spouseId)} selfNode`); // highlight target and spouse in blue
-        lines.push('');
+            for (const pc of parentCouples) {
+                lines.push(`    class ${nodeId(pc.id1)} parentNode`);
+                if (pc.id2) lines.push(`    class ${nodeId(pc.id2)} parentNode`);
+            }
+            for (const sid of siblings) {
+                lines.push(`    class ${nodeId(sid)} siblingNode`);
+                const ss = siblingSpouseMap.get(sid);
+                if (ss) lines.push(`    class ${nodeId(ss)} siblingNode`);
+            }
+            for (const cid of paginatedChildIds) {
+                lines.push(`    class ${nodeId(cid)} childNode`);
+                const cs = childSpouseMap.get(cid);
+                if (cs) lines.push(`    class ${nodeId(cs)} childNode`);
+            }
+            lines.push(`    class ${selfId} selfNode`);
+            if (spouseId) lines.push(`    class ${nodeId(spouseId)} selfNode`);
+            lines.push('');
 
-        const definition = lines.join('\n');
-
-        try {
-            const buffer = await MermaidRenderer.renderToBuffer(definition, {
+            const definition = lines.join('\n');
+            return await MermaidRenderer.renderToBuffer(definition, {
                 theme: 'default',
                 fontFamily: `"${fontName}", Georgia, Times New Roman, serif`,
                 backgroundColor: '#ffffff'
             });
-            const attachment = new AttachmentBuilder(buffer, { name: `family_tree_${user.id}.png` });
+        };
 
-            return ctx.reply({
-                files: [attachment]
+        const buildTreeButtons = (currPage: number, maxPages: number): ActionRowBuilder<ButtonBuilder>[] => {
+            return [
+                new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`tree_prev_${user.id}`)
+                        .setEmoji('◀')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setDisabled(currPage <= 1),
+                    new ButtonBuilder()
+                        .setCustomId(`tree_page_${user.id}`)
+                        .setLabel(`Page ${currPage}/${maxPages}`)
+                        .setStyle(ButtonStyle.Secondary)
+                        .setDisabled(true),
+                    new ButtonBuilder()
+                        .setCustomId(`tree_next_${user.id}`)
+                        .setEmoji('▶')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setDisabled(currPage >= maxPages)
+                )
+            ];
+        };
+
+        try {
+            const initialBuffer = await renderTreePage(currentPage);
+            const attachment = new AttachmentBuilder(initialBuffer, { name: `family_tree_${user.id}.png` });
+            const components = totalPages > 1 ? buildTreeButtons(currentPage, totalPages) : [];
+
+            const response = await ctx.reply({
+                files: [attachment],
+                components
             });
+
+            if (totalPages <= 1) return response;
+
+            let targetMsg: any = response;
+            if (ctx.interaction && (!targetMsg || !('createMessageComponentCollector' in targetMsg))) {
+                targetMsg = await ctx.interaction.fetchReply().catch(() => null);
+            }
+
+            if (!targetMsg || !('createMessageComponentCollector' in targetMsg)) return response;
+
+            const collector = targetMsg.createMessageComponentCollector({
+                componentType: ComponentType.Button,
+                time: 120000,
+                filter: (i: any) => i.user.id === ctx.author.id
+            });
+
+            collector.on('collect', async (i: any) => {
+                try {
+                    await i.deferUpdate();
+                } catch {}
+
+                if (i.customId.startsWith('tree_prev')) {
+                    if (currentPage > 1) currentPage--;
+                } else if (i.customId.startsWith('tree_next')) {
+                    if (currentPage < totalPages) currentPage++;
+                }
+
+                try {
+                    const nextBuffer = await renderTreePage(currentPage);
+                    const nextAttachment = new AttachmentBuilder(nextBuffer, { name: `family_tree_${user.id}.png` });
+
+                    if (ctx.interaction) {
+                        await ctx.interaction.editReply({
+                            files: [nextAttachment],
+                            components: buildTreeButtons(currentPage, totalPages)
+                        }).catch(() => null);
+                    } else {
+                        await targetMsg.edit({
+                            files: [nextAttachment],
+                            components: buildTreeButtons(currentPage, totalPages)
+                        }).catch(() => null);
+                    }
+                } catch (err) {
+                    console.error('Error rendering tree page on button click:', err);
+                }
+            });
+
+            collector.on('end', async () => {
+                const disabledButtons = [
+                    new ActionRowBuilder<ButtonBuilder>().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`tree_prev_dis`)
+                            .setEmoji('◀')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setDisabled(true),
+                        new ButtonBuilder()
+                            .setCustomId(`tree_page_dis`)
+                            .setLabel(`Page ${currentPage}/${totalPages}`)
+                            .setStyle(ButtonStyle.Secondary)
+                            .setDisabled(true),
+                        new ButtonBuilder()
+                            .setCustomId(`tree_next_dis`)
+                            .setEmoji('▶')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setDisabled(true)
+                    )
+                ];
+
+                if (ctx.interaction) {
+                    await ctx.interaction.editReply({ components: disabledButtons }).catch(() => null);
+                } else {
+                    await targetMsg.edit({ components: disabledButtons }).catch(() => null);
+                }
+            });
+
+            return response;
         } catch (err) {
             console.error('Mermaid tree render error:', err);
             return ctx.replyV2({ description: 'Failed to render the family tree. Please try again later.', isAlert: true });
@@ -785,7 +874,10 @@ export const marriageHelper = {
 
     // 9. FULL TREE
     async fulltree(client: ExtendedClient, ctx: Context, page = 1, fontName = 'Inter'): Promise<any> {
-        
+        if (ctx.interaction && !ctx.deferred) {
+            await ctx.deferReply();
+        }
+
         // Fetch all Marriage and FamilyRelation
         const marriages = await client.prisma.marriage.findMany();
         const familyRelations = await client.prisma.familyRelation.findMany();
@@ -860,279 +952,342 @@ export const marriageHelper = {
         if (currentPage < 1) currentPage = 1;
         if (currentPage > totalPages) currentPage = totalPages;
 
-        const comp = components[currentPage - 1];
+        const renderFulltreePage = async (pageIdx: number): Promise<Buffer> => {
+            const comp = components[pageIdx - 1];
 
-        // Assign levels (generations) using DAG-based meta-node leveling within this component
-        const getMetaId = (uid: string): string => {
-            const spouse = spouseMap.get(uid);
-            if (spouse && comp.includes(spouse)) {
-                return uid < spouse ? `${uid}_${spouse}` : `${spouse}_${uid}`;
-            }
-            return uid;
-        };
-
-        const metaIds = new Set<string>();
-        for (const uid of comp) {
-            metaIds.add(getMetaId(uid));
-        }
-
-        const parentsOfMeta = new Map<string, Set<string>>();
-        for (const mId of metaIds) {
-            const parentsSet = new Set<string>();
-            const uids = mId.includes('_') ? mId.split('_') : [mId];
-            for (const uid of uids) {
-                const pList = parentsMap.get(uid) || [];
-                for (const p of pList) {
-                    if (comp.includes(p)) {
-                        parentsSet.add(getMetaId(p));
-                    }
+            const getMetaId = (uid: string): string => {
+                const spouse = spouseMap.get(uid);
+                if (spouse && comp.includes(spouse)) {
+                    return uid < spouse ? `${uid}_${spouse}` : `${spouse}_${uid}`;
                 }
-            }
-            parentsOfMeta.set(mId, parentsSet);
-        }
+                return uid;
+            };
 
-        const metaLevels = new Map<string, number>();
-        const visiting = new Set<string>();
-
-        const getMetaLevel = (mId: string): number => {
-            if (metaLevels.has(mId)) {
-                return metaLevels.get(mId)!;
-            }
-            if (visiting.has(mId)) {
-                return 0; // Cycle fallback
-            }
-            visiting.add(mId);
-
-            const parents = parentsOfMeta.get(mId) || new Set<string>();
-            if (parents.size === 0) {
-                visiting.delete(mId);
-                metaLevels.set(mId, 0);
-                return 0;
+            const metaIds = new Set<string>();
+            for (const uid of comp) {
+                metaIds.add(getMetaId(uid));
             }
 
-            let maxParentLvl = 0;
-            for (const pMetaId of parents) {
-                const pLvl = getMetaLevel(pMetaId);
-                if (pLvl > maxParentLvl) {
-                    maxParentLvl = pLvl;
-                }
-            }
-
-            const lvl = maxParentLvl + 1;
-            visiting.delete(mId);
-            metaLevels.set(mId, lvl);
-            return lvl;
-        };
-
-        const level = new Map<string, number>();
-        for (const uid of comp) {
-            const mId = getMetaId(uid);
-            level.set(uid, getMetaLevel(mId));
-        }
-
-        // Shift levels so min is 0
-        let minL = Infinity;
-        for (const lvl of level.values()) {
-            if (lvl < minL) minL = lvl;
-        }
-
-        for (const uid of comp) {
-            level.set(uid, level.get(uid)! - minL);
-        }
-
-        const maxLevel = Math.max(...Array.from(level.values()));
-
-        interface GenNode {
-            type: 'SINGLE' | 'COUPLE';
-            id1: string;
-            id2?: string;
-        }
-
-        const generations: GenNode[][] = [];
-        for (let i = 0; i <= maxLevel; i++) {
-            generations.push([]);
-        }
-
-        const processed = new Set<string>();
-        const sortedComp = [...comp].sort();
-
-        for (const uid of sortedComp) {
-            if (processed.has(uid)) continue;
-            const lvl = level.get(uid)!;
-            const spouseId = spouseMap.get(uid);
-
-            if (spouseId && comp.includes(spouseId)) {
-                generations[lvl].push({
-                    type: 'COUPLE',
-                    id1: uid,
-                    id2: spouseId
-                });
-                processed.add(uid);
-                processed.add(spouseId);
-            } else {
-                generations[lvl].push({
-                    type: 'SINGLE',
-                    id1: uid
-                });
-                processed.add(uid);
-            }
-        }
-
-        // ═══════════════════════════════════════════════════
-        // FETCH ALL USERS + AVATARS
-        // ═══════════════════════════════════════════════════
-        const fetchedUsers = await Promise.all(
-            comp.map(async (id) => {
-                try { return await client.users.fetch(id); } catch { return null; }
-            })
-        );
-        const userMap = new Map<string, User>(fetchedUsers.filter(Boolean).map(u => [u!.id, u!]));
-
-        // ═══════════════════════════════════════════════════
-        // BUILD MERMAID DEFINITION
-        // ═══════════════════════════════════════════════════
-        const getName = (id: string): string => {
-            const u = userMap.get(id);
-            return sanitizeMermaidLabel(u ? u.username : 'Unknown');
-        };
-
-        const nodeId = (id: string): string => `u${id.substring(0, 8)}`;
-
-        const lines: string[] = [];
-        lines.push('graph TD');
-        lines.push('');
-
-        // Title statistics (dark text for white background)
-        const stats = [
-            `👥 ${comp.length} member${comp.length !== 1 ? 's' : ''}`,
-            `🌳 ${generations.length} generation${generations.length !== 1 ? 's' : ''}`
-        ].join(' · ');
-
-        lines.push(`    TITLE["👑 Global Marriage Tree #${currentPage}<br/><small>${stats}</small>"]`);
-        lines.push(`    style TITLE fill:transparent,stroke:none,color:#000000,font-size:18px`);
-        lines.push('');
-
-        const selfLevel = level.get(ctx.author.id) ?? -1;
-
-        // Draw nodes with plain usernames (no roles)
-        for (const uid of comp) {
-            const uIdStr = nodeId(uid);
-            const name = getName(uid);
-            lines.push(`    ${uIdStr}["${name}"]`);
-        }
-        lines.push('');
-
-        // Draw marriages & create junctions
-        const processedMarriages = new Set<string>();
-        const coupleJunctions = new Map<string, string>(); // pairKey -> junctionNodeId
-        for (const uid of comp) {
-            const spouseId = spouseMap.get(uid);
-            if (spouseId && comp.includes(spouseId)) {
-                const pairKey = uid < spouseId ? `${uid}_${spouseId}` : `${spouseId}_${uid}`;
-                if (!processedMarriages.has(pairKey)) {
-                    processedMarriages.add(pairKey);
-                    const id1 = nodeId(uid);
-                    const id2 = nodeId(spouseId);
-                    
-                    const juncId = `j_${id1}_${id2}`;
-                    lines.push(`    ${juncId}(( ))`);
-                    lines.push(`    class ${juncId} junctionNode`);
-                    
-                    lines.push(`    ${id1} --- ${juncId}`);
-                    lines.push(`    ${id2} --- ${juncId}`);
-                    coupleJunctions.set(pairKey, juncId);
-                }
-            }
-        }
-
-        // Draw parent-to-child connections
-        const childToParentsMap = new Map<string, string[]>();
-        for (const rel of familyRelations) {
-            if (comp.includes(rel.parentId) && comp.includes(rel.childId)) {
-                const parents = childToParentsMap.get(rel.childId) || [];
-                parents.push(rel.parentId);
-                childToParentsMap.set(rel.childId, parents);
-            }
-        }
-
-        for (const [childId, parents] of childToParentsMap.entries()) {
-            const cId = nodeId(childId);
-            let connectedViaJunction = false;
-            
-            if (parents.length >= 2) {
-                // Find if any pair of parents are married and have a junction
-                for (let i = 0; i < parents.length; i++) {
-                    for (let j = i + 1; j < parents.length; j++) {
-                        const p1 = parents[i];
-                        const p2 = parents[j];
-                        const pairKey = p1 < p2 ? `${p1}_${p2}` : `${p2}_${p1}`;
-                        const juncId = coupleJunctions.get(pairKey);
-                        if (juncId) {
-                            lines.push(`    ${juncId} --> ${cId}`);
-                            connectedViaJunction = true;
-                            break;
+            const parentsOfMeta = new Map<string, Set<string>>();
+            for (const mId of metaIds) {
+                const parentsSet = new Set<string>();
+                const uids = mId.includes('_') ? mId.split('_') : [mId];
+                for (const uid of uids) {
+                    const pList = parentsMap.get(uid) || [];
+                    for (const p of pList) {
+                        if (comp.includes(p)) {
+                            parentsSet.add(getMetaId(p));
                         }
                     }
-                    if (connectedViaJunction) break;
+                }
+                parentsOfMeta.set(mId, parentsSet);
+            }
+
+            const metaLevels = new Map<string, number>();
+            const visiting = new Set<string>();
+
+            const getMetaLevel = (mId: string): number => {
+                if (metaLevels.has(mId)) {
+                    return metaLevels.get(mId)!;
+                }
+                if (visiting.has(mId)) {
+                    return 0;
+                }
+                visiting.add(mId);
+
+                const parents = parentsOfMeta.get(mId) || new Set<string>();
+                if (parents.size === 0) {
+                    visiting.delete(mId);
+                    metaLevels.set(mId, 0);
+                    return 0;
+                }
+
+                let maxParentLvl = 0;
+                for (const pMetaId of parents) {
+                    const pLvl = getMetaLevel(pMetaId);
+                    if (pLvl > maxParentLvl) {
+                        maxParentLvl = pLvl;
+                    }
+                }
+
+                const lvl = maxParentLvl + 1;
+                visiting.delete(mId);
+                metaLevels.set(mId, lvl);
+                return lvl;
+            };
+
+            const level = new Map<string, number>();
+            for (const uid of comp) {
+                const mId = getMetaId(uid);
+                level.set(uid, getMetaLevel(mId));
+            }
+
+            let minL = Infinity;
+            for (const lvl of level.values()) {
+                if (lvl < minL) minL = lvl;
+            }
+
+            for (const uid of comp) {
+                level.set(uid, level.get(uid)! - minL);
+            }
+
+            const maxLevel = Math.max(...Array.from(level.values()));
+
+            interface GenNode {
+                type: 'SINGLE' | 'COUPLE';
+                id1: string;
+                id2?: string;
+            }
+
+            const generations: GenNode[][] = [];
+            for (let i = 0; i <= maxLevel; i++) {
+                generations.push([]);
+            }
+
+            const processed = new Set<string>();
+            const sortedComp = [...comp].sort();
+
+            for (const uid of sortedComp) {
+                if (processed.has(uid)) continue;
+                const lvl = level.get(uid)!;
+                const spouseId = spouseMap.get(uid);
+
+                if (spouseId && comp.includes(spouseId)) {
+                    generations[lvl].push({
+                        type: 'COUPLE',
+                        id1: uid,
+                        id2: spouseId
+                    });
+                    processed.add(uid);
+                    processed.add(spouseId);
+                } else {
+                    generations[lvl].push({
+                        type: 'SINGLE',
+                        id1: uid
+                    });
+                    processed.add(uid);
                 }
             }
-            
-            if (!connectedViaJunction) {
-                // If single parent or parents not married, connect directly to primary parent
-                parents.sort();
-                const primaryParentId = parents[0];
-                const pId = nodeId(primaryParentId);
-                lines.push(`    ${pId} --> ${cId}`);
+
+            const fetchedUsers = await Promise.all(
+                comp.map(async (id) => {
+                    try { return await client.users.fetch(id); } catch { return null; }
+                })
+            );
+            const userMap = new Map<string, User>(fetchedUsers.filter(Boolean).map(u => [u!.id, u!]));
+
+            const getName = (id: string): string => {
+                const u = userMap.get(id);
+                return sanitizeMermaidLabel(u ? u.username : 'Unknown');
+            };
+
+            const nodeId = (id: string): string => `u${id.substring(0, 8)}`;
+
+            const lines: string[] = [];
+            lines.push('graph TD');
+            lines.push('');
+
+            const stats = [
+                `👥 ${comp.length} member${comp.length !== 1 ? 's' : ''}`,
+                `🌳 ${generations.length} generation${generations.length !== 1 ? 's' : ''}`
+            ].join(' · ');
+
+            lines.push(`    TITLE["👑 Global Marriage Tree #${pageIdx}<br/><small>${stats}</small>"]`);
+            lines.push(`    style TITLE fill:transparent,stroke:none,color:#000000,font-size:18px`);
+            lines.push('');
+
+            for (const uid of comp) {
+                const uIdStr = nodeId(uid);
+                const name = getName(uid);
+                lines.push(`    ${uIdStr}["${name}"]`);
             }
-        }
-        lines.push('');
+            lines.push('');
 
-        // Title to top level connection (invisible)
-        if (generations.length > 0 && generations[0].length > 0) {
-            const firstNode = nodeId(generations[0][0].id1);
-            lines.push(`    TITLE ~~~ ${firstNode}`);
-        }
-        lines.push('');
-
-        // Pagination footer (dark text for white background)
-        if (totalPages > 1) {
-            lines.push(`    FOOTER["<small>Family Tree Page ${currentPage}/${totalPages} · Use .fulltree [page] to browse</small>"]`);
-            lines.push(`    style FOOTER fill:transparent,stroke:none,color:#888888,font-size:11px`);
-            
-            const lastGen = generations[generations.length - 1];
-            if (lastGen && lastGen.length > 0) {
-                const lastNode = nodeId(lastGen[lastGen.length - 1].id1);
-                lines.push(`    ${lastNode} ~~~ FOOTER`);
+            const processedMarriages = new Set<string>();
+            const coupleJunctions = new Map<string, string>();
+            for (const uid of comp) {
+                const spouseId = spouseMap.get(uid);
+                if (spouseId && comp.includes(spouseId)) {
+                    const pairKey = uid < spouseId ? `${uid}_${spouseId}` : `${spouseId}_${uid}`;
+                    if (!processedMarriages.has(pairKey)) {
+                        processedMarriages.add(pairKey);
+                        const id1 = nodeId(uid);
+                        const id2 = nodeId(spouseId);
+                        
+                        const juncId = `j_${id1}_${id2}`;
+                        lines.push(`    ${juncId}(( ))`);
+                        lines.push(`    class ${juncId} junctionNode`);
+                        
+                        lines.push(`    ${id1} --- ${juncId}`);
+                        lines.push(`    ${id2} --- ${juncId}`);
+                        coupleJunctions.set(pairKey, juncId);
+                    }
+                }
             }
-        }
-        lines.push('');
+            lines.push('');
 
-        // Assign classes
-        for (const uid of comp) {
-            const uIdStr = nodeId(uid);
-            const isSelf = uid === ctx.author.id;
-            const isSpouse = spouseMap.get(ctx.author.id) === uid;
-            
-            if (isSelf || isSpouse) {
-                lines.push(`    class ${uIdStr} selfNode`); // highlight target and spouse in blue
-            } else {
-                lines.push(`    class ${uIdStr} genNode`);
+            for (const childId of comp) {
+                const pList = parentsMap.get(childId) || [];
+                const compParents = pList.filter(p => comp.includes(p));
+
+                if (compParents.length === 2) {
+                    const pairKey = compParents[0] < compParents[1] ? `${compParents[0]}_${compParents[1]}` : `${compParents[1]}_${compParents[0]}`;
+                    const juncId = coupleJunctions.get(pairKey);
+                    if (juncId) {
+                        lines.push(`    ${juncId} --> ${nodeId(childId)}`);
+                    } else {
+                        for (const p of compParents) {
+                            lines.push(`    ${nodeId(p)} --> ${nodeId(childId)}`);
+                        }
+                    }
+                } else if (compParents.length === 1) {
+                    const p = compParents[0];
+                    const sp = spouseMap.get(p);
+                    const pairKey = sp && comp.includes(sp) ? (p < sp ? `${p}_${sp}` : `${sp}_${p}`) : null;
+                    const juncId = pairKey ? coupleJunctions.get(pairKey) : null;
+
+                    if (juncId) {
+                        lines.push(`    ${juncId} --> ${nodeId(childId)}`);
+                    } else {
+                        lines.push(`    ${nodeId(p)} --> ${nodeId(childId)}`);
+                    }
+                }
             }
-        }
+            lines.push('');
 
-        const definition = lines.join('\n');
+            if (generations.length > 0 && generations[0].length > 0) {
+                const firstId = generations[0][0].id1;
+                lines.push(`    TITLE ~~~ ${nodeId(firstId)}`);
+            }
+            lines.push('');
 
-        try {
-            const buffer = await MermaidRenderer.renderToBuffer(definition, {
+            for (const uid of comp) {
+                const uIdStr = nodeId(uid);
+                const isSelf = uid === ctx.author.id;
+                const isSpouse = spouseMap.get(ctx.author.id) === uid;
+                
+                if (isSelf || isSpouse) {
+                    lines.push(`    class ${uIdStr} selfNode`);
+                } else {
+                    lines.push(`    class ${uIdStr} genNode`);
+                }
+            }
+
+            const definition = lines.join('\n');
+            return await MermaidRenderer.renderToBuffer(definition, {
                 theme: 'default',
                 fontFamily: `"${fontName}", Georgia, Times New Roman, serif`,
                 backgroundColor: '#ffffff'
             });
-            const attachment = new AttachmentBuilder(buffer, { name: `global_family_tree_${currentPage}.png` });
+        };
 
-            return ctx.reply({
-                files: [attachment]
+        const buildFulltreeButtons = (currPage: number, maxPages: number): ActionRowBuilder<ButtonBuilder>[] => {
+            return [
+                new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`fulltree_prev`)
+                        .setEmoji('◀')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setDisabled(currPage <= 1),
+                    new ButtonBuilder()
+                        .setCustomId(`fulltree_page`)
+                        .setLabel(`Tree ${currPage}/${maxPages}`)
+                        .setStyle(ButtonStyle.Secondary)
+                        .setDisabled(true),
+                    new ButtonBuilder()
+                        .setCustomId(`fulltree_next`)
+                        .setEmoji('▶')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setDisabled(currPage >= maxPages)
+                )
+            ];
+        };
+
+        try {
+            const initialBuffer = await renderFulltreePage(currentPage);
+            const attachment = new AttachmentBuilder(initialBuffer, { name: `global_family_tree_${currentPage}.png` });
+            const componentsList = totalPages > 1 ? buildFulltreeButtons(currentPage, totalPages) : [];
+
+            const response = await ctx.reply({
+                files: [attachment],
+                components: componentsList
             });
+
+            if (totalPages <= 1) return response;
+
+            let targetMsg: any = response;
+            if (ctx.interaction && (!targetMsg || !('createMessageComponentCollector' in targetMsg))) {
+                targetMsg = await ctx.interaction.fetchReply().catch(() => null);
+            }
+
+            if (!targetMsg || !('createMessageComponentCollector' in targetMsg)) return response;
+
+            const collector = targetMsg.createMessageComponentCollector({
+                componentType: ComponentType.Button,
+                time: 120000,
+                filter: (i: any) => i.user.id === ctx.author.id
+            });
+
+            collector.on('collect', async (i: any) => {
+                try {
+                    await i.deferUpdate();
+                } catch {}
+
+                if (i.customId === 'fulltree_prev') {
+                    if (currentPage > 1) currentPage--;
+                } else if (i.customId === 'fulltree_next') {
+                    if (currentPage < totalPages) currentPage++;
+                }
+
+                try {
+                    const nextBuffer = await renderFulltreePage(currentPage);
+                    const nextAttachment = new AttachmentBuilder(nextBuffer, { name: `global_family_tree_${currentPage}.png` });
+
+                    if (ctx.interaction) {
+                        await ctx.interaction.editReply({
+                            files: [nextAttachment],
+                            components: buildFulltreeButtons(currentPage, totalPages)
+                        }).catch(() => null);
+                    } else {
+                        await targetMsg.edit({
+                            files: [nextAttachment],
+                            components: buildFulltreeButtons(currentPage, totalPages)
+                        }).catch(() => null);
+                    }
+                } catch (err) {
+                    console.error('Error rendering fulltree page on button click:', err);
+                }
+            });
+
+            collector.on('end', async () => {
+                const disabledButtons = [
+                    new ActionRowBuilder<ButtonBuilder>().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`fulltree_prev_dis`)
+                            .setEmoji('◀')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setDisabled(true),
+                        new ButtonBuilder()
+                            .setCustomId(`fulltree_page_dis`)
+                            .setLabel(`Tree ${currentPage}/${totalPages}`)
+                            .setStyle(ButtonStyle.Secondary)
+                            .setDisabled(true),
+                        new ButtonBuilder()
+                            .setCustomId(`fulltree_next_dis`)
+                            .setEmoji('▶')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setDisabled(true)
+                    )
+                ];
+
+                if (ctx.interaction) {
+                    await ctx.interaction.editReply({ components: disabledButtons }).catch(() => null);
+                } else {
+                    await targetMsg.edit({ components: disabledButtons }).catch(() => null);
+                }
+            });
+
+            return response;
         } catch (err) {
             console.error('Mermaid fulltree render error:', err);
             return ctx.replyV2({ description: 'Failed to render the global family tree. Please try again later.', isAlert: true });
@@ -1142,6 +1297,10 @@ export const marriageHelper = {
 
     // 10. RELATIONSHIP
     async relationship(client: ExtendedClient, ctx: Context, targetUser: User | null): Promise<any> {
+        if (ctx.interaction && !ctx.deferred) {
+            await ctx.deferReply();
+        }
+
         if (!targetUser) {
             return ctx.replyV2({ description: 'Please mention a user to check relationship.\n**Usage:** `.relationship <@user>` or `/marriage relationship <user>`', isAlert: true });
         }

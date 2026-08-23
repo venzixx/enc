@@ -45,7 +45,7 @@ export default class StreaksCommand extends Command {
         }
 
         const embed = new EmbedBuilder()
-            .setTitle(`🔥 ${target.username}'s Streaks`)
+            .setTitle(`${client.emoji.streak_fire} ${target.username}'s Streaks`)
             .setColor(client.color.main)
             .setThumbnail(target.displayAvatarURL({ forceStatic: false }))
             .setTimestamp();

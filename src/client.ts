@@ -122,18 +122,17 @@ export class ExtendedClient extends Client {
         // Basic error handling for players
         // @ts-ignore
         this.lavalink.on('trackException', async (player: any, track: any, exception: any) => {
-            const errorMsg = exception?.message || exception || "Unknown Error";
+            const errorMsg = String(exception?.message || exception?.error || exception || "Unknown Error");
             logger.error(`[Lavalink] Track exception in guild ${player.guildId}: ${track?.info?.title || 'Unknown Track'} ->`, errorMsg);
 
-            // Failover to SoundCloud if YouTube is blocked/restricted
-            if (track?.info?.sourceName === "youtube" && (errorMsg.includes("403") || errorMsg.includes("Forbidden") || errorMsg.includes("unplayable"))) {
-                const channel = this.channels.cache.get(player.textChannelId) as any;
-                if (channel) channel.send(`${this.emoji.exclamation} YouTube is restricting access to this track. Searching for a SoundCloud alternative...`).catch(() => {});
-                
+            // Failover to SoundCloud if YouTube is blocked/restricted or failed
+            if (track?.info?.title && (track?.info?.sourceName === "youtube" || !track?.info?.uri?.includes("soundcloud.com"))) {
+                logger.info(`[Lavalink] Attempting automatic failover to SoundCloud for: ${track.info.title}`);
                 try {
                     const res = await this.lavalink.search({ query: track.info.title, source: "scsearch" }, track.requester);
-                    if (res && res.tracks.length > 0) {
-                        player.queue.add(res.tracks[0], 0); // Insert at start
+                    if (res && res.tracks && res.tracks.length > 0) {
+                        logger.info(`[Lavalink] Failover found SoundCloud alternative: ${res.tracks[0].info.title}`);
+                        await player.queue.add(res.tracks[0], 0);
                         return player.skip();
                     }
                 } catch (err) {
