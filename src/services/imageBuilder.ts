@@ -1,4 +1,32 @@
 import { createCanvas, loadImage, GlobalFonts, SKRSContext2D } from '@napi-rs/canvas';
+import * as path from 'path';
+import * as fs from 'fs';
+
+// Register fonts reliably across environments
+const fontsToLoad = [
+    { file: 'NotoSans.ttf', name: 'NotoSans' },
+    { file: 'Inter-Regular.ttf', name: 'Inter' },
+    { file: 'exo2.ttf', name: 'Exo2' }
+];
+
+const fontDirs = [
+    path.join(process.cwd(), 'src/assets/fonts'),
+    path.join(process.cwd(), 'assets/fonts'),
+    path.join(__dirname, '../assets/fonts'),
+    path.join(__dirname, '../../assets/fonts')
+];
+
+for (const font of fontsToLoad) {
+    for (const dir of fontDirs) {
+        const fullPath = path.join(dir, font.file);
+        if (fs.existsSync(fullPath)) {
+            try {
+                GlobalFonts.registerFromPath(fullPath, font.name);
+                break;
+            } catch {}
+        }
+    }
+}
 
 // Helper to draw rounded rectangles for glass effect
 function drawRoundedRect(ctx: SKRSContext2D, x: number, y: number, width: number, height: number, radius: number) {
@@ -15,54 +43,165 @@ function drawRoundedRect(ctx: SKRSContext2D, x: number, y: number, width: number
     ctx.closePath();
 }
 
-export async function generateWelcomeImage(avatarUrl: string, username: string, memberCount: number): Promise<Buffer> {
-    const canvas = createCanvas(800, 250);
+export async function generateWelcomeImage(
+    avatarUrl: string, 
+    username: string, 
+    memberCount: number,
+    serverName?: string
+): Promise<Buffer> {
+    const canvas = createCanvas(880, 280);
     const ctx = canvas.getContext('2d');
 
-    // Background (Black)
-    ctx.fillStyle = '#000000';
+    // 1. Deep Obsidian Gradient Base
+    const bgGrad = ctx.createLinearGradient(0, 0, 880, 280);
+    bgGrad.addColorStop(0, '#0a0b10');
+    bgGrad.addColorStop(0.5, '#0e111a');
+    bgGrad.addColorStop(1, '#090a0e');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Subtle Grey border/accents
-    ctx.strokeStyle = '#2B2D31';
-    ctx.lineWidth = 10;
-    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+    // 2. Ambient Colorful Glows (Cyan & Purple subtle ambient lighting)
+    const cyanGlow = ctx.createRadialGradient(130, 140, 0, 130, 140, 220);
+    cyanGlow.addColorStop(0, 'rgba(56, 189, 248, 0.14)');
+    cyanGlow.addColorStop(0.6, 'rgba(99, 102, 241, 0.04)');
+    cyanGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = cyanGlow;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Text: Welcome
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 50px sans-serif';
-    ctx.fillText('WELCOME TO THE SERVER', 250, 100);
+    const cornerGlow = ctx.createRadialGradient(800, 40, 0, 800, 40, 250);
+    cornerGlow.addColorStop(0, 'rgba(168, 85, 247, 0.08)');
+    cornerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = cornerGlow;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Text: Username
-    ctx.font = 'regular 40px sans-serif';
-    ctx.fillStyle = '#A0A0A0';
-    ctx.fillText(`@${username}`, 250, 160);
+    // 3. Ultra-Glass Inner Panel
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = 'rgba(18, 22, 34, 0.65)';
+    drawRoundedRect(ctx, 16, 16, 848, 248, 24);
+    ctx.fill();
+    ctx.restore();
 
-    // Text: Member Count
-    ctx.font = 'bold 25px sans-serif';
-    ctx.fillStyle = '#606060';
-    ctx.fillText(`Member #${memberCount}`, 250, 210);
+    // Subtle Glass Rim Border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1.5;
+    drawRoundedRect(ctx, 16, 16, 848, 248, 24);
+    ctx.stroke();
 
-    // Load and draw Avatar (Circle)
+    // Top Rim Specular Gloss
+    const rimGrad = ctx.createLinearGradient(0, 16, 0, 100);
+    rimGrad.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
+    rimGrad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+    ctx.fillStyle = rimGrad;
+    drawRoundedRect(ctx, 16, 16, 848, 248, 24);
+    ctx.fill();
+
+    // Decorative Geometric Watermark lines on right
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+    ctx.lineWidth = 1;
+    for (let i = 600; i < 840; i += 30) {
+        ctx.beginPath();
+        ctx.moveTo(i, 30);
+        ctx.lineTo(i + 40, 250);
+        ctx.stroke();
+    }
+
+    // 4. Avatar (Circular Crop with Dual Glowing Rings)
     try {
         const avatar = await loadImage(avatarUrl);
-        ctx.save();
+        
+        // Outer Cyan Glow Ring
         ctx.beginPath();
-        ctx.arc(125, 125, 80, 0, Math.PI * 2, true);
-        ctx.closePath();
-        ctx.clip();
-        ctx.drawImage(avatar, 45, 45, 160, 160);
-        ctx.restore();
+        ctx.arc(130, 140, 80, 0, Math.PI * 2, true);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+        ctx.stroke();
 
-        // White border around avatar
+        // Inner White Ring
         ctx.beginPath();
-        ctx.arc(125, 125, 80, 0, Math.PI * 2, true);
-        ctx.lineWidth = 6;
+        ctx.arc(130, 140, 74, 0, Math.PI * 2, true);
+        ctx.lineWidth = 2.5;
         ctx.strokeStyle = '#FFFFFF';
         ctx.stroke();
+
+        // Draw Avatar Clipped
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(130, 140, 71, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(avatar, 59, 69, 142, 142);
+        ctx.restore();
     } catch (e) {
-        console.error('Failed to load avatar for welcome image', e);
+        // Fallback Circle if avatar fetch fails
+        ctx.beginPath();
+        ctx.arc(130, 140, 71, 0, Math.PI * 2, true);
+        ctx.fillStyle = '#1e2438';
+        ctx.fill();
     }
+
+    // 5. Typography & Badges
+    // Sub-header / Category
+    const subtitle = serverName 
+        ? `W E L C O M E   T O   ${serverName.toUpperCase().slice(0, 24)}` 
+        : 'W E L C O M E   T O   T H E   S E R V E R';
+    ctx.font = '700 14px "Exo2", "NotoSans", "Inter", sans-serif';
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText(subtitle, 245, 95);
+
+    // Username (with automatic ellipsis if too long)
+    ctx.font = '700 36px "NotoSans", "Exo2", "Inter", sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+
+    let displayUser = `@${username}`;
+    if (ctx.measureText(displayUser).width > 420) {
+        while (ctx.measureText(displayUser + '...').width > 420 && displayUser.length > 3) {
+            displayUser = displayUser.slice(0, -1);
+        }
+        displayUser += '...';
+    }
+    ctx.fillText(displayUser, 245, 148);
+
+    // Pill 1: Member Count Badge
+    const pill1X = 245;
+    const pill1Y = 175;
+    const pill1W = 160;
+    const pill1H = 34;
+    const pill1R = 17;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+    drawRoundedRect(ctx, pill1X, pill1Y, pill1W, pill1H, pill1R);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
+    drawRoundedRect(ctx, pill1X, pill1Y, pill1W, pill1H, pill1R);
+    ctx.stroke();
+
+    ctx.font = '700 13px "Exo2", "NotoSans", "Inter", sans-serif';
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillText(`MEMBER #${memberCount || 1}`, pill1X + 22, pill1Y + 22);
+
+    // Pill 2: Community Badge
+    const pill2X = pill1X + pill1W + 12;
+    const pill2Y = 175;
+    const pill2W = 135;
+    const pill2H = 34;
+    const pill2R = 17;
+
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+    drawRoundedRect(ctx, pill2X, pill2Y, pill2W, pill2H, pill2R);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+    ctx.lineWidth = 1;
+    drawRoundedRect(ctx, pill2X, pill2Y, pill2W, pill2H, pill2R);
+    ctx.stroke();
+
+    ctx.font = '700 13px "Exo2", "NotoSans", "Inter", sans-serif';
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText('COMMUNITY', pill2X + 20, pill2Y + 22);
 
     return canvas.toBuffer('image/png');
 }

@@ -119,7 +119,7 @@ export default class GuildMemberAdd extends Event {
                         try {
                             const { generateWelcomeImage } = await import('../services/imageBuilder');
                             const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
-                            const imageBuffer = await generateWelcomeImage(avatarUrl, member.user.username, guild.memberCount);
+                            const imageBuffer = await generateWelcomeImage(avatarUrl, member.user.username, guild.memberCount, guild.name);
                             const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome.png' });
 
                             const embed = new EmbedBuilder()

@@ -8,11 +8,11 @@ export default class Test extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'test',
-            aliases: ['preview'],
+            aliases: ['preview', 'testwelcome', 'testwelcomer', 'welcomertest'],
             description: {
                 content: 'Test and preview your configurations.',
                 usage: 'test <module> [options]',
-                examples: ['test greeter', 'test levelup', 'test streak']
+                examples: ['test welcome', 'test greeter', 'test levelup', 'test streak']
             },
             category: 'config',
             cooldown: 10,
@@ -22,6 +22,19 @@ export default class Test extends Command {
                 client: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles]
             },
             options: [
+                {
+                    name: 'welcome',
+                    description: 'Preview the modern welcome card and greeting',
+                    type: 1, // SUB_COMMAND
+                    options: [
+                        {
+                            name: 'user',
+                            description: 'Simulated user for the preview',
+                            type: 6, // USER
+                            required: false
+                        }
+                    ]
+                },
                 {
                     name: 'greeter',
                     description: 'Preview your configured greeter/welcome messages',
@@ -33,8 +46,8 @@ export default class Test extends Command {
                             type: 3, // STRING
                             required: false,
                             choices: [
+                                { name: 'Welcome Card & Message', value: 'welcome' },
                                 { name: 'Greeter Message', value: 'greeter' },
-                                { name: 'Welcome Image', value: 'welcome' },
                                 { name: 'Leave Message', value: 'leave' },
                                 { name: 'Join DM', value: 'joindm' },
                                 { name: 'All', value: 'all' },
@@ -81,12 +94,22 @@ export default class Test extends Command {
     }
 
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-        const subCommand = ctx.isInteraction ? ctx.options.getSubcommand() : args[0]?.toLowerCase();
+        let subCommand = ctx.isInteraction ? ctx.options.getSubcommand() : args[0]?.toLowerCase();
         
-        if (!['greeter', 'levelup', 'streak'].includes(subCommand)) {
+        // Handle direct alias execution (e.g. e!testwelcome)
+        const interactionCmdName = ctx.interaction && 'commandName' in ctx.interaction ? (ctx.interaction as any).commandName : undefined;
+        const msgCmdName = ctx.message?.content?.split(' ')[0]?.slice(client.config.prefix?.length || 2);
+        const cmdName = (interactionCmdName || msgCmdName)?.toLowerCase();
+        if (cmdName === 'testwelcome' || cmdName === 'testwelcomer' || cmdName === 'welcomertest') {
+            subCommand = 'welcome';
+        }
+
+        if (subCommand === 'welcomer') subCommand = 'welcome';
+
+        if (!['welcome', 'greeter', 'levelup', 'streak'].includes(subCommand)) {
             return ctx.replyV2({
                 title: `${client.emoji.cross} Error`,
-                description: 'Please specify a valid module to test: `greeter`, `levelup`, or `streak`.',
+                description: 'Please specify a valid module to test: `welcome`, `greeter`, `levelup`, or `streak`.\n\n*Example:* `e!test welcome`',
                 isAlert: true,
                 color: client.color.red
             });
@@ -104,6 +127,40 @@ export default class Test extends Command {
                 isAlert: true,
                 color: client.color.red
             });
+        }
+
+        if (subCommand === 'welcome') {
+            const targetMember = (ctx.isInteraction ? ctx.options.getMember('user') : null) as GuildMember || ctx.member as GuildMember;
+            try {
+                const { generateWelcomeImage } = await import('../../services/imageBuilder');
+                const avatarUrl = targetMember.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
+                const imageBuffer = await generateWelcomeImage(avatarUrl, targetMember.user.username, guild.memberCount, guild.name);
+                const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome-card.png' });
+
+                const welcomeRaw = guildData.welcomeMessage || `Welcome to **{guild}**, {user}! We're thrilled to have you here.`;
+                const resolved = await PlaceholderManager.resolve(client, welcomeRaw, targetMember, guild);
+
+                const embed = new EmbedBuilder()
+                    .setTitle('👋 Welcome Preview')
+                    .setDescription(resolved.content || null)
+                    .setImage('attachment://welcome-card.png')
+                    .setColor(client.color.main)
+                    .setFooter({ text: `Enc Welcome System • Member #${guild.memberCount}` })
+                    .setTimestamp();
+
+                return await ctx.sendMessage({
+                    embeds: [embed, ...resolved.embeds],
+                    components: resolved.components,
+                    files: [attachment]
+                });
+            } catch (e: any) {
+                return ctx.replyV2({
+                    title: `${client.emoji.cross} Render Error`,
+                    description: `Failed to generate welcome preview: ${e.message}`,
+                    isAlert: true,
+                    color: client.color.red
+                });
+            }
         }
 
         if (subCommand === 'greeter') {
@@ -134,37 +191,33 @@ export default class Test extends Command {
 
             // --- Welcome Image Preview ---
             if (type === 'welcome' || type === 'all') {
-                if (guildData.welcomeChannelId) {
-                    try {
-                        const { generateWelcomeImage } = await import('../../services/imageBuilder');
-                        const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
-                        const imageBuffer = await generateWelcomeImage(avatarUrl, member.user.username, guild.memberCount);
-                        const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome-preview.png' });
+                try {
+                    const { generateWelcomeImage } = await import('../../services/imageBuilder');
+                    const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
+                    const imageBuffer = await generateWelcomeImage(avatarUrl, member.user.username, guild.memberCount, guild.name);
+                    const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome-preview.png' });
 
-                        const welcomeRaw = guildData.welcomeMessage || `Welcome to the server, {user}!`;
-                        const resolved = await PlaceholderManager.resolve(client, welcomeRaw, member, guild);
+                    const welcomeRaw = guildData.welcomeMessage || `Welcome to the server, {user}!`;
+                    const resolved = await PlaceholderManager.resolve(client, welcomeRaw, member, guild);
 
-                        const embed = new EmbedBuilder()
-                            .setTitle('👋 Welcome!')
-                            .setDescription(resolved.content || null)
-                            .setImage('attachment://welcome-preview.png')
-                            .setColor(client.color.main)
-                            .setTimestamp();
+                    const embed = new EmbedBuilder()
+                        .setTitle('👋 Welcome!')
+                        .setDescription(resolved.content || null)
+                        .setImage('attachment://welcome-preview.png')
+                        .setColor(client.color.main)
+                        .setTimestamp();
 
-                        await ctx.channel.send({
-                            content: `📋 **Welcome Image Preview:**`,
-                        });
-                        await ctx.channel.send({
-                            embeds: [embed, ...resolved.embeds],
-                            components: resolved.components,
-                            files: [attachment]
-                        });
-                        results.push('✅ Welcome image previewed');
-                    } catch (e: any) {
-                        results.push(`❌ Welcome image error: ${e.message}`);
-                    }
-                } else {
-                    results.push('⏭️ Welcome image not configured (no channel set)');
+                    await ctx.channel.send({
+                        content: `📋 **Welcome Image Preview:**`,
+                    });
+                    await ctx.channel.send({
+                        embeds: [embed, ...resolved.embeds],
+                        components: resolved.components,
+                        files: [attachment]
+                    });
+                    results.push('✅ Welcome image previewed');
+                } catch (e: any) {
+                    results.push(`❌ Welcome image error: ${e.message}`);
                 }
             }
 

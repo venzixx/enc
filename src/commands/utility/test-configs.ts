@@ -250,7 +250,7 @@ export default class TestConfigCommand extends Command {
         try {
             const { generateWelcomeImage } = await import('../../services/imageBuilder');
             const avatarUrl = ctx.author.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
-            const imageBuffer = await generateWelcomeImage(avatarUrl, ctx.author.username, ctx.guild.memberCount);
+            const imageBuffer = await generateWelcomeImage(avatarUrl, ctx.author.username, ctx.guild.memberCount, ctx.guild.name);
             const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome-preview.png' });
 
             const welcomeRaw = guild.welcomeMessage || "Welcome to the server, {user}!";
