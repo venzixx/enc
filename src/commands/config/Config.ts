@@ -155,67 +155,6 @@ export default class Config extends Command {
                     ]
                 },
                 {
-                    name: 'automod',
-                    description: 'Manage the custom Auto-Mod security suite.',
-                    type: ApplicationCommandOptionType.SubcommandGroup,
-                    options: [
-                        { name: 'status', description: 'View current Auto-Mod configuration.', type: ApplicationCommandOptionType.Subcommand },
-                        { name: 'enable', description: 'Enable the global Auto-Mod master switch.', type: ApplicationCommandOptionType.Subcommand },
-                        { name: 'disable', description: 'Disable the global Auto-Mod master switch.', type: ApplicationCommandOptionType.Subcommand },
-                        { 
-                            name: 'blacklist', 
-                            description: 'Manage the neural word blacklist.', 
-                            type: ApplicationCommandOptionType.Subcommand,
-                            options: [
-                                { name: 'action', description: 'Action', type: ApplicationCommandOptionType.String, required: true, choices: [{name:'add', value:'add'},{name:'remove', value:'remove'},{name:'show', value:'show'}] },
-                                { name: 'phrase', description: 'Word or phrase', type: ApplicationCommandOptionType.String, required: false }
-                            ]
-                        },
-                        { name: 'heat', description: 'Monitor the Anti-Nuke Thermal Layer status.', type: ApplicationCommandOptionType.Subcommand }
-                    ]
-                },
-                {
-                    name: 'antinuke',
-                    description: 'Manage the Anti-Nuke security system.',
-                    type: ApplicationCommandOptionType.SubcommandGroup,
-                    options: [
-                        { name: 'status', description: 'Show the Anti-Nuke dashboard and security audit.', type: ApplicationCommandOptionType.Subcommand },
-                        { 
-                            name: 'toggle', 
-                            description: 'Toggle global anti-nuke shield.', 
-                            type: ApplicationCommandOptionType.Subcommand,
-                            options: [{ name: 'state', description: 'Protection state', type: ApplicationCommandOptionType.Boolean, required: true }]
-                        },
-                        { 
-                            name: 'config', 
-                            description: 'Manage specific categories.', 
-                            type: ApplicationCommandOptionType.Subcommand,
-                            options: [
-                                { name: 'category', description: 'Category', type: ApplicationCommandOptionType.String, required: true, choices: [{name:'Global', value:'antiNukeEnabled'},{name:'Ban', value:'antiNukeBan'},{name:'Kick', value:'antiNukeKick'},{name:'Channel', value:'antiNukeChannel'},{name:'Role', value:'antiNukeRole'},{name:'Bot', value:'antiNukeBot'},{name:'Webhook', value:'antiNukeWebhook'}] },
-                                { name: 'state', description: 'Enable/disable', type: ApplicationCommandOptionType.Boolean, required: true }
-                            ]
-                        },
-                        { 
-                            name: 'trust', 
-                            description: 'Manage the security whitelist.', 
-                            type: ApplicationCommandOptionType.Subcommand,
-                            options: [
-                                { name: 'action', description: 'Action', type: ApplicationCommandOptionType.String, required: true, choices: [{name:'Add', value:'add'},{name:'Remove', value:'remove'}] },
-                                { name: 'target', description: 'User or role', type: ApplicationCommandOptionType.Mentionable, required: true }
-                            ]
-                        },
-                        { 
-                            name: 'extraowner', 
-                            description: 'Manage the Extra Owner inner circle.', 
-                            type: ApplicationCommandOptionType.Subcommand,
-                            options: [
-                                { name: 'action', description: 'Action', type: ApplicationCommandOptionType.String, required: true, choices: [{name:'Add', value:'add'},{name:'Remove', value:'remove'}] },
-                                { name: 'user', description: 'User', type: ApplicationCommandOptionType.User, required: true }
-                            ]
-                        }
-                    ]
-                },
-                {
                     name: 'log',
                     description: 'Configure guild logging categories and status.',
                     type: ApplicationCommandOptionType.SubcommandGroup,
@@ -313,40 +252,6 @@ export default class Config extends Command {
                         },
                         { name: 'list', description: 'List responses', type: ApplicationCommandOptionType.Subcommand }
                     ]
-                },
-                {
-                    name: 'security',
-                    description: 'Manage server security configurations.',
-                    type: ApplicationCommandOptionType.SubcommandGroup,
-                    options: [
-                        { 
-                            name: 'extraowner', 
-                            description: 'Manage extra owners.', 
-                            type: ApplicationCommandOptionType.Subcommand,
-                            options: [
-                                { name: 'action', description: 'Action', type: ApplicationCommandOptionType.String, required: true, choices: [{name:'add', value:'add'},{name:'remove', value:'remove'},{name:'list', value:'list'}] },
-                                { name: 'target', description: 'User', type: ApplicationCommandOptionType.User, required: false }
-                            ]
-                        },
-                        { 
-                            name: 'trusted', 
-                            description: 'Manage trusted admins.', 
-                            type: ApplicationCommandOptionType.Subcommand,
-                            options: [
-                                { name: 'action', description: 'Action', type: ApplicationCommandOptionType.String, required: true, choices: [{name:'add', value:'add'},{name:'remove', value:'remove'},{name:'list', value:'list'}] },
-                                { name: 'target', description: 'User or role', type: ApplicationCommandOptionType.Mentionable, required: false }
-                            ]
-                        },
-                        { 
-                            name: 'whitelist', 
-                            description: 'Manage automod whitelist.', 
-                            type: ApplicationCommandOptionType.Subcommand,
-                            options: [
-                                { name: 'action', description: 'Action', type: ApplicationCommandOptionType.String, required: true, choices: [{name:'add', value:'add'},{name:'remove', value:'remove'},{name:'list', value:'list'}] },
-                                { name: 'target', description: 'Target', type: ApplicationCommandOptionType.Mentionable, required: false }
-                            ]
-                        }
-                    ]
                 }
             ]
         });
@@ -363,13 +268,10 @@ export default class Config extends Command {
 
         if (group) {
             switch(group) {
-                case 'automod': return this.handleAutomod(client, ctx, sub);
-                case 'antinuke': return this.handleAntinuke(client, ctx, sub);
                 case 'log': return this.handleLog(client, ctx, sub);
                 case 'streaktier': return this.handleStreaktier(client, ctx, sub);
                 case 'roleconnect': return this.handleRoleconnect(client, ctx, sub);
                 case 'autoresponder': return this.handleAutoresponder(client, ctx, sub);
-                case 'security': return this.handleSecurity(client, ctx, sub);
             }
         } else if (sub) {
             switch(sub) {
@@ -540,128 +442,6 @@ export default class Config extends Command {
         };
     }
 
-    private async handleAutomod(client: ExtendedClient, ctx: Context, sub: string) {
-        if (sub === 'status') {
-            const guildData = await client.prisma.guild.findUnique({ where: { id: ctx.guild.id }, include: { autoModFilters: true } });
-            const filterList = guildData?.autoModFilters?.map(f => `${f.enabled ? '🟢' : '🔴'} **${f.type}**: ${f.action}`).join('\n') || 'None configured.';
-            return ctx.replyV2({ title: '🛡️ Auto-Mod Manifest', description: `**Master Switch:** ${guildData?.autoModEnabled ? '🟢 ENABLED' : '🔴 DISABLED'}\n\n**Active Filters:**\n${filterList}`, color: client.color.main });
-        } else if (sub === 'enable' || sub === 'disable') {
-            const state = sub === 'enable';
-            await client.prisma.guild.update({ where: { id: ctx.guild.id }, data: { autoModEnabled: state } });
-            return ctx.replyV2({ title: state ? 'Auto-Mod Activated' : 'Auto-Mod Deactivated', description: `The global master switch has been set to **${state ? 'ENABLED' : 'DISABLED'}**.`, color: state ? client.color.main : client.color.red });
-        } else if (sub === 'blacklist') {
-            const action = ctx.options.getString('action', true);
-            const phrase = ctx.options.getString('phrase')?.toLowerCase();
-            const filter = await client.prisma.autoModFilter.findUnique({ where: { guildId_type: { guildId: ctx.guild.id, type: 'WORDS' } } });
-            const { AutoModHandler } = require('../../utils/AutoModHandler');
-            const wordsConfig = AutoModHandler.parseWordsConfig(filter?.data);
-            let words = wordsConfig.words;
-            
-            if (action === 'show') {
-                return ctx.replyV2({ title: '📓 Neural Blacklist', description: words.length ? `\`\`\`${words.join(', ')}\`\`\`` : '*No blacklisted phrases protocolled.*', color: client.color.main });
-            }
-            if (!phrase) return ctx.replyV2({description: 'Phrase required.', color: client.color.red});
-            
-            if (action === 'add') {
-                if (words.includes(phrase)) return ctx.replyV2({ description: 'That phrase is already blacklisted.' });
-                words.push(phrase);
-            } else if (action === 'remove') {
-                if (!words.includes(phrase)) return ctx.replyV2({ description: 'That phrase is not in the blacklist.' });
-                words = words.filter((w: string) => w !== phrase);
-            }
-            wordsConfig.words = words;
-            await client.prisma.autoModFilter.upsert({ where: { guildId_type: { guildId: ctx.guild.id, type: 'WORDS' } }, update: { data: JSON.stringify(wordsConfig) }, create: { guildId: ctx.guild.id, type: 'WORDS', enabled: true, data: JSON.stringify(wordsConfig) } });
-            return ctx.replyV2({ description: `Neural blacklist updated. \`${phrase}\` has been **${action === 'add' ? 'added to' : 'removed from'}** the filter.`, color: client.color.main });
-        } else if (sub === 'heat') {
-            const { HeatManager } = require('../../utils/HeatManager');
-            const activeHeat = HeatManager.getAllHeat(ctx.guild.id);
-            if (activeHeat.length === 0) return ctx.replyV2({ title: '🔥 Thermal Security Radar', description: '*The server is currently operating at optimal temperatures. No active thermal signatures detected.*', color: client.color.main });
-            const heatList = activeHeat.map((h: any) => {
-                const filled = Math.round((h.value / 100) * 10);
-                const bar = '▓'.repeat(filled) + '░'.repeat(10 - filled);
-                return `${h.value > 80 ? '🔴' : h.value > 50 ? '🟠' : '🟢'} <@${h.userId}>: \`${bar}\` **${Math.round(h.value)}%**`;
-            }).join('\n');
-            return ctx.replyV2({ title: '🔥 Thermal Security Radar', description: `**Active Thermal Signatures:**\n\n${heatList}\n\n*Heat decays every 10 seconds. Users hitting 100% will be neutralized.*`, color: client.color.main });
-        }
-    }
-
-    private async handleAntinuke(client: ExtendedClient, ctx: Context, sub: string) {
-        const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
-        const isBotOwner = BOT_OWNERS.has(ctx.author.id);
-        const isOwner = ctx.guild.ownerId === ctx.author.id || isBotOwner;
-        const extraOwners = await client.prisma.extraOwner.findMany({ where: { guildId: ctx.guild.id } });
-        const isExtraOwner = isBotOwner || extraOwners.some((eo: any) => eo.userId === ctx.author.id);
-
-        if (!isOwner && !isExtraOwner) {
-            return ctx.replyV2({ description: `${client.emoji.cross} Only the **Server Owner** or an **Extra Owner** can manage Anti-Nuke settings.`, isAlert: true, color: client.color.red, ephemeral: true });
-        }
-
-        if (sub === 'status') {
-            const guildData = await client.prisma.guild.findUnique({ where: { id: ctx.guild.id }, include: { extraOwners: true, whitelistedUsers: true, whitelistedRoles: true } });
-            const members = await ctx.guild.members.fetch();
-            const threats = members.filter((m: any) => 
-                !m.user.bot && 
-                m.id !== ctx.guild.ownerId &&
-                !guildData?.extraOwners.some((eo: any) => eo.userId === m.id) &&
-                !guildData?.whitelistedUsers.some((wu: any) => wu.userId === m.id) &&
-                !m.roles.cache.some((r: any) => guildData?.whitelistedRoles.some((wr: any) => wr.roleId === r.id)) &&
-                (m.permissions.has(PermissionFlagsBits.Administrator) || m.permissions.has(PermissionFlagsBits.ManageGuild))
-            );
-            const threatList = threats.size > 0 
-               ? threats.map((m: any) => ` <@${m.id}> (\`${m.id}\`)`).slice(0, 10).join('\n') + (threats.size > 10 ? `\n*+ ${threats.size - 10} more*` : '')
-               : `${client.emoji.success} No at-risk users found.`;
-
-            return ctx.replyV2({
-                title: `${client.emoji.shield} Anti-Nuke Dashboard`,
-                color: client.color.main,
-                fields: [
-                    { name: 'System Status', value: `Global: ${guildData?.antiNukeEnabled ? client.emoji.success : client.emoji.cross}`, inline: true },
-                    { name: `${client.emoji.shield} Categories`, value: [`${guildData?.antiNukeBan ? client.emoji.success : client.emoji.cross} Ban`, `${guildData?.antiNukeKick ? client.emoji.success : client.emoji.cross} Kick`, `${guildData?.antiNukeChannel ? client.emoji.success : client.emoji.cross} Channel`, `${guildData?.antiNukeRole ? client.emoji.success : client.emoji.cross} Role`, `${guildData?.antiNukeBot ? client.emoji.success : client.emoji.cross} Bot`, `${guildData?.antiNukeWebhook ? client.emoji.success : client.emoji.cross} Webhook`].join('\n'), inline: true },
-                    { name: `${client.emoji.rank} Extra Owners`, value: guildData?.extraOwners.length ? guildData.extraOwners.map(o => `<@${o.userId}>`).join(', ') : 'None', inline: false },
-                    { name: `${client.emoji.exclamation} Security Audit`, value: threatList, inline: false }
-                ]
-            });
-        } else if (sub === 'toggle') {
-            const state = ctx.options.getBoolean('state', true);
-            await client.prisma.guild.update({ where: { id: ctx.guild.id }, data: { antiNukeEnabled: state } });
-            return ctx.replyV2({ description: `${client.emoji.shield} Global Anti-Nuke state set to **${state ? 'Enabled' : 'Disabled'}**.`, color: client.color.main });
-        } else if (sub === 'config') {
-            const category = ctx.options.getString('category', true);
-            const state = ctx.options.getBoolean('state', true);
-            await client.prisma.guild.update({ where: { id: ctx.guild.id }, data: { [category]: state } });
-            const name = category === 'antiNukeEnabled' ? 'Global Anti-Nuke' : category.replace('antiNuke', '') + ' Protection';
-            return ctx.replyV2({ description: `${client.emoji.shield} **${name}** has been **${state ? 'Enabled' : 'Disabled'}**.`, color: client.color.main });
-        } else if (sub === 'trust') {
-            const action = ctx.options.getString('action', true);
-            const target = ctx.options.getMentionable('target') as any;
-            if (action === 'add') {
-                if ('username' in target) {
-                    await client.prisma.whitelistedUser.upsert({ where: { guildId_userId: { guildId: ctx.guild.id, userId: target.id } }, update: {}, create: { guildId: ctx.guild.id, userId: target.id } });
-                } else {
-                    await client.prisma.whitelistedRole.upsert({ where: { guildId_roleId: { guildId: ctx.guild.id, roleId: target.id } }, update: {}, create: { guildId: ctx.guild.id, roleId: target.id } });
-                }
-                return ctx.replyV2({ description: `${client.emoji.success} Added **${target.displayName || target.name}** to the security whitelist.`, color: client.color.main });
-            } else {
-                if ('username' in target) {
-                    await client.prisma.whitelistedUser.deleteMany({ where: { guildId: ctx.guild.id, userId: target.id } });
-                } else {
-                    await client.prisma.whitelistedRole.deleteMany({ where: { guildId: ctx.guild.id, roleId: target.id } });
-                }
-                return ctx.replyV2({ description: `${client.emoji.remove_user} Removed **${target.displayName || target.name}** from the security whitelist.`, color: client.color.main });
-            }
-        } else if (sub === 'extraowner') {
-            const action = ctx.options.getString('action', true);
-            const user = ctx.options.getUser('user', true);
-            if (action === 'add') {
-                await client.prisma.extraOwner.upsert({ where: { guildId_userId: { guildId: ctx.guild.id, userId: user.id } }, update: {}, create: { guildId: ctx.guild.id, userId: user.id } });
-                return ctx.replyV2({ description: `${client.emoji.rank} Added **${user.tag}** as an **Extra Owner**.`, color: client.color.main });
-            } else {
-                await client.prisma.extraOwner.deleteMany({ where: { guildId: ctx.guild.id, userId: user.id } });
-                return ctx.replyV2({ description: `${client.emoji.remove_user} Removed **${user.tag}** from the Extra Owners.`, color: client.color.main });
-            }
-        }
-    }
-
     private async handleLog(client: ExtendedClient, ctx: Context, sub: string): Promise<any> {
         if (sub === 'status') {
             const guildData = await client.prisma.guild.findUnique({ where: { id: ctx.guild.id } }) as any;
@@ -783,74 +563,6 @@ export default class Config extends Command {
             if (!responders.length) return ctx.replyV2({ description: 'No auto-responses configured.', color: client.color.red });
             const list = responders.map(r => ` \`${r.trigger}\`  ${r.response}`).join('\n');
             return ctx.replyV2({ title: 'Auto-Responses', description: list.slice(0, 4000), color: client.color.main });
-        }
-    }
-
-    private async handleSecurity(client: ExtendedClient, ctx: Context, sub: string) {
-        const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
-        const isBotOwner = BOT_OWNERS.has(ctx.author.id);
-        const isOwner = ctx.guild.ownerId === ctx.author.id || isBotOwner;
-        const extraOwners = await client.prisma.extraOwner.findMany({ where: { guildId: ctx.guild.id } });
-        const isExtraOwner = isBotOwner || extraOwners.some((eo: any) => eo.userId === ctx.author.id);
-
-        if (!isOwner && !isExtraOwner) {
-            return ctx.replyV2({ description: `${client.emoji.cross} Only the **Server Owner** or an **Extra Owner** can use this.`, isAlert: true, color: client.color.red });
-        }
-
-        const action = ctx.options.getString('action', true);
-        const target = ctx.options.get('target')?.value as string;
-
-        if (sub === 'extraowner') {
-            if (!isOwner && action !== 'list') return ctx.replyV2({ description: `${client.emoji.cross} Only the **Server Owner** can manage Extra Owners.`, isAlert: true, color: client.color.red });
-            if (action === 'list') {
-                const list = extraOwners.length ? extraOwners.map((o: any) => `<@${o.userId}>`).join('\n') : 'No Extra Owners.';
-                return ctx.replyV2({ title: 'Extra Owners', description: list, color: client.color.main });
-            }
-            if (!target) return ctx.replyV2({description: 'Target required.', color: client.color.red});
-            if (action === 'add') {
-                await client.prisma.extraOwner.upsert({ where: { guildId_userId: { guildId: ctx.guild.id, userId: target } }, update: {}, create: { guildId: ctx.guild.id, userId: target } });
-                return ctx.replyV2({ description: `Added <@${target}> as an Extra Owner.`, color: client.color.main });
-            } else {
-                await client.prisma.extraOwner.deleteMany({ where: { guildId: ctx.guild.id, userId: target } });
-                return ctx.replyV2({ description: `Removed <@${target}> from Extra Owners.`, color: client.color.main });
-            }
-        } else if (sub === 'trusted') {
-            if (action === 'list') {
-                const wUsers = await client.prisma.whitelistedUser.findMany({ where: { guildId: ctx.guild.id } });
-                const wRoles = await client.prisma.whitelistedRole.findMany({ where: { guildId: ctx.guild.id } });
-                const combined = [...wUsers.map((u: any) => `<@${u.userId}>`), ...wRoles.map((r: any) => `<@&${r.roleId}>`)];
-                return ctx.replyV2({ title: 'Trusted Admins', description: combined.length ? combined.join('\n') : 'No trusted admins.', color: client.color.main });
-            }
-            if (!target) return ctx.replyV2({description: 'Target required.', color: client.color.red});
-            const isRole = ctx.guild.roles.cache.has(target);
-            if (action === 'add') {
-                if (isRole) await client.prisma.whitelistedRole.upsert({ where: { guildId_roleId: { guildId: ctx.guild.id, roleId: target } }, update: {}, create: { guildId: ctx.guild.id, roleId: target } });
-                else await client.prisma.whitelistedUser.upsert({ where: { guildId_userId: { guildId: ctx.guild.id, userId: target } }, update: {}, create: { guildId: ctx.guild.id, userId: target } });
-                return ctx.replyV2({ description: `Added to Trusted Admins.`, color: client.color.main });
-            } else {
-                if (isRole) await client.prisma.whitelistedRole.deleteMany({ where: { guildId: ctx.guild.id, roleId: target } });
-                else await client.prisma.whitelistedUser.deleteMany({ where: { guildId: ctx.guild.id, userId: target } });
-                return ctx.replyV2({ description: `Removed from Trusted Admins.`, color: client.color.main });
-            }
-        } else if (sub === 'whitelist') {
-            if (action === 'list') {
-                const whitelists = await client.prisma.autoModWhitelist.findMany({ where: { guildId: ctx.guild.id } });
-                const lines = whitelists.map((w: any) => `${w.type}: ${w.targetId}`);
-                return ctx.replyV2({ title: 'AutoMod Whitelist', description: lines.length ? lines.join('\n') : 'No whitelists.', color: client.color.main });
-            }
-            if (!target) return ctx.replyV2({description: 'Target required.', color: client.color.red});
-            let type = 'USER';
-            if (ctx.guild.roles.cache.has(target)) type = 'ROLE';
-            else if (ctx.guild.channels.cache.has(target)) {
-                type = ctx.guild.channels.cache.get(target)?.type === ChannelType.GuildCategory ? 'CATEGORY' : 'CHANNEL';
-            }
-            if (action === 'add') {
-                await client.prisma.autoModWhitelist.create({ data: { guildId: ctx.guild.id, targetId: target, type } });
-                return ctx.replyV2({ description: `Added to AutoMod Whitelist.`, color: client.color.main });
-            } else {
-                await client.prisma.autoModWhitelist.deleteMany({ where: { guildId: ctx.guild.id, targetId: target } });
-                return ctx.replyV2({ description: `Removed from AutoMod Whitelist.`, color: client.color.main });
-            }
         }
     }
 }

@@ -100,6 +100,7 @@ model Guild {
   lockdownEnabled       Boolean           @default(false)
   lockdownMode          String            @default("PUBLIC")
   lockdownChannels      String?
+  lockdownRoles         String?
   autoModEnabled        Boolean           @default(false)
   botNickname           String?
   botBio                String?
@@ -165,6 +166,7 @@ model Guild {
   suggestions           Suggestion[]
   whitelistedRoles      WhitelistedRole[]
   whitelistedUsers      WhitelistedUser[]
+  trustedUsers          TrustedUser[]
   permits               Permit[]
   autoModFilters        AutoModFilter[]
   autoModWhitelists     AutoModWhitelist[]
@@ -270,12 +272,20 @@ model StarboardMessage {
   guild              Guild  @relation(fields: [guildId], references: [id])
 }
 
+model TrustedUser {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  userId  String
+  guild   Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, userId])
+}
 
 model ExtraOwner {
   id      Int    @id @default(autoincrement())
   guildId String
   userId  String
-  guild   Guild  @relation(fields: [guildId], references: [id])
+  guild   Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@unique([guildId, userId])
 }
@@ -284,7 +294,7 @@ model WhitelistedUser {
   id      Int    @id @default(autoincrement())
   guildId String
   userId  String
-  guild   Guild  @relation(fields: [guildId], references: [id])
+  guild   Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@unique([guildId, userId])
 }

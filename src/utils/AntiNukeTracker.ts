@@ -22,8 +22,7 @@ export class AntiNukeTracker {
             where: { id: guild.id },
             include: {
                 extraOwners: true,
-                whitelistedUsers: true,
-                whitelistedRoles: true
+                trustedUsers: true
             }
         });
 
@@ -34,15 +33,10 @@ export class AntiNukeTracker {
         const catKey = category as keyof typeof guildData;
         if (!(guildData as any)[catKey]) return false;
 
-        // 3. Bypass Checks (Owner, Extra Owner, Whitelist)
+        // 3. Bypass Checks (Owner, Extra Owner, Trusted Admin)
         if (userId === guild.ownerId) return false;
         if (guildData.extraOwners.some(eo => eo.userId === userId)) return false;
-        if (guildData.whitelistedUsers.some(wu => wu.userId === userId)) return false;
-
-        const member = await guild.members.fetch(userId).catch(() => null);
-        if (!member) return false;
-
-        if (member.roles.cache.some(r => guildData.whitelistedRoles.some(wr => wr.roleId === r.id))) return false;
+        if (guildData.trustedUsers.some(tu => tu.userId === userId)) return false;
 
         // 4. Rate Limit Logic
         const now = Date.now();
@@ -59,6 +53,8 @@ export class AntiNukeTracker {
 
         // 5. NUKE TRIGGERED - Apply Punishment
         this.cache.delete(cacheKey); // Reset count after trigger
+        const member = await guild.members.fetch(userId).catch(() => null);
+        if (!member) return false;
         return await this.punish(client, guild, member, category, data.count);
     }
 

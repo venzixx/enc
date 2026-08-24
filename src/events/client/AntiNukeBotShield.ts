@@ -43,7 +43,7 @@ export default class AntiNukeBotShield extends Event {
                 where: { id: guild.id },
                 include: {
                     extraOwners: true,
-                    whitelistedUsers: true
+                    trustedUsers: true
                 }
             });
 
@@ -52,9 +52,9 @@ export default class AntiNukeBotShield extends Event {
             // Bypass Checks for normal antinuke
             const isOwner = log.executorId === guild.ownerId;
             const isExtraOwner = guildData.extraOwners.some(eo => eo.userId === log.executorId);
-            const isWhitelisted = guildData.whitelistedUsers.some(wu => wu.userId === log.executorId);
+            const isTrusted = guildData.trustedUsers.some(tu => tu.userId === log.executorId);
 
-            if (isOwner || isExtraOwner || isWhitelisted) return;
+            if (isOwner || isExtraOwner || isTrusted) return;
         }
 
         // 4. Rogue Bot Detected -> Kick the bot

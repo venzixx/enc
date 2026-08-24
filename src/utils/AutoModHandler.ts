@@ -71,7 +71,19 @@ export class AutoModHandler {
         const guildData = await client.prisma.guild.findUnique({ where: { id: message.guildId! } });
         if (!guildData || !guildData.autoModEnabled) return false;
 
-        // 2. Bypass Check (Owner, Immunity, Permit Permission)
+        // 2. Bypass Check (Owner, ExtraOwner, WhitelistedUser, Immunity, Permit Permission)
+        if (message.author.id === message.guild.ownerId) return false;
+
+        const isExtraOwner = await client.prisma.extraOwner.findUnique({
+            where: { guildId_userId: { guildId: message.guildId!, userId: message.author.id } }
+        });
+        if (isExtraOwner) return false;
+
+        const isWhitelistedUser = await client.prisma.whitelistedUser.findUnique({
+            where: { guildId_userId: { guildId: message.guildId!, userId: message.author.id } }
+        });
+        if (isWhitelistedUser) return false;
+
         if (await PermitManager.isImmune(client, message.guildId!, message.member!)) return false;
         if (await PermitManager.hasPermission(client, message.guildId!, message.member!, PermitPermission.BYPASS_AUTOMOD)) return false;
 
