@@ -18,6 +18,12 @@ model Guild {
   autoroleId            String?
   welcomeChannelId      String?
   welcomeMessage        String?
+  welcomeCardEnabled    Boolean           @default(true)
+  welcomeCardBackground String?
+  welcomeCardColor      String?           @default("#38bdf8")
+  welcomeCardFont       String?           @default("Exo2")
+  welcomeCardStyle      String?           @default("glass")
+  welcomeCardTitle      String?
   joinDmMessage         String?
   giveawayDefaultRoleId  String?
   giveawayDefaultInvites Int?      @default(0)

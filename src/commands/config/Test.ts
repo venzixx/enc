@@ -134,7 +134,17 @@ export default class Test extends Command {
             try {
                 const { generateWelcomeImage } = await import('../../services/imageBuilder');
                 const avatarUrl = targetMember.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
-                const imageBuffer = await generateWelcomeImage(avatarUrl, targetMember.user.username, guild.memberCount, guild.name);
+                const imageBuffer = await generateWelcomeImage({
+                    avatarUrl,
+                    username: targetMember.user.username,
+                    memberCount: guild.memberCount,
+                    serverName: guild.name,
+                    background: guildData.welcomeCardBackground,
+                    color: guildData.welcomeCardColor,
+                    font: guildData.welcomeCardFont,
+                    style: guildData.welcomeCardStyle,
+                    title: guildData.welcomeCardTitle
+                });
                 const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome-card.png' });
 
                 const welcomeRaw = guildData.welcomeMessage || `Welcome to **{guild}**, {user}! We're thrilled to have you here.`;

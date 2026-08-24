@@ -117,23 +117,41 @@ export default class GuildMemberAdd extends Event {
                     } else {
                         // Standard Welcome Banner + Text
                         try {
-                            const { generateWelcomeImage } = await import('../services/imageBuilder');
-                            const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
-                            const imageBuffer = await generateWelcomeImage(avatarUrl, member.user.username, guild.memberCount, guild.name);
-                            const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome.png' });
+                            if (guildData.welcomeCardEnabled !== false) {
+                                const { generateWelcomeImage } = await import('../services/imageBuilder');
+                                const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
+                                const imageBuffer = await generateWelcomeImage({
+                                    avatarUrl,
+                                    username: member.user.username,
+                                    memberCount: guild.memberCount,
+                                    serverName: guild.name,
+                                    background: guildData.welcomeCardBackground,
+                                    color: guildData.welcomeCardColor,
+                                    font: guildData.welcomeCardFont,
+                                    style: guildData.welcomeCardStyle,
+                                    title: guildData.welcomeCardTitle
+                                });
+                                const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome.png' });
 
-                            const embed = new EmbedBuilder()
-                                .setTitle('👋 Welcome!')
-                                .setDescription(resolved.content || `Welcome to the server, ${member.toString()}!`)
-                                .setImage('attachment://welcome.png')
-                                .setColor(this.client.color.main)
-                                .setTimestamp();
+                                const embed = new EmbedBuilder()
+                                    .setTitle('👋 Welcome!')
+                                    .setDescription(resolved.content || `Welcome to the server, ${member.toString()}!`)
+                                    .setImage('attachment://welcome.png')
+                                    .setColor(guildData.welcomeCardColor ? parseInt(guildData.welcomeCardColor.replace('#', ''), 16) || this.client.color.main : this.client.color.main)
+                                    .setTimestamp();
 
-                            await welcomeChannel.send({
-                                embeds: [embed],
-                                components: resolved.components,
-                                files: [attachment]
-                            }).catch(() => {});
+                                await welcomeChannel.send({
+                                    embeds: [embed],
+                                    components: resolved.components,
+                                    files: [attachment]
+                                }).catch(() => {});
+                            } else {
+                                await welcomeChannel.send({
+                                    content: resolved.content || `Welcome ${member.toString()} to **${guild.name}**!`,
+                                    embeds: resolved.embeds,
+                                    components: resolved.components
+                                }).catch(() => {});
+                            }
                         } catch {
                             await welcomeChannel.send({
                                 content: resolved.content || `Welcome ${member.toString()} to **${guild.name}**!`

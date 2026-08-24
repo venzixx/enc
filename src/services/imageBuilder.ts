@@ -43,33 +43,105 @@ function drawRoundedRect(ctx: SKRSContext2D, x: number, y: number, width: number
     ctx.closePath();
 }
 
+export interface WelcomeImageOptions {
+    avatarUrl: string;
+    username: string;
+    memberCount: number;
+    serverName?: string;
+    background?: string | null;
+    color?: string | null;
+    font?: string | null;
+    style?: string | null;
+    title?: string | null;
+}
+
 export async function generateWelcomeImage(
-    avatarUrl: string, 
-    username: string, 
-    memberCount: number,
-    serverName?: string
+    avatarOrOptions: string | WelcomeImageOptions,
+    usernameArg?: string,
+    memberCountArg?: number,
+    serverNameArg?: string
 ): Promise<Buffer> {
+    let options: WelcomeImageOptions;
+    if (typeof avatarOrOptions === 'object') {
+        options = avatarOrOptions;
+    } else {
+        options = {
+            avatarUrl: avatarOrOptions,
+            username: usernameArg || 'User',
+            memberCount: memberCountArg || 1,
+            serverName: serverNameArg
+        };
+    }
+
+    const { avatarUrl, username, memberCount, serverName } = options;
+    const accentColor = options.color || '#38bdf8';
+    const fontChoice = options.font || 'Exo2';
+    const fontStack = `"${fontChoice}", "NotoSans", "Inter", sans-serif`;
+
     const canvas = createCanvas(880, 280);
     const ctx = canvas.getContext('2d');
 
-    // 1. Deep Obsidian Gradient Base
-    const bgGrad = ctx.createLinearGradient(0, 0, 880, 280);
-    bgGrad.addColorStop(0, '#0a0b10');
-    bgGrad.addColorStop(0.5, '#0e111a');
-    bgGrad.addColorStop(1, '#090a0e');
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // 1. Background (Custom Image OR Preset Gradient)
+    let bgDrawn = false;
+    if (options.background && options.background.startsWith('http')) {
+        try {
+            const bgImage = await loadImage(options.background);
+            ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+            
+            // Dark Frosted Scrim Overlay for contrast
+            ctx.fillStyle = 'rgba(8, 9, 13, 0.72)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            bgDrawn = true;
+        } catch (e) {
+            bgDrawn = false;
+        }
+    }
 
-    // 2. Ambient Colorful Glows (Cyan & Purple subtle ambient lighting)
-    const cyanGlow = ctx.createRadialGradient(130, 140, 0, 130, 140, 220);
-    cyanGlow.addColorStop(0, 'rgba(56, 189, 248, 0.14)');
-    cyanGlow.addColorStop(0.6, 'rgba(99, 102, 241, 0.04)');
-    cyanGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = cyanGlow;
+    if (!bgDrawn) {
+        const bgGrad = ctx.createLinearGradient(0, 0, 880, 280);
+        const preset = (options.background || 'obsidian').toLowerCase();
+
+        if (preset === 'cyberpunk') {
+            bgGrad.addColorStop(0, '#130924');
+            bgGrad.addColorStop(0.5, '#0d081f');
+            bgGrad.addColorStop(1, '#080b1e');
+        } else if (preset === 'ocean') {
+            bgGrad.addColorStop(0, '#061325');
+            bgGrad.addColorStop(0.5, '#041624');
+            bgGrad.addColorStop(1, '#021b2b');
+        } else if (preset === 'crimson') {
+            bgGrad.addColorStop(0, '#1f080c');
+            bgGrad.addColorStop(0.5, '#160609');
+            bgGrad.addColorStop(1, '#100508');
+        } else if (preset === 'emerald') {
+            bgGrad.addColorStop(0, '#051a14');
+            bgGrad.addColorStop(0.5, '#04140f');
+            bgGrad.addColorStop(1, '#04100c');
+        } else if (preset === 'gold') {
+            bgGrad.addColorStop(0, '#1c1608');
+            bgGrad.addColorStop(0.5, '#140f05');
+            bgGrad.addColorStop(1, '#0d0b04');
+        } else {
+            // Obsidian default
+            bgGrad.addColorStop(0, '#0a0b10');
+            bgGrad.addColorStop(0.5, '#0e111a');
+            bgGrad.addColorStop(1, '#090a0e');
+        }
+
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // 2. Ambient Accent Glows
+    const ambientGlow = ctx.createRadialGradient(130, 140, 0, 130, 140, 220);
+    ambientGlow.addColorStop(0, hexToRgba(accentColor, 0.16));
+    ambientGlow.addColorStop(0.6, hexToRgba(accentColor, 0.04));
+    ambientGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = ambientGlow;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const cornerGlow = ctx.createRadialGradient(800, 40, 0, 800, 40, 250);
-    cornerGlow.addColorStop(0, 'rgba(168, 85, 247, 0.08)');
+    cornerGlow.addColorStop(0, hexToRgba(accentColor, 0.08));
     cornerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = cornerGlow;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -111,11 +183,11 @@ export async function generateWelcomeImage(
     try {
         const avatar = await loadImage(avatarUrl);
         
-        // Outer Cyan Glow Ring
+        // Outer Accent Glow Ring
         ctx.beginPath();
         ctx.arc(130, 140, 80, 0, Math.PI * 2, true);
         ctx.lineWidth = 4;
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+        ctx.strokeStyle = hexToRgba(accentColor, 0.5);
         ctx.stroke();
 
         // Inner White Ring
@@ -143,15 +215,18 @@ export async function generateWelcomeImage(
 
     // 5. Typography & Badges
     // Sub-header / Category
-    const subtitle = serverName 
-        ? `W E L C O M E   T O   ${serverName.toUpperCase().slice(0, 24)}` 
-        : 'W E L C O M E   T O   T H E   S E R V E R';
-    ctx.font = '700 14px "Exo2", "NotoSans", "Inter", sans-serif';
-    ctx.fillStyle = '#38bdf8';
+    let subtitle = options.title;
+    if (!subtitle) {
+        subtitle = serverName 
+            ? `W E L C O M E   T O   ${serverName.toUpperCase().slice(0, 24)}` 
+            : 'W E L C O M E   T O   T H E   S E R V E R';
+    }
+    ctx.font = `700 14px ${fontStack}`;
+    ctx.fillStyle = accentColor;
     ctx.fillText(subtitle, 245, 95);
 
     // Username (with automatic ellipsis if too long)
-    ctx.font = '700 36px "NotoSans", "Exo2", "Inter", sans-serif';
+    ctx.font = `700 36px ${fontStack}`;
     ctx.fillStyle = '#FFFFFF';
 
     let displayUser = `@${username}`;
@@ -179,31 +254,45 @@ export async function generateWelcomeImage(
     drawRoundedRect(ctx, pill1X, pill1Y, pill1W, pill1H, pill1R);
     ctx.stroke();
 
-    ctx.font = '700 13px "Exo2", "NotoSans", "Inter", sans-serif';
+    ctx.font = `700 13px ${fontStack}`;
     ctx.fillStyle = '#e2e8f0';
     ctx.fillText(`MEMBER #${memberCount || 1}`, pill1X + 22, pill1Y + 22);
 
-    // Pill 2: Community Badge
+    // Pill 2: Community Badge with accent tint
     const pill2X = pill1X + pill1W + 12;
     const pill2Y = 175;
     const pill2W = 135;
     const pill2H = 34;
     const pill2R = 17;
 
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+    ctx.fillStyle = hexToRgba(accentColor, 0.08);
     drawRoundedRect(ctx, pill2X, pill2Y, pill2W, pill2H, pill2R);
     ctx.fill();
 
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+    ctx.strokeStyle = hexToRgba(accentColor, 0.28);
     ctx.lineWidth = 1;
     drawRoundedRect(ctx, pill2X, pill2Y, pill2W, pill2H, pill2R);
     ctx.stroke();
 
-    ctx.font = '700 13px "Exo2", "NotoSans", "Inter", sans-serif';
-    ctx.fillStyle = '#38bdf8';
+    ctx.font = `700 13px ${fontStack}`;
+    ctx.fillStyle = accentColor;
     ctx.fillText('COMMUNITY', pill2X + 20, pill2Y + 22);
 
     return canvas.toBuffer('image/png');
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+    if (!hex || !hex.startsWith('#')) return `rgba(56, 189, 248, ${alpha})`;
+    let cleanHex = hex.replace('#', '');
+    if (cleanHex.length === 3) {
+        cleanHex = cleanHex.split('').map(c => c + c).join('');
+    }
+    const num = parseInt(cleanHex, 16);
+    if (isNaN(num)) return `rgba(56, 189, 248, ${alpha})`;
+    const r = (num >> 16) & 255;
+    const g = (num >> 8) & 255;
+    const b = num & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 export async function generateRankCard(options: {
