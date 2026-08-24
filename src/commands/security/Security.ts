@@ -194,8 +194,8 @@ export default class SecurityCommand extends Command {
         if (group === 'trust' || group === 'trustedadmin' || group === 'trustedadmins') group = 'trusted';
         if (group === 'wl' || group === 'whitelists') group = 'whitelist';
 
-        // 1. If no args provided, show Overview Hub
-        if (!group) {
+        // 1. If no args or status/antinuke requested, show Overview Hub
+        if (!group || group === 'status' || group === 'antinuke') {
             const whitelistedUsers = await client.prisma.whitelistedUser.findMany({ where: { guildId: ctx.guild.id } });
             const guildData = await client.prisma.guild.findUnique({
                 where: { id: ctx.guild.id },

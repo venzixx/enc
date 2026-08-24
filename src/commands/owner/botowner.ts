@@ -111,8 +111,21 @@ export default class BotOwnerCommand extends Command {
         // ===== ANTINUKE CONTROL =====
         } else if (sub === 'antinuke') {
             const arg = match[2]?.trim()?.toLowerCase();
-            if (!arg || !['enable', 'disable'].includes(arg)) {
-                return ctx.replyV2({ description: '**Usage:** `botowner antinuke <enable/disable>`', isAlert: true });
+            const current = await (client.prisma as any).devAntiNuke.findUnique({
+                where: { guildId: ctx.guild.id }
+            });
+
+            if (!arg || arg === 'status') {
+                const state = current?.enabled ? '🟢 **ENABLED**' : '🔴 **DISABLED**';
+                return ctx.replyV2({
+                    title: '🛡️ Developer Anti-Nuke Status',
+                    description: `Developer Anti-Nuke is currently ${state} for **${ctx.guild.name}**.\n\n*Use \`botowner antinuke <enable|disable>\` to toggle.*`,
+                    color: current?.enabled ? client.color.green : client.color.red
+                });
+            }
+
+            if (!['enable', 'disable'].includes(arg)) {
+                return ctx.replyV2({ description: '**Usage:** `botowner antinuke <enable|disable|status>`', isAlert: true });
             }
 
             const isEnabled = arg === 'enable';
@@ -123,7 +136,8 @@ export default class BotOwnerCommand extends Command {
             });
 
             return ctx.replyV2({
-                description: `Developer Anti-Nuke has been **${isEnabled ? 'enabled' : 'disabled'}** for this server.`
+                description: `Developer Anti-Nuke has been **${isEnabled ? 'enabled' : 'disabled'}** for this server.`,
+                color: isEnabled ? client.color.green : client.color.red
             });
         }
     }
