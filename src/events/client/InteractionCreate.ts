@@ -294,8 +294,19 @@ export default class InteractionCreate extends Event {
 				}
 
 				await command.run(this.client, ctx, args);
-			} catch (error) {
+			} catch (error: any) {
 				logger.error(error);
+				const { ErrorReporter } = await import('../../utils/ErrorReporter');
+				ErrorReporter.reportCommandError(this.client, {
+					commandName: interaction.commandName,
+					user: interaction.user,
+					guild: interaction.guild,
+					channel: interaction.channel,
+					args: (interaction as any).options?.data?.map((o: any) => `${o.name}:${o.value}`) || [],
+					error: error,
+					type: 'SLASH'
+				}).catch(() => {});
+
 				try {
 					if (!interaction.replied && !interaction.deferred) {
 						await ctx.replyV2({
@@ -351,6 +362,14 @@ export default class InteractionCreate extends Event {
 				} catch (error: any) {
                     if (error.code === 10062) return; // Interaction expired, ignore
 					logger.error(error);
+					const { ErrorReporter } = await import('../../utils/ErrorReporter');
+					ErrorReporter.reportComponentError(this.client, {
+						customId: customId,
+						user: interaction.user,
+						guild: interaction.guild,
+						channel: interaction.channel,
+						error: error
+					}).catch(() => {});
 				}
 			} else if (interaction.guildId) {
 				try {

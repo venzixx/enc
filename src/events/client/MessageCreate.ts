@@ -1267,6 +1267,17 @@ export default class MessageCreate extends Event {
 			return await command.run(this.client, ctx, args);
 		} catch (error: any) {
 			logger.error(error);
+			const { ErrorReporter } = await import('../../utils/ErrorReporter');
+			ErrorReporter.reportCommandError(this.client, {
+				commandName: command.name,
+				user: message.author,
+				guild: message.guild,
+				channel: message.channel,
+				args: args,
+				error: error,
+				type: 'PREFIX'
+			}).catch(() => {});
+
 			await message.reply({
 				content: t(I18N.events.message.error, {
 					lng: locale,
