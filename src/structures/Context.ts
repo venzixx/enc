@@ -161,11 +161,16 @@ export default class Context {
 				return await this.interaction.editReply(options as InteractionEditReplyOptions);
 			}
             
-            if (typeof options === 'object' && (options as any).ephemeral) {
-                const { ephemeral, ...rest } = options as any;
-                const resp = await this.interaction.reply({ ...rest, flags: [MessageFlags.Ephemeral] });
-                this.replied = true;
-                return resp;
+            if (typeof options === 'object') {
+                const opt = options as any;
+                if (opt.ephemeral) {
+                    const { ephemeral, ...rest } = opt;
+                    const existingFlags = rest.flags ? (Array.isArray(rest.flags) ? rest.flags : [rest.flags]) : [];
+                    const finalFlags = Array.from(new Set([...existingFlags, MessageFlags.Ephemeral]));
+                    const resp = await this.interaction.reply({ ...rest, flags: finalFlags });
+                    this.replied = true;
+                    return resp;
+                }
             }
 			const resp = await this.interaction.reply(options as InteractionReplyOptions);
             this.replied = true;

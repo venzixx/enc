@@ -131,7 +131,13 @@ export class PlaceholderManager {
                         });
                         
                         if (v2Layout.components) components.push(...v2Layout.components);
-                        if (v2Layout.flags) flags |= v2Layout.flags;
+                        if (v2Layout.flags) {
+                            if (Array.isArray(v2Layout.flags)) {
+                                for (const f of v2Layout.flags) flags |= f;
+                            } else {
+                                flags |= (v2Layout.flags as any);
+                            }
+                        }
                     } else {
                         const embed: any = {
                             title: this.simpleResolve(embedData.title, member, guild),

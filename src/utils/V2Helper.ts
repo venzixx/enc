@@ -169,10 +169,15 @@ export class V2Helper {
             });
         }
 
+        const flags = [MessageFlags.IsComponentsV2];
+        if (options.ephemeral) {
+            flags.push(MessageFlags.Ephemeral);
+        }
+
         return {
             content: null as any,
             components: [container],
-            flags: options.ephemeral ? (MessageFlags.Ephemeral | MessageFlags.IsComponentsV2) : MessageFlags.IsComponentsV2
+            flags
         };
     }
 }

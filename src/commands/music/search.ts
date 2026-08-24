@@ -56,7 +56,10 @@ export default class Search extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-		const query = args.join(" ");
+		let query = args.join(" ");
+		if (!query || query.trim().length === 0) {
+			query = ctx.options?.getString?.("query", false) || (ctx.interaction as any)?.options?.getString?.("query", false) || "";
+		}
 
 		let player = client.lavalink.getPlayer(ctx.guild.id);
 		if (!player) {

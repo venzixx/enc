@@ -61,7 +61,10 @@ export default class Play extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-		const query = args.join(" ");
+		let query = args.join(" ");
+		if (!query || query.trim().length === 0) {
+			query = ctx.options?.getString?.("song", false) || (ctx.interaction as any)?.options?.getString?.("song", false) || "";
+		}
 		if (!query || query.trim().length === 0) {
 			return await ctx.replyV2({
 				title: `${client.emoji.cross} Missing Argument`,

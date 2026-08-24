@@ -199,7 +199,26 @@ export default class Music extends Command {
 
         // Map arguments if needed for prefix-style run
         const internalArgs = [...args];
-        if (group) internalArgs.shift(); // Remove group if present
+        if (ctx.interaction && (ctx.interaction as any).options) {
+            const extractOptions = (data: any[]): string[] => {
+                const res: string[] = [];
+                for (const opt of data) {
+                    if (opt.value !== undefined && opt.value !== null) {
+                        res.push(String(opt.value));
+                    }
+                    if (opt.options) {
+                        res.push(...extractOptions(opt.options));
+                    }
+                }
+                return res;
+            };
+            const extracted = extractOptions((ctx.interaction as any).options.data || []);
+            if (extracted.length > 0) {
+                internalArgs.push(...extracted);
+            }
+        } else if (group) {
+            internalArgs.shift(); // Remove group if present
+        }
 
         return cmd.run(client, ctx, internalArgs);
     }
