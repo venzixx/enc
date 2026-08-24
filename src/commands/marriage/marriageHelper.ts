@@ -58,12 +58,12 @@ export const marriageHelper = {
         }
 
         const acceptBtn = new ButtonBuilder()
-            .setCustomId('marry_accept')
+            .setCustomId(`marry_accept_${ctx.author.id}_${targetUser.id}`)
             .setLabel('Accept')
             .setStyle(ButtonStyle.Success);
 
         const denyBtn = new ButtonBuilder()
-            .setCustomId('marry_deny')
+            .setCustomId(`marry_deny_${ctx.author.id}_${targetUser.id}`)
             .setLabel('Decline')
             .setStyle(ButtonStyle.Danger);
 
@@ -166,12 +166,12 @@ export const marriageHelper = {
         const spouseId = marriage.user1Id === ctx.author.id ? marriage.user2Id : marriage.user1Id;
 
         const confirmBtn = new ButtonBuilder()
-            .setCustomId('divorce_confirm')
+            .setCustomId(`divorce_confirm_${ctx.author.id}_${spouseId}`)
             .setLabel('Confirm')
             .setStyle(ButtonStyle.Danger);
 
         const cancelBtn = new ButtonBuilder()
-            .setCustomId('divorce_cancel')
+            .setCustomId(`divorce_cancel_${ctx.author.id}_${spouseId}`)
             .setLabel('Cancel')
             .setStyle(ButtonStyle.Secondary);
 
@@ -327,12 +327,12 @@ export const marriageHelper = {
         const spouseId = marriage ? (marriage.user1Id === ctx.author.id ? marriage.user2Id : marriage.user1Id) : null;
 
         const acceptBtn = new ButtonBuilder()
-            .setCustomId('adopt_accept')
+            .setCustomId(`adopt_accept_${ctx.author.id}_${targetUser.id}`)
             .setLabel('Accept')
             .setStyle(ButtonStyle.Success);
 
         const denyBtn = new ButtonBuilder()
-            .setCustomId('adopt_deny')
+            .setCustomId(`adopt_deny_${ctx.author.id}_${targetUser.id}`)
             .setLabel('Decline')
             .setStyle(ButtonStyle.Danger);
 

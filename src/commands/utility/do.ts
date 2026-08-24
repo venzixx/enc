@@ -131,7 +131,7 @@ export default class Do extends Command {
             if (isTargeted && targetUser) {
                 row.addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`social_${action}_${ctx.author.id}`)
+                        .setCustomId(`social_${action}_${ctx.author.id}_${targetUser.id}`)
                         .setLabel(`${action.charAt(0).toUpperCase() + action.slice(1)} Back!`)
                         .setStyle(ButtonStyle.Primary)
                 );

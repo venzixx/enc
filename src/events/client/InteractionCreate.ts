@@ -344,6 +344,13 @@ export default class InteractionCreate extends Event {
 				}
 			}
 
+			// Persistent Component Router (Social actions, Marriage, Divorce, Adoption, etc.)
+			if (interaction.isButton()) {
+				const { PersistentComponentRouter } = await import('../../utils/PersistentComponentRouter');
+				const handled = await PersistentComponentRouter.handle(this.client, interaction as any);
+				if (handled) return;
+			}
+
 			let component = this.client.components.get(customId);
 
 			if (!component) {
@@ -394,6 +401,22 @@ export default class InteractionCreate extends Event {
 
 				// Unhandled component interaction — log for debug
 				logger.info(`[COMPONENT] Unhandled component interaction: ${customId}`);
+
+				// Global fallback acknowledgment to prevent "Application did not respond"
+				if (!interaction.replied && !interaction.deferred) {
+					await (interaction as any).reply({
+						content: `${this.client.emoji.clock || '⏳'} This interactive prompt has expired. Please re-run the command to interact again.`,
+						flags: MessageFlags.Ephemeral
+					}).catch(() => {});
+				}
+			} else {
+				// DM fallback acknowledgment
+				if (!interaction.replied && !interaction.deferred) {
+					await (interaction as any).reply({
+						content: `${this.client.emoji.clock || '⏳'} This interaction prompt has expired.`,
+						flags: MessageFlags.Ephemeral
+					}).catch(() => {});
+				}
 			}
 		} else if (interaction.type === InteractionType.ApplicationCommandAutocomplete) {
 			const command = this.client.commands.get(interaction.commandName);
