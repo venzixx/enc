@@ -112,16 +112,16 @@ export default class UnlockdownCommand extends Command {
         // 1. If no subcommand provided, show Overview Hub
         if (!sub) {
             const embed = new EmbedBuilder()
-                .setTitle(`🔓 Emergency Unlockdown Protocol Interface`)
+                .setTitle(`${client.emoji.mod_unlock} Emergency Unlockdown Protocol Interface`)
                 .setColor(0x22c55e)
                 .setDescription(
                     `The **Unlockdown Protocol** reverses active containment measures and restores normal server operations.\n\n` +
-                    `### 🔓 Available Unlockdown Modules\n` +
-                    `• \`e!unlockdown channel\` — Unlocks all text/voice channels for @everyone.\n` +
+                    `### ${client.emoji.mod_unlock} Available Unlockdown Modules\n` +
+                    `• ${client.emoji.folder_module} \`e!unlockdown channel\` — Unlocks all text/voice channels for @everyone.\n` +
                     `> *Access: Trusted Admins, Extra Owners, Server Owner*\n\n` +
-                    `• \`e!unlockdown roles\` — Restores original permissions to all stripped roles from backup.\n` +
+                    `• ${client.emoji.shield} \`e!unlockdown roles\` — Restores original permissions to all stripped roles from backup.\n` +
                     `> *Access: **Extra Owners & Server Owner ONLY***\n\n` +
-                    `• \`e!unlockdown server\` — Reverses full server lockdown (Channels + Roles).\n` +
+                    `• ${client.emoji.antinuke_siren} \`e!unlockdown server\` — Reverses full server lockdown (Channels + Roles).\n` +
                     `> *Access: Extra Owners (all) / Trusted Admins (Channels only)*\n\n` +
                     `*💡 Tip: Append \`--force\` to bypass the confirmation dialog.*`
                 )
@@ -267,7 +267,7 @@ export default class UnlockdownCommand extends Command {
                 data: { lockdownEnabled: false, lockdownMode: 'PUBLIC' }
             });
 
-            results.push(`🔓 **Channels Unlocked:** Successfully restored permissions across **${unlockedCount}** channels.`);
+            results.push(`${client.emoji.mod_unlock} **Channels Unlocked:** Successfully restored permissions across **${unlockedCount}** channels.`);
         }
 
         // 2. RESTORE ROLES
@@ -298,19 +298,19 @@ export default class UnlockdownCommand extends Command {
                         data: { lockdownRoles: null }
                     });
 
-                    results.push(`🛡️ **Role Permissions Restored:** Recovered original administrative permissions for **${restoredRoles}** roles.`);
+                    results.push(`${client.emoji.shield} **Role Permissions Restored:** Recovered original administrative permissions for **${restoredRoles}** roles.`);
                 } catch (e: any) {
-                    results.push(`⚠️ *Error parsing role permissions backup: ${e.message}*`);
+                    results.push(`${client.emoji.cross} *Error parsing role permissions backup: ${e.message}*`);
                 }
             } else {
-                results.push(`ℹ️ *No stored role permission backups found in database.*`);
+                results.push(`${client.emoji.system_info} *No stored role permission backups found in database.*`);
             }
         } else if (sub === 'server' && !isExtraOwner) {
-            results.push(`⚠️ *Role restoration skipped (Requires Extra Owner status).*`);
+            results.push(`${client.emoji.cross} *Role restoration skipped (Requires Extra Owner status).*`);
         }
 
         const successEmbed = new EmbedBuilder()
-            .setTitle(`🔓 Emergency Lockdown Lifted`)
+            .setTitle(`${client.emoji.mod_unlock} Emergency Lockdown Lifted`)
             .setColor(0x22c55e)
             .setDescription(
                 `Normalcy has been restored by <@${ctx.author.id}>.\n\n` +

@@ -63,29 +63,29 @@ export default class AntiNukeStatus extends Command {
         const botOn = !!guildData?.antiNukeBot;
         const webhookOn = !!guildData?.antiNukeWebhook;
 
-        const getIndicator = (state: boolean) => state ? '🟢 `ACTIVE`' : '🔴 `DISABLED`';
+        const getIndicator = (state: boolean) => state ? `${client.emoji.success} \`ACTIVE\`` : `${client.emoji.cross} \`DISABLED\``;
 
         const embed = new EmbedBuilder()
-            .setTitle(`🛡️ Anti-Nuke Security Radar — ${ctx.guild.name}`)
+            .setTitle(`${client.emoji.antinuke_siren} Anti-Nuke Security Radar — ${ctx.guild.name}`)
             .setColor(isMasterOn ? 0x22c55e : (isDevOn ? 0x3b82f6 : 0xef4444))
             .setDescription(
                 `Comprehensive real-time status of server anti-raid containment and protection layers.\n\n` +
-                `### ⚡ Master Shield Status\n` +
-                `• **Server Anti-Nuke:** ${isMasterOn ? '🟢 **ONLINE & PROTECTING**' : '🔴 **OFFLINE (DISABLED)**'}\n` +
-                `• **Developer Anti-Nuke:** ${isDevOn ? '🛡️ **ACTIVE (Dev Shield Enabled)**' : '⚪ **INACTIVE**'}\n\n` +
-                `### 🔒 Active Shield Modules\n` +
-                `• 🔨 **Ban Protection:** ${getIndicator(banOn)}\n` +
-                `• 👢 **Kick Protection:** ${getIndicator(kickOn)}\n` +
-                `• 💬 **Channel Protection:** ${getIndicator(channelOn)}\n` +
-                `• 🎭 **Role Protection:** ${getIndicator(roleOn)}\n` +
-                `• 🤖 **Bot Shield:** ${getIndicator(botOn)}\n` +
-                `• 🔗 **Webhook Guard:** ${getIndicator(webhookOn)}\n\n` +
-                `### 👑 Security Hierarchy\n` +
+                `### ${client.emoji.shield} Master Shield Status\n` +
+                `• **Server Anti-Nuke:** ${isMasterOn ? `${client.emoji.success} **ONLINE & PROTECTING**` : `${client.emoji.cross} **OFFLINE (DISABLED)**`}\n` +
+                `• **Developer Anti-Nuke:** ${isDevOn ? `${client.emoji.shield} **ACTIVE (Dev Shield Enabled)**` : `${client.emoji.cross} **INACTIVE**`}\n\n` +
+                `### ${client.emoji.mod_lock} Active Shield Modules\n` +
+                `• ${client.emoji.mod_ban} **Ban Protection:** ${getIndicator(banOn)}\n` +
+                `• ${client.emoji.mod_kick} **Kick Protection:** ${getIndicator(kickOn)}\n` +
+                `• ${client.emoji.folder_module} **Channel Protection:** ${getIndicator(channelOn)}\n` +
+                `• ${client.emoji.folder_module} **Role Protection:** ${getIndicator(roleOn)}\n` +
+                `• ${client.emoji.system_bot} **Bot Shield:** ${getIndicator(botOn)}\n` +
+                `• ${client.emoji.link} **Webhook Guard:** ${getIndicator(webhookOn)}\n\n` +
+                `### ${client.emoji.crown_owner} Security Hierarchy\n` +
                 `• **Extra Owners (${extraOwners.length}):** ${extraOwners.length ? extraOwners.map((e: any) => `<@${e.userId}>`).join(', ') : '*None*'}\n` +
                 `• **Trusted Admins (${trustedAdmins.length}):** ${trustedAdmins.length ? trustedAdmins.map((t: any) => `<@${t.userId}>`).join(', ') : '*None*'}`
             )
             .addFields({
-                name: '⚡ Quick Actions',
+                name: `${client.emoji.ping_bolt} Quick Actions`,
                 value:
                     '• `e!s extraowner <add|remove|list>` — Configure Extra Owners\n' +
                     '• `e!s trusted <add|remove|list>` — Configure Trusted Admins\n' +

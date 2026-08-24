@@ -203,27 +203,28 @@ export default class SecurityCommand extends Command {
             });
 
             const embed = new EmbedBuilder()
-                .setTitle(`🛡️ Security Management Core`)
+                .setTitle(`${client.emoji.shield} Security Management Core`)
                 .setColor(0x5865F2)
                 .setDescription(
                     `Welcome to the **Enc Security Matrix**. Configure tiered administrative privileges, Anti-Nuke defenses, and AutoMod immunity.\n\n` +
-                    `### 👑 Extra Owners (${extraOwners.length})\n` +
+                    `### ${client.emoji.crown_owner} Extra Owners (${extraOwners.length})\n` +
                     `> *Full immunity from Anti-Nuke & AutoMod, full access to Enc Dashboard including Security/Anti-Nuke controls.*\n` +
                     `${extraOwners.length ? extraOwners.map((eo: any) => `• <@${eo.userId}> (\`${eo.userId}\`)`).join('\n') : '• *No Extra Owners assigned.*'}\n\n` +
-                    `### 🛡️ Trusted Admins (${trustedAdmins.length})\n` +
+                    `### ${client.emoji.shield} Trusted Admins (${trustedAdmins.length})\n` +
                     `> *Anti-Nuke bypass & general Dashboard access without requiring Discord Administrator permissions. (Restricted from Security settings).*\n` +
                     `${trustedAdmins.length ? trustedAdmins.map((tu: any) => `• <@${tu.userId}> (\`${tu.userId}\`)`).join('\n') : '• *No Trusted Admins assigned.*'}\n\n` +
-                    `### 📝 AutoMod Whitelist (${whitelistedUsers.length})\n` +
+                    `### ${client.emoji.mod_blacklist} AutoMod Whitelist (${whitelistedUsers.length})\n` +
                     `> *Immunity from chat AutoMod rules (spam, links, caps, bad words). Does not grant Anti-Nuke or Dashboard access.*\n` +
                     `${whitelistedUsers.length ? whitelistedUsers.map((wu: any) => `• <@${wu.userId}> (\`${wu.userId}\`)`).join('\n') : '• *No Whitelisted Users.*'}`
                 )
                 .addFields(
                     {
-                        name: '⚡ Quick Command Syntax',
+                        name: `${client.emoji.ping_bolt} Quick Command Syntax`,
                         value:
                             '`e!s extraowner <add|remove|list> [@user]`\n' +
                             '`e!s trusted <add|remove|list> [@user]`\n' +
-                            '`e!s whitelist <add|remove|list> [@user]`'
+                            '`e!s whitelist <add|remove|list> [@user]`\n' +
+                            '`e!antinuke` (View complete status radar)'
                     }
                 )
                 .setFooter({ text: `Enc Security • Anti-Nuke: ${guildData?.antiNukeEnabled ? 'ACTIVE' : 'DISABLED'}` })
@@ -326,7 +327,7 @@ export default class SecurityCommand extends Command {
                     : '*No Extra Owners configured.*';
 
                 const embed = new EmbedBuilder()
-                    .setTitle(`👑 Extra Owners — ${ctx.guild.name}`)
+                    .setTitle(`${client.emoji.crown_owner} Extra Owners — ${ctx.guild.name}`)
                     .setColor(0x5865F2)
                     .setDescription(list)
                     .setFooter({ text: `Total: ${extraOwners.length}` });
@@ -421,7 +422,7 @@ export default class SecurityCommand extends Command {
                     : '*No Trusted Admins configured.*';
 
                 const embed = new EmbedBuilder()
-                    .setTitle(`🛡️ Trusted Admins — ${ctx.guild.name}`)
+                    .setTitle(`${client.emoji.shield} Trusted Admins — ${ctx.guild.name}`)
                     .setColor(0x5865F2)
                     .setDescription(list)
                     .setFooter({ text: `Total: ${trustedAdmins.length}` });
@@ -509,7 +510,7 @@ export default class SecurityCommand extends Command {
                     : '*No users in AutoMod whitelist.*';
 
                 const embed = new EmbedBuilder()
-                    .setTitle(`📝 AutoMod Whitelist — ${ctx.guild.name}`)
+                    .setTitle(`${client.emoji.mod_blacklist} AutoMod Whitelist — ${ctx.guild.name}`)
                     .setColor(0x5865F2)
                     .setDescription(list)
                     .setFooter({ text: `Total: ${whitelisted.length}` });

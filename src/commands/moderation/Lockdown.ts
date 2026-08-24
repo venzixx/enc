@@ -156,20 +156,20 @@ export default class LockdownCommand extends Command {
         // 1. If no subcommand provided, show Overview Hub
         if (!sub) {
             const embed = new EmbedBuilder()
-                .setTitle(`🚨 Emergency Lockdown Protocol Interface`)
+                .setTitle(`${client.emoji.antinuke_siren} Emergency Lockdown Protocol Interface`)
                 .setColor(0xef4444)
                 .setDescription(
                     `The **Lockdown Protocol** provides rapid containment tools during raids, token breaches, or server emergencies.\n\n` +
-                    `### 🔒 Available Lockdown Modules\n` +
-                    `• \`e!lockdown channel\` — Locks all text/voice channels for @everyone.\n` +
+                    `### ${client.emoji.mod_lock} Available Lockdown Modules\n` +
+                    `• ${client.emoji.folder_module} \`e!lockdown channel\` — Locks all text/voice channels for @everyone.\n` +
                     `> *Access: Trusted Admins, Extra Owners, Server Owner*\n\n` +
-                    `• \`e!lockdown kick\` — Kicks all accounts that joined in the last 24h with a lockdown DM.\n` +
+                    `• ${client.emoji.mod_kick} \`e!lockdown kick\` — Kicks all accounts that joined in the last 24h with a lockdown DM.\n` +
                     `> *Access: Trusted Admins, Extra Owners, Server Owner*\n\n` +
-                    `• \`e!lockdown ban\` — Bans all accounts that joined in the last 24h with a lockdown DM.\n` +
+                    `• ${client.emoji.mod_ban} \`e!lockdown ban\` — Bans all accounts that joined in the last 24h with a lockdown DM.\n` +
                     `> *Access: **Extra Owners & Server Owner ONLY***\n\n` +
-                    `• \`e!lockdown roles\` — Strips administrative & dangerous permissions from all roles.\n` +
+                    `• ${client.emoji.shield} \`e!lockdown roles\` — Strips administrative & dangerous permissions from all roles.\n` +
                     `> *Access: **Extra Owners & Server Owner ONLY***\n\n` +
-                    `• \`e!lockdown server\` — Full emergency containment (Channels + Kick + Roles).\n` +
+                    `• ${client.emoji.antinuke_siren} \`e!lockdown server\` — Full emergency containment (Channels + Kick + Roles).\n` +
                     `> *Access: Extra Owners (all 3) / Trusted Admins (Channels + Kick)*\n\n` +
                     `*💡 Tip: Append \`--force\` to bypass the confirmation dialog.*`
                 )
@@ -347,7 +347,7 @@ export default class LockdownCommand extends Command {
                 } catch {}
             }
 
-            results.push(`👢 **Recent Joins Kicked:** Kicked **${kickedCount}** members (joined in last 24h).`);
+            results.push(`${client.emoji.mod_kick} **Recent Joins Kicked:** Kicked **${kickedCount}** members (joined in last 24h).`);
         }
 
         // 3. BAN RECENT JOINS (Extra Owner only)
@@ -367,7 +367,7 @@ export default class LockdownCommand extends Command {
                     await member.send({
                         embeds: [
                             new EmbedBuilder()
-                                .setTitle(`🚨 Server Emergency Lockdown`)
+                                .setTitle(`${client.emoji.antinuke_siren} Server Emergency Lockdown`)
                                 .setDescription(`You have been banned from **${guild.name}** during an emergency raid containment protocol.`)
                                 .setColor(0xef4444)
                         ]
@@ -378,7 +378,7 @@ export default class LockdownCommand extends Command {
                 } catch {}
             }
 
-            results.push(`🔨 **Recent Joins Banned:** Banned **${bannedCount}** members (joined in last 24h).`);
+            results.push(`${client.emoji.mod_ban} **Recent Joins Banned:** Banned **${bannedCount}** members (joined in last 24h).`);
         }
 
         // 4. ROLES LOCKDOWN (Strip dangerous perms)
@@ -416,13 +416,13 @@ export default class LockdownCommand extends Command {
                 });
             }
 
-            results.push(`🛡️ **Role Permissions Stripped:** Neutered dangerous permissions on **${modifiedRoles}** roles.`);
+            results.push(`${client.emoji.shield} **Role Permissions Stripped:** Neutered dangerous permissions on **${modifiedRoles}** roles.`);
         } else if (sub === 'server' && !isExtraOwner) {
-            results.push(`⚠️ *Role permissions strip skipped (Requires Extra Owner status).*`);
+            results.push(`${client.emoji.cross} *Role permissions strip skipped (Requires Extra Owner status).*`);
         }
 
         const successEmbed = new EmbedBuilder()
-            .setTitle(`🚨 Emergency Lockdown Protocol Executed`)
+            .setTitle(`${client.emoji.antinuke_siren} Emergency Lockdown Protocol Executed`)
             .setColor(0xef4444)
             .setDescription(
                 `Lockdown module **${sub.toUpperCase()}** has been deployed successfully by <@${ctx.author.id}>.\n\n` +
