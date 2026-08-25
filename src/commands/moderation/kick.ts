@@ -10,6 +10,7 @@ import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
 import { Appeals } from '../../utils/Appeals';
 import { CaseManager } from '../../utils/CaseManager';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class Kick extends Command {
 	constructor(client: ExtendedClient) {
@@ -67,6 +68,22 @@ export default class Kick extends Command {
 		if (!target.kickable) {
 			return await ctx.replyV2({ description: 'Hierarchy Block: My role position is below this user. Move me higher to enable moderation.', color: client.color.red, isAlert: true });
 		}
+
+		const force = args.includes('--force') || args.includes('-f');
+		const confirmed = await ModConfirmation.ask({
+			client,
+			ctx,
+			actionName: 'Kick Member',
+			targetName: `${target.user.tag} (${target.id})`,
+			targetAvatar: target.user.displayAvatarURL(),
+			dangerLevel: 'danger',
+			reason,
+			confirmLabel: 'Confirm Kick',
+			confirmEmoji: client.emoji?.mod_kick || '👢',
+			force
+		});
+
+		if (!confirmed) return;
 
 		try {
             // Send DM before kicking

@@ -1,6 +1,7 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class Unbackroom extends Command {
     constructor(client: ExtendedClient) {
@@ -46,6 +47,22 @@ export default class Unbackroom extends Command {
         if (!history) {
             return ctx.replyV2({ description: `${target} has no backroom history record. I cannot restore their original roles automatically.`, color: client.color.red, isAlert: true });
         }
+
+        const force = args.includes('--force') || args.includes('-f');
+        const confirmed = await ModConfirmation.ask({
+            client,
+            ctx,
+            actionName: 'Rescue from Backrooms',
+            targetName: `${target.user.tag} (${target.id})`,
+            targetAvatar: target.user.displayAvatarURL(),
+            dangerLevel: 'primary',
+            details: 'This will restore their saved roles and remove them from quarantine.',
+            confirmLabel: 'Confirm Rescue',
+            confirmEmoji: '✨',
+            force
+        });
+
+        if (!confirmed) return;
 
         const rolesToRestore = JSON.parse(history.roleIds) as string[];
         

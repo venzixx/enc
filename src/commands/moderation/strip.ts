@@ -9,6 +9,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
 import { isDev } from '../../utils/devCheck';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 const DANGEROUS_PERMS = [
     { flag: PermissionFlagsBits.Administrator, label: 'Administrator' },
@@ -131,6 +132,23 @@ export default class StripCommand extends Command {
                 ]
             });
         }
+
+        const force = args.includes('--force') || args.includes('-f');
+        const roleListStr = dangerousRolesToRemove.map(r => `\`${r.role.name}\``).join(', ');
+        const confirmed = await ModConfirmation.ask({
+            client,
+            ctx,
+            actionName: 'Strip Roles',
+            targetName: `${target.user.tag} (${target.id})`,
+            targetAvatar: target.user.displayAvatarURL(),
+            dangerLevel: 'danger',
+            details: `Stripping ${dangerousRolesToRemove.length} dangerous role(s): ${roleListStr}`,
+            confirmLabel: 'Confirm Role Strip',
+            confirmEmoji: client.emoji?.shield || '🛡️',
+            force
+        });
+
+        if (!confirmed) return;
 
         if (dangerousRolesToRemove.length > 0) {
             await target.roles.remove(

@@ -8,6 +8,7 @@ import { ExtendedClient } from '../../client';
 import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
 import { CaseManager } from '../../utils/CaseManager';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class Unban extends Command {
 	constructor(client: ExtendedClient) {
@@ -57,6 +58,22 @@ export default class Unban extends Command {
 			if (!ban) {
 				return await ctx.reply({ content: `${client.emoji.cross} This user is not banned from this server.`, flags: [64] });
 			}
+
+			const force = args.includes('--force') || args.includes('-f');
+			const confirmed = await ModConfirmation.ask({
+				client,
+				ctx,
+				actionName: 'Unban User',
+				targetName: `${user.tag} (${user.id})`,
+				targetAvatar: user.displayAvatarURL(),
+				dangerLevel: 'primary',
+				reason,
+				confirmLabel: 'Confirm Unban',
+				confirmEmoji: client.emoji?.volmore || '🔓',
+				force
+			});
+
+			if (!confirmed) return;
 
 			await ctx.guild.bans.remove(user.id, `Unbanned by ${ctx.author.tag}: ${reason}`);
 			

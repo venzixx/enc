@@ -3,6 +3,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { AuditLogger, AuditLogType } from '../../utils/AuditLogger';
 import { LockManager } from '../../utils/LockManager';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class UnlockChannel extends Command {
     constructor(client: ExtendedClient) {
@@ -36,6 +37,22 @@ export default class UnlockChannel extends Command {
         if (!targetChannel || targetChannel.isDMBased()) {
             return ctx.replyV2({ description: 'Invalid channel specified.', color: client.color.red, isAlert: true });
         }
+
+        const channelName = (targetChannel as any).name;
+        const force = args.includes('--force') || args.includes('-f');
+        const confirmed = await ModConfirmation.ask({
+            client,
+            ctx,
+            actionName: 'Unlock Channel',
+            targetName: `#${channelName} (${targetChannel.id})`,
+            dangerLevel: 'primary',
+            details: 'This will restore SendMessages/Connect permissions for @everyone.',
+            confirmLabel: 'Confirm Unlock',
+            confirmEmoji: '🔓',
+            force
+        });
+
+        if (!confirmed) return;
 
         const isVoice = targetChannel.isVoiceBased();
         const permissionsToUnlock = isVoice

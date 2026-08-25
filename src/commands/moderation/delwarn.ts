@@ -6,6 +6,7 @@ import {
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { CaseManager } from '../../utils/CaseManager';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class DelWarn extends Command {
     constructor(client: ExtendedClient) {
@@ -54,11 +55,38 @@ export default class DelWarn extends Command {
             caseNumber = parseInt(args[0], 10);
         }
 
+        const targetCase = await client.prisma.case.findFirst({
+            where: { guildId: ctx.guild.id, caseNumber }
+        });
+
+        if (!targetCase) {
+            return await ctx.replyV2({
+                description: `Case **#${caseNumber}** was not found in this server.`,
+                color: client.color.red,
+                isAlert: true
+            });
+        }
+
+        const force = args.includes('--force') || args.includes('-f');
+        const confirmed = await ModConfirmation.ask({
+            client,
+            ctx,
+            actionName: 'Delete Case / Warning',
+            targetName: `Case #${caseNumber} (${targetCase.type})`,
+            dangerLevel: 'warning',
+            details: `Target: ${targetCase.targetTag || 'Unknown'} (${targetCase.targetId})\nReason: ${targetCase.reason}`,
+            confirmLabel: 'Confirm Delete Case',
+            confirmEmoji: '🗑️',
+            force
+        });
+
+        if (!confirmed) return;
+
         const deletedCase = await CaseManager.deleteCase(client, ctx.guild.id, caseNumber);
 
         if (!deletedCase) {
             return await ctx.replyV2({
-                description: `Case **#${caseNumber}** was not found in this server.`,
+                description: `Case **#${caseNumber}** could not be deleted.`,
                 color: client.color.red,
                 isAlert: true
             });

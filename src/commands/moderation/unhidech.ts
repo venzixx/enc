@@ -2,6 +2,7 @@ import { PermissionFlagsBits, TextChannel, VoiceChannel } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { AuditLogger, AuditLogType } from '../../utils/AuditLogger';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class UnhideChannel extends Command {
     constructor(client: ExtendedClient) {
@@ -35,6 +36,22 @@ export default class UnhideChannel extends Command {
         if (!targetChannel || targetChannel.isDMBased()) {
             return ctx.replyV2({ description: 'Invalid channel specified.', color: client.color.red, isAlert: true });
         }
+
+        const channelName = (targetChannel as any).name;
+        const force = args.includes('--force') || args.includes('-f');
+        const confirmed = await ModConfirmation.ask({
+            client,
+            ctx,
+            actionName: 'Unhide Channel',
+            targetName: `#${channelName} (${targetChannel.id})`,
+            dangerLevel: 'primary',
+            details: 'This will restore ViewChannel permission for @everyone.',
+            confirmLabel: 'Confirm Unhide',
+            confirmEmoji: '👁️',
+            force
+        });
+
+        if (!confirmed) return;
 
         await (targetChannel as TextChannel | VoiceChannel).permissionOverwrites.edit(ctx.guild.roles.everyone, {
             ViewChannel: null

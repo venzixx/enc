@@ -16,6 +16,7 @@ import { Resolver } from '../../utils/Resolver';
 import { Appeals } from '../../utils/Appeals';
 import { V2Helper } from '../../utils/V2Helper';
 import { CaseManager } from '../../utils/CaseManager';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 import ms from 'ms';
 
 export default class Mute extends Command {
@@ -91,6 +92,23 @@ export default class Mute extends Command {
 		if (!time || (time as any) < 10000 || (time as any) > 2419200000) {
 			return await ctx.replyV2({ description: 'Invalid Duration: Must be between 10 seconds and 28 days (e.g., 10m, 1h, 1d).', color: client.color.red, isAlert: true });
 		}
+
+		const force = args.includes('--force') || args.includes('-f');
+		const confirmed = await ModConfirmation.ask({
+			client,
+			ctx,
+			actionName: 'Mute Member',
+			targetName: `${target.user.tag} (${target.id})`,
+			targetAvatar: target.user.displayAvatarURL(),
+			dangerLevel: 'warning',
+			duration: durationStr,
+			reason,
+			confirmLabel: 'Confirm Timeout',
+			confirmEmoji: client.emoji?.mod_mute || '🔇',
+			force
+		});
+
+		if (!confirmed) return;
 
 		try {
             if (target.permissions.has(PermissionFlagsBits.Administrator) && isGuildOwner) {

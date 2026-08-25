@@ -2,6 +2,7 @@ import { PermissionFlagsBits, TextChannel, VoiceChannel } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { AuditLogger, AuditLogType } from '../../utils/AuditLogger';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class DeleteChannel extends Command {
     constructor(client: ExtendedClient) {
@@ -37,6 +38,21 @@ export default class DeleteChannel extends Command {
         }
 
         const channelName = (targetChannel as any).name;
+
+        const force = args.includes('--force') || args.includes('-f');
+        const confirmed = await ModConfirmation.ask({
+            client,
+            ctx,
+            actionName: 'Delete Channel',
+            targetName: `#${channelName} (${targetChannel.id})`,
+            dangerLevel: 'danger',
+            details: 'This action is irreversible. All messages and attachments in this channel will be permanently deleted.',
+            confirmLabel: 'Confirm Delete Channel',
+            confirmEmoji: '🗑️',
+            force
+        });
+
+        if (!confirmed) return;
 
         await (targetChannel as any).delete(`Deleted by ${ctx.author.tag}`).catch((err: any) => {
             console.error(err);

@@ -9,6 +9,7 @@ import { ExtendedClient } from '../../client';
 import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
 import { CaseManager } from '../../utils/CaseManager';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class Unmute extends Command {
 	constructor(client: ExtendedClient) {
@@ -60,6 +61,22 @@ export default class Unmute extends Command {
 		}
 
 		const hasTimeout = Boolean(target.communicationDisabledUntilTimestamp);
+
+		const force = args.includes('--force') || args.includes('-f');
+		const confirmed = await ModConfirmation.ask({
+			client,
+			ctx,
+			actionName: 'Unmute Member',
+			targetName: `${target.user.tag} (${target.id})`,
+			targetAvatar: target.user.displayAvatarURL(),
+			dangerLevel: 'primary',
+			reason,
+			confirmLabel: 'Confirm Unmute',
+			confirmEmoji: client.emoji?.volmore || '🔊',
+			force
+		});
+
+		if (!confirmed) return;
 
 		try {
             // 1. Remove timeout if active

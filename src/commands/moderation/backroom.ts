@@ -1,6 +1,7 @@
 import { ChannelType, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class Backroom extends Command {
     constructor(client: ExtendedClient) {
@@ -103,6 +104,20 @@ export default class Backroom extends Command {
                 return ctx.replyV2({ description: 'The backrooms have not been set up. Use `/backroom setup` first.', color: client.color.red, isAlert: true });
             }
 
+            const confirmed = await ModConfirmation.ask({
+                client,
+                ctx,
+                actionName: 'Banish to Backrooms',
+                targetName: `${target.user.tag} (${target.id})`,
+                targetAvatar: target.user.displayAvatarURL(),
+                dangerLevel: 'danger',
+                details: 'This will strip all roles and isolate the member in the backroom channel.',
+                confirmLabel: 'Confirm Banish',
+                confirmEmoji: '🚪'
+            });
+
+            if (!confirmed) return;
+
             // Save old roles
             const oldRoles = (target.roles.cache as any).filter((r: any) => r.id !== ctx.guild.id && r.name !== '@everyone').map((r: any) => r.id);
             
@@ -141,6 +156,20 @@ export default class Backroom extends Command {
             if (!history) {
                 return ctx.replyV2({ description: `${target} has no backroom history. We cannot restore their rules natively.`, color: client.color.red, isAlert: true });
             }
+
+            const confirmed = await ModConfirmation.ask({
+                client,
+                ctx,
+                actionName: 'Rescue from Backrooms',
+                targetName: `${target.user.tag} (${target.id})`,
+                targetAvatar: target.user.displayAvatarURL(),
+                dangerLevel: 'primary',
+                details: 'This will restore their saved roles and remove them from quarantine.',
+                confirmLabel: 'Confirm Rescue',
+                confirmEmoji: '✨'
+            });
+
+            if (!confirmed) return;
 
             const rolesToRestore = JSON.parse(history.roleIds) as string[];
             
