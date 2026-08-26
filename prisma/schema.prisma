@@ -30,7 +30,12 @@ model Guild {
   giveawayBypassRoleId   String?
   verificationChannelId String?
   verificationRoleId    String?
-  verificationType      String            @default("BUTTON")
+  unverifiedRoleId      String?
+  verificationType      String            @default("NORMAL")
+  verificationLogChannelId String?
+  verificationMessage   String?
+  verificationTitle     String?
+  verificationEnabled   Boolean           @default(false)
   vanityString          String?
   vanityRoleId          String?
   birthdayChannelId     String?
@@ -1010,5 +1015,58 @@ model UserVote {
 
   @@index([userId])
 }
+
+model VerificationSession {
+  token        String    @id
+  guildId      String
+  userId       String
+  userTag      String?
+  expiresAt    DateTime
+  used         Boolean   @default(false)
+  ip           String?
+  fingerprint  String?
+  userAgent    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([token])
+  @@index([guildId, userId])
+}
+
+model VerifiedDevice {
+  id           String    @id @default(cuid())
+  guildId      String
+  userId       String
+  userTag      String?
+  ip           String
+  fingerprint  String
+  userAgent    String?
+  isAlt        Boolean   @default(false)
+  altOfUserId  String?
+  altOfUserTag String?
+  verifiedAt   DateTime  @default(now())
+
+  @@index([guildId, userId])
+  @@index([guildId, ip])
+  @@index([guildId, fingerprint])
+  @@index([fingerprint])
+  @@index([ip])
+}
+
+model MachineBan {
+  id           String    @id @default(cuid())
+  guildId      String?
+  userId       String?
+  userTag      String?
+  fingerprint  String
+  ip           String?
+  reason       String?
+  bannedBy     String?
+  createdAt    DateTime  @default(now())
+
+  @@index([fingerprint])
+  @@index([ip])
+  @@index([guildId, fingerprint])
+}
+
 
 

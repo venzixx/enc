@@ -163,34 +163,30 @@ export default class Help extends Command {
 		const commands = client.commands.filter(c => c.category === category && !c.hidden);
 
 		const commandsList = commands.map(c => {
-			let text = `**\`/${c.name}\`** · ${c.description.content}`;
+			let text = `**\`/${c.name}\`** · ${c.description?.content || 'No description'}`;
 
-			// Special handling for the 'do' command to show reactions as prefix commands
-			if (c.name === 'do') {
-				const reactions = c.aliases.map(r => `\`${r}\``).join(', ');
-				text += `\n\u3000\u2514 **Prefix Reactions**: ${reactions}`;
-			}
-			
+			// If command has subcommands, show a concise inline list of subcommands
 			if (c.options && c.options.length > 0 && c.name !== 'do') {
-				const subItems = c.options.filter((opt: any) => 
-					opt.type === ApplicationCommandOptionType.Subcommand || 
-					opt.type === ApplicationCommandOptionType.SubcommandGroup
-				);
+				const subNames: string[] = [];
+				c.options.forEach((opt: any) => {
+					if (opt.type === ApplicationCommandOptionType.Subcommand) {
+						subNames.push(`\`${opt.name}\``);
+					} else if (opt.type === ApplicationCommandOptionType.SubcommandGroup && opt.options) {
+						opt.options.forEach((s: any) => subNames.push(`\`${opt.name} ${s.name}\``));
+					}
+				});
 
-				if (subItems.length > 0) {
-					subItems.forEach((sub: any) => {
-						if (sub.type === ApplicationCommandOptionType.Subcommand) {
-							text += `\n\u3000\u2514 \`/${c.name} ${sub.name}\` · ${sub.description}`;
-						} else if (sub.type === ApplicationCommandOptionType.SubcommandGroup) {
-							if (sub.options) {
-								sub.options.forEach((s: any) => {
-									text += `\n\u3000\u2514 \`/${c.name} ${sub.name} ${s.name}\` · ${s.description}`;
-								});
-							}
-						}
-					});
+				if (subNames.length > 0) {
+					text += `\n\u3000\u2514 ${subNames.join(' ')}`;
 				}
 			}
+
+			// Special handling for the 'do' command to show reactions as prefix commands
+			if (c.name === 'do' && c.aliases.length > 0) {
+				const reactions = c.aliases.slice(0, 15).map(r => `\`${r}\``).join(', ');
+				text += `\n\u3000\u2514 **Reactions**: ${reactions}${c.aliases.length > 15 ? '...' : ''}`;
+			}
+
 			return text;
 		}).join('\n\n');
 
@@ -201,7 +197,7 @@ export default class Help extends Command {
 			title: `${categoryEmoji} **${categoryName}** · ${commands.size} commands`,
 			description: commandsList || 'No visible commands in this module.',
 			color: client.color.main,
-			footer: `Use /help <command> for detailed info`,
+			footer: `Use /help <command> for detailed syntax`,
 			buttons: [
 				new ButtonBuilder()
 					.setCustomId('help_back')
