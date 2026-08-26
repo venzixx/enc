@@ -37,6 +37,7 @@ model Guild {
   verificationLogChannelId String?
   verificationMessage   String?
   verificationTitle     String?
+  verificationEmbedData String?
   verificationEnabled   Boolean           @default(false)
   vanityString          String?
   vanityRoleId          String?
