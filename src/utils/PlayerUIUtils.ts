@@ -58,37 +58,43 @@ export async function updatePlayerMessage(
 	player: Player,
 	text: string,
 ) {
-	const setup = await client.db.getSetup(interaction.guildId!);
-	const locale = await client.db.getLanguage(interaction.guildId!);
+	try {
+		const setup = await client.db.getSetup(interaction.guildId!);
+		const locale = await client.db.getLanguage(interaction.guildId!);
 
-	// If it's the setup channel, update use the setup system logic
-	if (
-		setup &&
-		interaction.channelId === setup.textId &&
-		interaction.message.id === setup.messageId
-	) {
-		await updateSetup(client, interaction.guild!, locale);
-		return;
+		// If it's the setup channel, update use the setup system logic
+		if (
+			setup &&
+			interaction.channelId === setup.textId &&
+			interaction.message.id === setup.messageId
+		) {
+			await updateSetup(client, interaction.guild!, locale);
+			return;
+		}
+
+		// Otherwise, edit the current message (normal player)
+		const track = player.queue.current;
+		if (!track) return;
+
+		const embed = new EmbedBuilder()
+			.setAuthor({ name: t(I18N.player.trackStart.now_playing, { lng: locale }) })
+			.setDescription(
+				`**[${track.info.title}](${track.info.uri})**\n` +
+				`-# ${text}\n` +
+				`${t(I18N.player.trackStart.author, { lng: locale })}: ${track.info.author}\n` +
+				`${t(I18N.player.trackStart.duration, { lng: locale })}: ${track.info.isStream ? "LIVE" : client.utils.formatTime(track.info.duration)}`
+			)
+			.setColor(client.config.color.main as ColorResolvable);
+
+		if (track.info.artworkUrl) {
+			embed.setThumbnail(track.info.artworkUrl);
+		}
+
+		const buttonRows = getButtons(player);
+
+		await interaction.message.edit({ embeds: [embed], components: buttonRows }).catch(() => {});
+	} catch (e) {
+		// Ignore message edit errors if message was deleted or interaction expired
 	}
-
-	// Otherwise, edit the current message (normal player)
-	const track = player.queue.current!;
-    const embed = new EmbedBuilder()
-        .setAuthor({ name: t(I18N.player.trackStart.now_playing, { lng: locale }) })
-        .setDescription(
-            `**[${track.info.title}](${track.info.uri})**\n` +
-            `-# ${text}\n` +
-            `${t(I18N.player.trackStart.author, { lng: locale })}: ${track.info.author}\n` +
-            `${t(I18N.player.trackStart.duration, { lng: locale })}: ${track.info.isStream ? "LIVE" : client.utils.formatTime(track.info.duration)}`
-        )
-        .setColor(client.config.color.main as ColorResolvable);
-
-    if (track.info.artworkUrl) {
-        embed.setThumbnail(track.info.artworkUrl);
-    }
-
-    const buttonRows = getButtons(player);
-
-	await interaction.message.edit({ embeds: [embed], components: buttonRows });
 }
 

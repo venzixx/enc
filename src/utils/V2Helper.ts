@@ -92,6 +92,7 @@ export class V2Helper {
 
         // Add Thumbnail as part of a Section (Type 9)
         const primaryContent = (title ? `### ${title}\n` : "") + (description || "");
+        const primaryChunks = V2Helper.chunkText(primaryContent || "\u200b");
 
         if (thumbnail) {
             container.components.push({
@@ -99,7 +100,7 @@ export class V2Helper {
                 components: [ // Required by validator: components[0].components[0].components
                     {
                         type: 10, // Text Display
-                        content: primaryContent || "\u200b"
+                        content: primaryChunks[0] || "\u200b"
                     }
                 ],
                 accessory: {
@@ -109,22 +110,33 @@ export class V2Helper {
                     }
                 }
             });
+
+            // If primaryContent exceeded 3900 chars, push remaining chunks as subsequent text components
+            for (let i = 1; i < primaryChunks.length; i++) {
+                container.components.push({
+                    type: 10,
+                    content: primaryChunks[i]
+                });
+            }
         } else if (primaryContent) {
-            container.components.push({
-                type: 10, // Text Display
-                content: primaryContent
-            });
+            for (const chunk of primaryChunks) {
+                container.components.push({
+                    type: 10, // Text Display
+                    content: chunk
+                });
+            }
         }
-
-
 
         // Add fields as compact text
         if (fields && fields.length > 0) {
             const fieldContent = fields.map(f => `**${f.name}**: ${f.value}`).join("\n");
-            container.components.push({
-                type: 10,
-                content: fieldContent
-            });
+            const fieldChunks = V2Helper.chunkText(fieldContent);
+            for (const fChunk of fieldChunks) {
+                container.components.push({
+                    type: 10,
+                    content: fChunk
+                });
+            }
         }
 
         if (footer) {
@@ -179,5 +191,25 @@ export class V2Helper {
             components: [container],
             flags
         };
+    }
+
+    public static chunkText(text: string, maxLen = 3900): string[] {
+        if (!text || text.length === 0) return ['\u200b'];
+        if (text.length <= maxLen) return [text];
+        const chunks: string[] = [];
+        let remaining = text;
+        while (remaining.length > 0) {
+            if (remaining.length <= maxLen) {
+                chunks.push(remaining);
+                break;
+            }
+            let splitIdx = remaining.lastIndexOf('\n', maxLen);
+            if (splitIdx === -1 || splitIdx < maxLen * 0.5) {
+                splitIdx = maxLen;
+            }
+            chunks.push(remaining.substring(0, splitIdx));
+            remaining = remaining.substring(splitIdx).trimStart();
+        }
+        return chunks;
     }
 }

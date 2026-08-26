@@ -18,6 +18,8 @@ export default class HelpMenu extends Component {
 		const layoutOptions = Help.getCategoryLayout(this.client, category);
 		const layout = V2Helper.createLayout(layoutOptions);
 
-		await interaction.update(layout as any);
+		await interaction.update(layout as any).catch((err) => {
+			console.error('Failed to update help menu:', err);
+		});
 	}
 }
