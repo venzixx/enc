@@ -1,4 +1,4 @@
-import { EmbedBuilder } from 'discord.js';
+import { ApplicationIntegrationType, EmbedBuilder, InteractionContextType } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { AfkManager } from '../../utils/AfkManager';
@@ -16,6 +16,8 @@ export default class Afk extends Command {
 			aliases: ['away'],
 			cooldown: 5,
 			slashCommand: true,
+			integration_types: [ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall],
+			contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],
 			options: [
 				{
 					name: 'reason',
