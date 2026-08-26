@@ -42,6 +42,9 @@ export default class VerifyButton extends Component {
 				if (guildData.unverifiedRoleId && member.roles.cache.has(guildData.unverifiedRoleId)) {
 					await member.roles.remove(guildData.unverifiedRoleId, "Normal Verification passed").catch(() => {});
 				}
+				if (guildData.verificationSilentRoleId && member.roles.cache.has(guildData.verificationSilentRoleId)) {
+					await member.roles.remove(guildData.verificationSilentRoleId, "Normal Verification passed").catch(() => {});
+				}
 
 				if (guildData.verificationLogChannelId) {
 					const logChannel = interaction.guild.channels.cache.get(guildData.verificationLogChannelId);

@@ -60,6 +60,22 @@ export default class GuildMemberAdd extends Event {
                 }
             }
 
+            // --- Verification Silent Role / Unverified Role Assignment ---
+            if (guildData?.verificationEnabled) {
+                if (guildData.verificationSilentRoleEnabled && guildData.verificationSilentRoleId) {
+                    const silentRole = guild.roles.cache.get(guildData.verificationSilentRoleId);
+                    if (silentRole) {
+                        await member.roles.add(silentRole).catch(() => console.error("Missing permissions for Silent Verification Role"));
+                    }
+                }
+                if (guildData.unverifiedRoleId) {
+                    const unverifiedRole = guild.roles.cache.get(guildData.unverifiedRoleId);
+                    if (unverifiedRole) {
+                        await member.roles.add(unverifiedRole).catch(() => console.error("Missing permissions for Unverified Role"));
+                    }
+                }
+            }
+
             // --- Role Rules Evaluation ---
             const { RoleRuleEvaluator } = await import('../utils/RoleRuleEvaluator');
             await RoleRuleEvaluator.evaluateMember(this.client, member);

@@ -31,6 +31,8 @@ model Guild {
   verificationChannelId String?
   verificationRoleId    String?
   unverifiedRoleId      String?
+  verificationSilentRoleEnabled Boolean           @default(false)
+  verificationSilentRoleId      String?
   verificationType      String            @default("NORMAL")
   verificationLogChannelId String?
   verificationMessage   String?
