@@ -1,6 +1,5 @@
 import { 
     ApplicationIntegrationType, 
-    EmbedBuilder, 
     InteractionContextType, 
     ApplicationCommandOptionType 
 } from 'discord.js';
@@ -13,18 +12,18 @@ export default class RepeatRoll extends Command {
         super(client, {
             name: 'rr',
             description: {
-                content: 'Roll a dice formula multiple times (Avrae-style iteration rolls).',
+                content: 'Roll a dice formula multiple times (iteration rolls).',
                 usage: 'rr <iterations> <dice expression> [reason]',
                 examples: [
                     'rr 4 d6+2',
-                    'rr 6 1d20+5 Multiattack',
+                    'drr 6 1d20+5 Multiattack',
                     'rr 3 2d6+4 Greatsword Hits',
                     'rr 4 4d6kh3 Stat Generation'
                 ]
             },
             category: 'utility',
-            aliases: ['repeatroll', 'multiroll'],
-            cooldown: 3,
+            aliases: ['drr', 'repeatroll', 'multiroll'],
+            cooldown: 2,
             slashCommand: true,
             integration_types: [ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall],
             contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],
@@ -54,6 +53,11 @@ export default class RepeatRoll extends Command {
     }
 
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+        // Delete user's trigger message if sent as a prefix text command
+        if (!ctx.isInteraction && ctx.message?.deletable) {
+            ctx.message.delete().catch(() => {});
+        }
+
         let iterations = ctx.options?.getInteger?.('iterations');
         let expression = ctx.options?.getString?.('expression');
         let reason = ctx.options?.getString?.('reason');
@@ -61,23 +65,14 @@ export default class RepeatRoll extends Command {
         if (iterations === undefined || iterations === null) {
             if (!args.length) {
                 return await ctx.sendMessage({
-                    embeds: [
-                        client.embed()
-                            .setColor(client.color.red)
-                            .setDescription(' Please specify the number of iterations and a dice formula.\n\n**Usage:** `,rr <count> <dice>` (e.g. `,rr 4 d6+3`)')
-                    ]
+                    content: `<@${ctx.author.id}> ❌ Please specify the number of iterations and a dice formula.\n**Usage:** \`.rr <count> <dice>\` (e.g. \`.rr 4 d6+3\`)`
                 });
             }
 
-            // Parse args e.g. ,rr 4 d6+2 reason
             const parsedCount = parseInt(args[0], 10);
             if (isNaN(parsedCount) || parsedCount < 1) {
                 return await ctx.sendMessage({
-                    embeds: [
-                        client.embed()
-                            .setColor(client.color.red)
-                            .setDescription(' The first argument must be a valid number of rolls (1 - 25).\n\n**Example:** `,rr 4 1d20+5`')
-                    ]
+                    content: `<@${ctx.author.id}> ❌ The first argument must be a valid number of rolls (1 - 25).\n**Example:** \`.rr 4 1d20+5\``
                 });
             }
 
@@ -97,8 +92,6 @@ export default class RepeatRoll extends Command {
         }
 
         const results: RollResult[] = DiceRoller.repeatRoll(iterations, expression);
-        const authorName = ctx.author.displayName || ctx.author.username;
-        const authorIcon = ctx.author.displayAvatarURL({ size: 128 });
 
         const lines: string[] = [];
         let grandTotal = 0;
@@ -118,36 +111,22 @@ export default class RepeatRoll extends Command {
                 }
             }
 
-            lines.push(`**#${index + 1}:** \`${res.breakdown}\` ➔ **\`${res.total}\`**${tag}`);
+            lines.push(`**#${index + 1}:** ${res.breakdown} ➔ **${res.total}**${tag}`);
         });
 
         const avg = (grandTotal / results.length).toFixed(1);
+        const reasonHeader = reason ? ` *(${reason})*` : '';
 
-        const embed = new EmbedBuilder()
-            .setColor(client.color.main)
-            .setAuthor({ name: `${authorName} rolled ${results.length}× (${expression})`, iconURL: authorIcon });
-
-        if (reason) {
-            embed.setTitle(`🎲 ${reason}`);
-        }
-
-        embed.setDescription(lines.join('\n'));
-
-        // Stats summary field
-        let summaryText = `**Total:** \`${grandTotal}\`  •  **Average:** \`${avg}\``;
+        let summaryText = `\n**Total:** ${grandTotal} • **Average:** ${avg}`;
         if (nat20Count > 0 || nat1Count > 0) {
-            summaryText += `\n**Crits:** ${nat20Count}x Nat 20 | ${nat1Count}x Nat 1`;
+            summaryText += ` • Crits: ${nat20Count}x Nat 20 | ${nat1Count}x Nat 1`;
         }
 
-        embed.addFields({
-            name: '📊 Summary',
-            value: summaryText,
-            inline: false
+        const content = `<@${ctx.author.id}> 🎲${reasonHeader}\n${lines.join('\n')}${summaryText}`;
+
+        return await ctx.sendMessage({
+            content,
+            allowedMentions: { users: [ctx.author.id] }
         });
-
-        embed.setFooter({ text: `Formula: ${expression} • Iterations: ${results.length}` });
-        embed.setTimestamp();
-
-        return await ctx.sendMessage({ embeds: [embed] });
     }
 }
