@@ -8,7 +8,7 @@ export default class ReactLock extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'reactlock',
-            aliases: ['rl'],
+            aliases: ['rlock'],
             description: {
                 content: 'Automatically react to every message from a specific user or role.',
                 usage: 'reactlock <add/remove/list> [user/role] [emoji]',

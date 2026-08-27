@@ -45,7 +45,7 @@ export default class RoleCommand extends Command {
 	constructor(client: ExtendedClient) {
 		super(client, {
 			name: 'role',
-			aliases: ['r'],
+			aliases: ['rl'],
 			description: {
 				content: 'Manage server roles (add, remove, create, delete, color, icon, info, exch, rename, and strip).',
 				usage: 'role <add/remove/create/delete/color/icon/info/exch/rename/strip> [args]',
