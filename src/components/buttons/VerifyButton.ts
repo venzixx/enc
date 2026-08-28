@@ -2,6 +2,7 @@ import { type ButtonInteraction, type GuildMember, ActionRowBuilder, ButtonBuild
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
 import { CaptchaManager } from "../../utils/CaptchaManager";
+import { VerificationFilterEngine } from "../../utils/VerificationFilterEngine";
 import crypto from "crypto";
 
 export default class VerifyButton extends Component {
@@ -30,6 +31,21 @@ export default class VerifyButton extends Component {
 		const member = interaction.member as GuildMember;
 		if (member.roles.cache.has(role.id)) {
 			return await interaction.reply({ content: `${this.client.emoji.info} You are already verified!`, ephemeral: true });
+		}
+
+		// Evaluate Gatekeeper Security Filters
+		const filterResult = await VerificationFilterEngine.evaluate(this.client, member, guildData);
+		if (!filterResult.passed) {
+			if (filterResult.actionTaken === "BAN" || filterResult.actionTaken === "KICK") {
+				return await interaction.reply({
+					content: `${this.client.emoji.cross} Your account was rejected by the server verification filter:\n\n${filterResult.reason}`,
+					ephemeral: true
+				});
+			}
+			return await interaction.reply({
+				content: `${this.client.emoji.cross} **Verification Blocked**: Your account does not meet the server security requirements:\n\n${filterResult.reason}`,
+				ephemeral: true
+			});
 		}
 
 		const verifyType = guildData.verificationType || "NORMAL";

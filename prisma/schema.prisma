@@ -39,6 +39,14 @@ model Guild {
   verificationTitle     String?
   verificationEmbedData String?
   verificationEnabled   Boolean           @default(false)
+  verificationMinAgeDays        Int?              @default(0)
+  verificationMinAgeAction      String            @default("BLOCK")
+  verificationNoPfpFilter       Boolean           @default(false)
+  verificationNoPfpAction       String            @default("BLOCK")
+  verificationSuspiciousFilter  Boolean           @default(false)
+  verificationSuspiciousAction  String            @default("INFORM")
+  verificationFilterKeywords    String?
+  verificationKickReasonDm      String?
   vanityString          String?
   vanityRoleId          String?
   birthdayChannelId     String?
