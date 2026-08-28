@@ -12,12 +12,13 @@ export default class RepeatRoll extends Command {
         super(client, {
             name: 'rr',
             description: {
-                content: 'Roll a dice formula multiple times (iteration rolls).',
+                content: 'Roll a dice formula multiple times (Avrae-style iteration rolls with automatic truncation).',
                 usage: 'rr <iterations> <dice expression> [reason]',
                 examples: [
                     'rr 4 d6+2',
-                    'drr 6 1d20+5 Multiattack',
-                    'rr 3 2d6+4 Greatsword Hits',
+                    'rr 30 20d100',
+                    'drr 6 1d20 + 5 Multiattack',
+                    'rr 3 2d6 + 4 Greatsword Hits',
                     'rr 4 4d6kh3 Stat Generation'
                 ]
             },
@@ -30,15 +31,15 @@ export default class RepeatRoll extends Command {
             options: [
                 {
                     name: 'iterations',
-                    description: 'Number of times to roll (1 - 25)',
+                    description: 'Number of times to roll (1 - 30)',
                     type: ApplicationCommandOptionType.Integer,
                     required: true,
                     min_value: 1,
-                    max_value: 25
+                    max_value: 30
                 },
                 {
                     name: 'expression',
-                    description: 'The dice formula to roll (e.g. d6+3, 1d20+5, 2d6)',
+                    description: 'The dice formula to roll (e.g. d20 + 6, 20d100, 2d6+3)',
                     type: ApplicationCommandOptionType.String,
                     required: true
                 },
@@ -72,16 +73,16 @@ export default class RepeatRoll extends Command {
             const parsedCount = parseInt(args[0], 10);
             if (isNaN(parsedCount) || parsedCount < 1) {
                 return await ctx.sendMessage({
-                    content: `<@${ctx.author.id}> ❌ The first argument must be a valid number of rolls (1 - 25).\n**Example:** \`.rr 4 1d20+5\``
+                    content: `<@${ctx.author.id}> ❌ The first argument must be a valid number of rolls (1 - 30).\n**Example:** \`.rr 4 1d20+5\``
                 });
             }
 
-            iterations = Math.min(25, parsedCount);
+            iterations = Math.min(30, parsedCount);
+
             if (args.length > 1) {
-                expression = args[1];
-                if (args.length > 2) {
-                    reason = args.slice(2).join(' ');
-                }
+                const parsed = DiceRoller.parseInput(args.slice(1));
+                expression = parsed.expression;
+                reason = parsed.reason;
             } else {
                 expression = '1d20';
             }
@@ -92,37 +93,41 @@ export default class RepeatRoll extends Command {
         }
 
         const results: RollResult[] = DiceRoller.repeatRoll(iterations, expression);
-
-        const lines: string[] = [];
-        let grandTotal = 0;
-        let nat20Count = 0;
-        let nat1Count = 0;
-
-        results.forEach((res, index) => {
-            grandTotal += res.total;
-            let tag = '';
-            if (res.hasD20) {
-                if (res.isNat20) {
-                    tag = ' 💥 *(Nat 20!)*';
-                    nat20Count++;
-                } else if (res.isNat1) {
-                    tag = ' 💀 *(Nat 1!)*';
-                    nat1Count++;
-                }
-            }
-
-            lines.push(`**#${index + 1}:** ${res.breakdown} ➔ **${res.total}**${tag}`);
-        });
-
-        const avg = (grandTotal / results.length).toFixed(1);
+        const grandTotal = results.reduce((acc, curr) => acc + curr.total, 0);
         const reasonHeader = reason ? ` *(${reason})*` : '';
 
-        let summaryText = `\n**Total:** ${grandTotal} • **Average:** ${avg}`;
-        if (nat20Count > 0 || nat1Count > 0) {
-            summaryText += ` • Crits: ${nat20Count}x Nat 20 | ${nat1Count}x Nat 1`;
+        const header = `<@${ctx.author.id}>\nRolling ${results.length} iterations...${reasonHeader}\n`;
+        const footer = `\n${grandTotal} total.`;
+
+        // Max safe text capacity for lines (Discord limit is 2000 chars)
+        const maxLinesLength = 1900 - header.length - footer.length;
+
+        const renderedLines: string[] = [];
+        let currentLength = 0;
+        let omittedCount = 0;
+
+        for (let i = 0; i < results.length; i++) {
+            const res = results[i];
+            const critTag = res.hasD20 && res.isNat20 ? ' 💥 *(Nat 20!)*' : (res.hasD20 && res.isNat1 ? ' 💀 *(Nat 1!)*' : '');
+            const line = `${res.breakdown} = **${res.total}**${critTag}`;
+
+            // Estimate if adding this line + potential omission message fits
+            const potentialOmitMsg = `\n[${results.length - i} results omitted for output size.]`;
+            if (currentLength + line.length + 1 + potentialOmitMsg.length > maxLinesLength && i > 0) {
+                omittedCount = results.length - i;
+                break;
+            }
+
+            renderedLines.push(line);
+            currentLength += line.length + 1;
         }
 
-        const content = `<@${ctx.author.id}> 🎲${reasonHeader}\n${lines.join('\n')}${summaryText}`;
+        let body = renderedLines.join('\n');
+        if (omittedCount > 0) {
+            body += `\n[${omittedCount} results omitted for output size.]`;
+        }
+
+        const content = `${header}${body}${footer}`;
 
         return await ctx.sendMessage({
             content,

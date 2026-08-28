@@ -12,11 +12,11 @@ export default class Roll extends Command {
         super(client, {
             name: 'roll',
             description: {
-                content: 'Roll dice with complex expressions, modifiers, and advantage (e.g. d6, 2d20kh1, 1d8+4).',
+                content: 'Roll dice with complex expressions, modifiers, and advantage (e.g. d20 + 6, 2d20kh1, 1d8+4).',
                 usage: 'roll <dice expression> [reason]',
                 examples: [
                     'roll d6',
-                    'dr d6+5',
+                    'dr d20 + 6',
                     'dr 2d6 + 1d4 + 3',
                     'dr 2d20kh1 + 5 Attack Roll',
                     'roll 4d6kh3 Stats Roll'
@@ -31,7 +31,7 @@ export default class Roll extends Command {
             options: [
                 {
                     name: 'expression',
-                    description: 'The dice formula to roll (e.g. d6, 1d20+5, 2d6+3)',
+                    description: 'The dice formula to roll (e.g. d20 + 6, 1d20+5, 2d6+3)',
                     type: ApplicationCommandOptionType.String,
                     required: true
                 },
@@ -55,22 +55,12 @@ export default class Roll extends Command {
         let reason = ctx.options?.getString?.('reason');
 
         if (!expression) {
-            if (!args.length) {
-                expression = '1d20';
-            } else {
-                const firstArg = args[0];
-                if (/d|\+|\-|\*|\//i.test(firstArg)) {
-                    expression = firstArg;
-                    if (args.length > 1) {
-                        reason = args.slice(1).join(' ');
-                    }
-                } else {
-                    expression = args.join(' ');
-                }
-            }
+            const parsed = DiceRoller.parseInput(args);
+            expression = parsed.expression;
+            reason = parsed.reason;
         }
 
-        const cleanExpr = expression.trim();
+        const cleanExpr = expression.trim() || '1d20';
         const result = DiceRoller.roll(cleanExpr);
 
         // Highlight Nat 20 / Nat 1

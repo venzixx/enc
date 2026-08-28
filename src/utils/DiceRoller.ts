@@ -3,9 +3,10 @@
  * Supports:
  * - Basic: d6, 1d20, 2d6, d100, 3d8
  * - Modifiers: d6+3, 2d20-2, 1d8+4+2, 4d6+5*2
+ * - Spaced expressions: d20 + 6, 2d6 + 1d4 - 2
  * - Keep High/Low: 2d20kh1 (advantage), 2d20kl1 (disadvantage), 4d6kh3 (drop lowest)
  * - Multi-dice expressions: 1d20+5 + 2d6+3
- * - Repeat rolls (rr)
+ * - Repeat rolls (rr) with intelligent output size truncation
  */
 
 export interface DieRoll {
@@ -42,6 +43,36 @@ export class DiceRoller {
     public static readonly MAX_REPEATS = 30;
 
     /**
+     * Parse args into expression and reason, respecting spaces in math like `d20 + 6`
+     */
+    public static parseInput(args: string[]): { expression: string; reason: string } {
+        if (!args.length) return { expression: '1d20', reason: '' };
+
+        const exprTokens: string[] = [];
+        const reasonTokens: string[] = [];
+        let isReasonMode = false;
+
+        const mathTokenRegex = /^(\d*d\d+(kh\d+|kl\d+|k\d+|!)?|[\d+\-*/().^!]|adv|dis|\+|\-|\*|\/)+$/i;
+
+        for (let i = 0; i < args.length; i++) {
+            const token = args[i].trim();
+            if (!token) continue;
+
+            if (!isReasonMode && mathTokenRegex.test(token)) {
+                exprTokens.push(token);
+            } else {
+                isReasonMode = true;
+                reasonTokens.push(token);
+            }
+        }
+
+        const expression = exprTokens.length > 0 ? exprTokens.join(' ') : (args[0] || '1d20');
+        const reason = reasonTokens.join(' ').trim();
+
+        return { expression, reason };
+    }
+
+    /**
      * Roll a single die with `sides`
      */
     public static rollDie(sides: number): number {
@@ -49,11 +80,10 @@ export class DiceRoller {
     }
 
     /**
-     * Parse and roll a single expression like "1d20+5", "2d6 + 1d4 - 2", "4d6kh3"
+     * Parse and roll a single expression like "1d20+5", "d20 + 6", "4d6kh3"
      */
     public static roll(expression: string): RollResult {
         let cleaned = expression.trim().toLowerCase();
-        // Replace shorthand "adv" and "dis" if present
         cleaned = cleaned.replace(/\badv\b/g, '2d20kh1').replace(/\bdis\b/g, '2d20kl1');
 
         const diceGroups: DiceGroup[] = [];
@@ -99,7 +129,6 @@ export class DiceRoller {
                 rawRolls.push({ value: val });
 
                 if (explode && val === actualSides && rawRolls.length < count * 3) {
-                    // Exploding die
                     let extra = this.rollDie(actualSides);
                     rawRolls.push({ value: extra, exploded: true });
                 }
@@ -146,13 +175,21 @@ export class DiceRoller {
                 rawText: match
             });
 
-            // Format roll display e.g. [4, 6] or [~~1~~, 20]
-            const formattedRolls = rawRolls.map(r => {
-                if (r.dropped) return `~~${r.value}~~`;
-                if (actualSides === 20 && r.value === 20) return `**${r.value}**`;
-                if (actualSides === 20 && r.value === 1) return `*${r.value}*`;
-                return `${r.value}`;
-            });
+            // Format roll display e.g. (4, 6) or (~~1~~, 20)
+            let formattedRolls: string[] = [];
+            if (rawRolls.length > 25) {
+                // If massive count of dice, show first 20 + abbreviated count
+                const head = rawRolls.slice(0, 20).map(r => r.dropped ? `~~${r.value}~~` : `${r.value}`);
+                head.push(`... ${rawRolls.length - 20} more`);
+                formattedRolls = head;
+            } else {
+                formattedRolls = rawRolls.map(r => {
+                    if (r.dropped) return `~~${r.value}~~`;
+                    if (actualSides === 20 && r.value === 20) return `**${r.value}**`;
+                    if (actualSides === 20 && r.value === 1) return `*${r.value}*`;
+                    return `${r.value}`;
+                });
+            }
 
             const rollDetail = `(${formattedRolls.join(', ')})`;
             breakdownString = breakdownString.replace(match, `${match} ${rollDetail}`);
@@ -160,7 +197,7 @@ export class DiceRoller {
             return `${groupSum}`;
         });
 
-        // Safely evaluate math expression (only allowed math characters)
+        // Safely evaluate math expression
         let total = 0;
         try {
             const sanitizedMath = evalExpression.replace(/[^0-9+\-*/().\s]/g, '');
@@ -195,7 +232,7 @@ export class DiceRoller {
     }
 
     /**
-     * Safe mathematical evaluation without dangerous eval()
+     * Safe mathematical evaluation
      */
     private static safeEval(expr: string): number {
         const fn = new Function(`return (${expr});`);
