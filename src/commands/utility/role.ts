@@ -47,9 +47,9 @@ export default class RoleCommand extends Command {
 			name: 'role',
 			aliases: ['r', 'rl'],
 			description: {
-				content: 'Manage server roles (add, remove, create, delete, color, icon, info, exch, rename, and strip).',
-				usage: 'role <add/remove/create/delete/color/icon/info/exch/rename/strip> [args]',
-				examples: ['role add @Member @Admin', 'role strip @User', 'role exch @RoleA , @RoleB', 'role rename @VIP VIP Member', 'role color @Admin #FF00FF']
+				content: 'Manage server roles (add, remove, create, delete, color, icon, info, exch, rename, strip, and move).',
+				usage: 'role <add/remove/create/delete/color/icon/info/exch/rename/strip/move> [args]',
+				examples: ['role add @Member @Admin', 'role move @VIP 3', 'role strip @User', 'role exch @RoleA , @RoleB', 'role rename @VIP VIP Member', 'role color @Admin #FF00FF']
 			},
 			category: 'tools',
 			cooldown: 3,
@@ -156,6 +156,15 @@ export default class RoleCommand extends Command {
                     type: 1,
                     options: [
                         { name: 'user', description: 'The member to strip dangerous roles from', type: 6, required: true }
+                    ]
+                },
+                {
+                    name: 'move',
+                    description: 'Move a role to a specific numbered position in the role hierarchy',
+                    type: 1,
+                    options: [
+                        { name: 'role', description: 'The role to move', type: 8, required: true },
+                        { name: 'position', description: 'Target position number (from ,roles list)', type: 4, required: true }
                     ]
                 }
 			]
@@ -1114,7 +1123,128 @@ export default class RoleCommand extends Command {
             return ctx.reply({ embeds: [embed] });
         }
 
-        return ctx.reply({ content: `${client.emoji.cross} Unknown subcommand \`${sub}\`. Usage: \`${ctx.prefix}role <add/remove/create/delete/color/icon/info/inrole/exch/rename/strip>\`` });
+        // Handle Move/Position
+        if (sub === 'move' || sub === 'pos' || sub === 'position') {
+            let targetPosition: number | null = null;
+
+            if (ctx.interaction) {
+                role = ctx.options.getRole('role') as Role;
+                targetPosition = ctx.options.getInteger('position');
+            } else {
+                if (args.length < 3) {
+                    return ctx.reply({ content: `${client.emoji.cross} Usage: \`${ctx.prefix}role move <@role/role_id/name> <position_number>\` (e.g. \`${ctx.prefix}role move @VIP 3\`)\nUse \`${ctx.prefix}roles\` to view numbered positions.` });
+                }
+
+                // Check if last arg is a number or if second arg is a number
+                const lastArg = args[args.length - 1];
+                const parsedLast = parseInt(lastArg, 10);
+
+                if (!isNaN(parsedLast)) {
+                    targetPosition = parsedLast;
+                    const roleQuery = args.slice(1, args.length - 1).join(' ');
+                    role = resolveRole(roleQuery);
+                } else {
+                    const parsedSecond = parseInt(args[1], 10);
+                    if (!isNaN(parsedSecond)) {
+                        targetPosition = parsedSecond;
+                        const roleQuery = args.slice(2).join(' ');
+                        role = resolveRole(roleQuery);
+                    }
+                }
+            }
+
+            if (!role) {
+                return ctx.reply({ content: `${client.emoji.cross} Could not find that role.` });
+            }
+
+            if (targetPosition === null || isNaN(targetPosition) || targetPosition < 1) {
+                return ctx.reply({ content: `${client.emoji.cross} Please provide a valid position number (1 or higher).` });
+            }
+
+            // Hierarchy & Permission checks
+            const clientMember = ctx.guild.members.me || (client.user ? ctx.guild.members.resolve(client.user.id) : null);
+            if (!clientMember) return ctx.reply({ content: `${client.emoji.cross} Bot member not found.` });
+
+            // Check if bot can manage the role
+            if (role.position >= clientMember.roles.highest.position) {
+                return ctx.reply({ content: `${client.emoji.cross} I cannot move <@&${role.id}> because it is higher than or equal to my highest role (<@&${clientMember.roles.highest.id}>).` });
+            }
+
+            // Check if user can manage the role (unless owner or dev)
+            if (!isOwner && ctx.author.id !== ctx.guild.ownerId && ctx.member) {
+                if (role.position >= ctx.member.roles.highest.position) {
+                    return ctx.reply({ content: `${client.emoji.cross} You cannot move <@&${role.id}> because it is higher than or equal to your highest role.` });
+                }
+            }
+
+            if (role.managed) {
+                return ctx.reply({ content: `${client.emoji.cross} <@&${role.id}> is managed by an integration/bot and cannot be manually moved.` });
+            }
+
+            // Fetch guild roles sorted by hierarchy descending (as displayed in ,roles)
+            const sortedRoles = [...ctx.guild.roles.cache
+                .filter((r: Role) => r.id !== ctx.guild.id)
+                .sort((a: Role, b: Role) => b.position - a.position)
+                .values()];
+
+            const totalRoles = sortedRoles.length;
+            if (targetPosition > totalRoles) {
+                return ctx.reply({ content: `${client.emoji.cross} Position \`${targetPosition}\` is out of bounds. This server has \`${totalRoles}\` custom roles (1 - ${totalRoles}).` });
+            }
+
+            const oldIndex = sortedRoles.findIndex(r => r.id === role!.id);
+            if (oldIndex === -1) {
+                return ctx.reply({ content: `${client.emoji.cross} Role not found in server hierarchy.` });
+            }
+
+            const oldRank = oldIndex + 1;
+            const targetRank = targetPosition; // 1-indexed
+
+            if (oldRank === targetRank) {
+                return ctx.reply({ content: `ℹ️ <@&${role.id}> is already at position **#${targetRank}**.` });
+            }
+
+            const targetIndex = targetRank - 1;
+            const roleAtTarget = sortedRoles[targetIndex];
+
+            // Check if moving to this position would put the role above bot's highest role
+            if (roleAtTarget && roleAtTarget.position >= clientMember.roles.highest.position && targetRank <= oldRank) {
+                return ctx.reply({ content: `${client.emoji.cross} Cannot move <@&${role.id}> to position **#${targetRank}** because it is higher than or equal to my highest role.` });
+            }
+
+            // User hierarchy check for target rank
+            if (!isOwner && ctx.author.id !== ctx.guild.ownerId && ctx.member) {
+                if (roleAtTarget && roleAtTarget.position >= ctx.member.roles.highest.position && targetRank <= oldRank) {
+                    return ctx.reply({ content: `${client.emoji.cross} Cannot move <@&${role.id}> to position **#${targetRank}** because it is higher than or equal to your highest role.` });
+                }
+            }
+
+            // Reorder array: remove role from oldIndex, insert at targetIndex
+            const newRolesOrder = [...sortedRoles];
+            const [removed] = newRolesOrder.splice(oldIndex, 1);
+            newRolesOrder.splice(targetIndex, 0, removed);
+
+            // Construct new position payload for Discord API
+            const positionPayload = newRolesOrder.map((r, idx) => ({
+                role: r.id,
+                position: newRolesOrder.length - idx
+            }));
+
+            await ctx.guild.roles.setPositions(positionPayload);
+
+            return ctx.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle('✅ Role Position Updated')
+                        .setDescription(`Successfully moved <@&${role.id}> from position **#${oldRank}** to **#${targetRank}**.\n\nUse \`${ctx.prefix}roles\` to view the updated hierarchy.`)
+                        .setColor(client.color.main)
+                        .setFooter({ text: `Moved by ${ctx.author.tag}` })
+                        .setTimestamp()
+                ]
+            });
+        }
+
+        return ctx.reply({ content: `${client.emoji.cross} Unknown subcommand \`${sub}\`. Usage: \`${ctx.prefix}role <add/remove/create/delete/color/icon/info/inrole/exch/rename/strip/move>\`` });
     } catch (err: any) {
         console.error('[RoleCommand Error]:', err);
         return ctx.reply({

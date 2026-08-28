@@ -77,8 +77,8 @@ export default class Roles extends Command {
 			const end = Math.min(start + perPage, rolesArray.length);
 			const pageRoles = rolesArray.slice(start, end);
 
-			const lines = pageRoles.map((role: Role) =>
-				`<@&${role.id}> — \`${role.members.size} members\``
+			const lines = pageRoles.map((role: Role, idx: number) =>
+				`\`${start + idx + 1}.\` <@&${role.id}> — \`${role.members.size} members\``
 			);
 
 			return new EmbedBuilder()
