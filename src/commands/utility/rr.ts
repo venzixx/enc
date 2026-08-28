@@ -59,11 +59,15 @@ export default class RepeatRoll extends Command {
             ctx.message.delete().catch(() => {});
         }
 
-        let iterations = ctx.options?.getInteger?.('iterations');
-        let expression = ctx.options?.getString?.('expression');
-        let reason = ctx.options?.getString?.('reason');
+        let iterations: number = 1;
+        let expression: string = '1d20';
+        let reason: string = '';
 
-        if (iterations === undefined || iterations === null) {
+        if (ctx.isInteraction) {
+            iterations = ctx.options?.getInteger?.('iterations') || 1;
+            expression = ctx.options?.getString?.('expression') || '1d20';
+            reason = ctx.options?.getString?.('reason') || '';
+        } else {
             if (!args.length) {
                 return await ctx.sendMessage({
                     content: `<@${ctx.author.id}> ❌ Please specify the number of iterations and a dice formula.\n**Usage:** \`.rr <count> <dice>\` (e.g. \`.rr 4 d6+3\`)`
@@ -79,17 +83,9 @@ export default class RepeatRoll extends Command {
 
             iterations = Math.min(30, parsedCount);
 
-            if (args.length > 1) {
-                const parsed = DiceRoller.parseInput(args.slice(1));
-                expression = parsed.expression;
-                reason = parsed.reason;
-            } else {
-                expression = '1d20';
-            }
-        }
-
-        if (!expression) {
-            expression = '1d20';
+            const parsed = DiceRoller.parseInput(args.slice(1));
+            expression = parsed.expression || '1d20';
+            reason = parsed.reason;
         }
 
         const results: RollResult[] = DiceRoller.repeatRoll(iterations, expression);
@@ -111,7 +107,6 @@ export default class RepeatRoll extends Command {
             const critTag = res.hasD20 && res.isNat20 ? ' 💥 *(Nat 20!)*' : (res.hasD20 && res.isNat1 ? ' 💀 *(Nat 1!)*' : '');
             const line = `${res.breakdown} = **${res.total}**${critTag}`;
 
-            // Estimate if adding this line + potential omission message fits
             const potentialOmitMsg = `\n[${results.length - i} results omitted for output size.]`;
             if (currentLength + line.length + 1 + potentialOmitMsg.length > maxLinesLength && i > 0) {
                 omittedCount = results.length - i;

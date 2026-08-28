@@ -51,12 +51,15 @@ export default class Roll extends Command {
             ctx.message.delete().catch(() => {});
         }
 
-        let expression = ctx.options?.getString?.('expression');
-        let reason = ctx.options?.getString?.('reason');
+        let expression: string = '1d20';
+        let reason: string = '';
 
-        if (!expression) {
+        if (ctx.isInteraction) {
+            expression = ctx.options?.getString?.('expression') || '1d20';
+            reason = ctx.options?.getString?.('reason') || '';
+        } else {
             const parsed = DiceRoller.parseInput(args);
-            expression = parsed.expression;
+            expression = parsed.expression || '1d20';
             reason = parsed.reason;
         }
 
