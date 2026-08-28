@@ -276,10 +276,47 @@ export default class Config extends Command {
         } else if (sub) {
             switch(sub) {
                 case 'prefix': {
-                    const newPrefix = ctx.options.getString('new_prefix', true);
-                    if (newPrefix.length > 5) return ctx.replyV2({ description: 'Prefix cannot be longer than 5 characters.', isAlert: true, color: client.color.red });
-                    await client.prisma.guild.upsert({ where: { id: ctx.guild.id }, update: { prefix: newPrefix }, create: { id: ctx.guild.id, prefix: newPrefix } });
-                    return ctx.replyV2({ title: 'Prefix Updated', description: `Successfully updated server prefix to \`${newPrefix}\`.`, color: client.color.main });
+                    let newPrefix: string | null = null;
+                    if (ctx.isInteraction) {
+                        newPrefix = ctx.options.getString('new_prefix');
+                    } else {
+                        if (args[0]?.toLowerCase() === 'prefix') {
+                            newPrefix = args.slice(1).join(' ').trim() || null;
+                        } else {
+                            newPrefix = args.join(' ').trim() || null;
+                        }
+                    }
+
+                    if (!newPrefix) {
+                        const guildData = await client.prisma.guild.findUnique({ where: { id: ctx.guild.id } });
+                        const currentPrefix = guildData?.prefix || client.config.prefix || ',';
+                        return ctx.replyV2({
+                            title: 'Server Prefix',
+                            description: `The current server prefix is \`${currentPrefix}\`.\n\nTo change it, use:\n\`${ctx.prefix}config prefix <new_prefix>\``,
+                            color: client.color.main
+                        });
+                    }
+
+                    if (newPrefix.length > 5) {
+                        return ctx.replyV2({
+                            title: 'Invalid Prefix',
+                            description: 'Prefix cannot be longer than 5 characters.',
+                            isAlert: true,
+                            color: client.color.red
+                        });
+                    }
+
+                    await client.prisma.guild.upsert({
+                        where: { id: ctx.guild.id },
+                        update: { prefix: newPrefix },
+                        create: { id: ctx.guild.id, prefix: newPrefix }
+                    });
+
+                    return ctx.replyV2({
+                        title: 'Prefix Updated',
+                        description: `Successfully updated server prefix to \`${newPrefix}\`.`,
+                        color: client.color.main
+                    });
                 }
                 case 'welcome': {
                     const channel = ctx.options.getChannel('channel', true);

@@ -943,8 +943,13 @@ export default class MessageCreate extends Event {
 			cmd = parts.shift()?.toLowerCase() || "";
 			const restAfterCmd = rest.slice(rest.toLowerCase().indexOf(cmd) + cmd.length).trim();
 
-			if (restAfterCmd.includes(",")) {
-				args = restAfterCmd.split(",").map((s) => s.trim()).filter(s => s.length > 0);
+			if (cmd !== 'prefix' && cmd !== 'config' && cmd !== 'setprefix' && restAfterCmd.includes(",")) {
+				const commaParts = restAfterCmd.split(",").map((s) => s.trim()).filter(s => s.length > 0);
+				if (commaParts.length > 1) {
+					args = commaParts;
+				} else {
+					args = parts;
+				}
 			} else {
 				args = parts;
 			}
