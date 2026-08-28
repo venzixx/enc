@@ -43,7 +43,7 @@ export async function getAIResponse(prompt: string, settings: AIGuildSettings, f
             }
 
             const model = geminiClient.getGenerativeModel({
-                model: 'gemini-1.5-flash',
+                model: 'gemini-3.6-flash',
                 systemInstruction: systemPrompt,
                 // Enable official Google Search Grounding if search is enabled/forced
                 tools: (settings.aiSearchEnabled || forceNormalAndSearch) ? [{ googleSearch: {} }] : undefined,
