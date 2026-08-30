@@ -33,8 +33,7 @@ export default class Verify extends Command {
         if (!isExtraOwner) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} **Access Denied**: Only the **Server Owner** and **Extra Owners** can manually verify members.`, 
-                color: client.color.red,
-                isAlert: true 
+                borderless: true
             });
         }
 
@@ -43,8 +42,7 @@ export default class Verify extends Command {
         if (!targetStr) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} Please specify a user to verify.\n\n**Usage:** \`${ctx.prefix || ','}verify <@user|userId>\``, 
-                color: client.color.red,
-                isAlert: true 
+                borderless: true
             });
         }
 
@@ -52,8 +50,7 @@ export default class Verify extends Command {
         if (!member) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} Could not find that member in this server.`, 
-                color: client.color.red,
-                isAlert: true 
+                borderless: true
             });
         }
 
@@ -62,8 +59,7 @@ export default class Verify extends Command {
         if (!guildData || !guildData.verificationRoleId) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} Verification is not configured for this server. Please set a verified role first via \`,config verify <#channel> <@role>\` or on the dashboard.`, 
-                color: client.color.red,
-                isAlert: true 
+                borderless: true
             });
         }
 
@@ -71,8 +67,7 @@ export default class Verify extends Command {
         if (!role) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} The configured verification role (<@&${guildData.verificationRoleId}>) was not found in this server.`, 
-                color: client.color.red,
-                isAlert: true 
+                borderless: true
             });
         }
 
@@ -80,7 +75,7 @@ export default class Verify extends Command {
         if (member.roles.cache.has(role.id)) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.info || 'ℹ️'} **${member.user.tag}** is already verified!`, 
-                isAlert: true 
+                borderless: true
             });
         }
 
@@ -110,13 +105,12 @@ export default class Verify extends Command {
 
             return await ctx.replyV2({
                 description: `${client.emoji.success || '✅'} Successfully verified <@${member.id}> and assigned <@&${role.id}>!`,
-                color: client.color.main
+                borderless: true
             });
         } catch (err: any) {
             return await ctx.replyV2({
                 description: `${client.emoji.cross || '❌'} Failed to assign verification role: ${err.message}`,
-                color: client.color.red,
-                isAlert: true
+                borderless: true
             });
         }
     }

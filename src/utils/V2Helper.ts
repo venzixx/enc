@@ -21,7 +21,8 @@ export interface V2Options {
     title?: string;
     description?: string;
     fields?: { name: string, value: string, inline?: boolean }[];
-    color?: ColorResolvable;
+    color?: ColorResolvable | null;
+    borderless?: boolean;
     footer?: string;
     footerIcon?: string;
     thumbnail?: string;
@@ -43,7 +44,7 @@ export class V2Helper {
      * This bypasses @discordjs/builders validation.
      */
     public static createLayout(options: V2Options) {
-        const { title, description, fields, buttons, selectMenu, isAlert, color, footer, image, thumbnail, media, authorName, authorIcon, authorUrl, timestamp } = options;
+        const { title, description, fields, buttons, selectMenu, isAlert, color, footer, image, thumbnail, media, authorName, authorIcon, authorUrl, timestamp, borderless } = options;
         const banner = image || media;
 
         // Start with basic container structure (Type 17)
@@ -52,11 +53,15 @@ export class V2Helper {
             components: []
         };
 
-        // Set accent color (Default to monochromatic White for high-end look if not specified)
-        if (isAlert) {
-            container.accent_color = resolveColor(color || '#FFFFFF');
-        } else {
-            container.accent_color = resolveColor(color || '#FFFFFF');
+        // Set accent color if NOT borderless
+        if (!borderless && color !== null) {
+            if (color) {
+                container.accent_color = resolveColor(color);
+            } else if (isAlert) {
+                container.accent_color = resolveColor('#EF4444');
+            } else {
+                container.accent_color = resolveColor('#FFFFFF');
+            }
         }
 
         // Add Author (Simulated in V2)
