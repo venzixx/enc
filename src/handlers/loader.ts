@@ -111,24 +111,19 @@ export async function loadCommands(client: ExtendedClient) {
         try {
             logger.info(`Started refreshing ${slashCommands.length} application (/) commands.`);
             
-            if (env.GUILD_ID) {
-                // Clear any stale global commands to prevent duplicates
-                await client.rest.put(
-                    Routes.applicationCommands(env.CLIENT_ID),
-                    { body: [] }
-                );
+            // Always register globally so User-Installable and cross-server commands work in all guilds and DMs
+            await client.rest.put(
+                Routes.applicationCommands(env.CLIENT_ID),
+                { body: slashCommands }
+            );
+            logger.success(`Successfully reloaded ${slashCommands.length} global (/) commands.`);
 
+            // If a specific GUILD_ID was previously used, clear stale guild-level commands to avoid duplicates
+            if (env.GUILD_ID) {
                 await client.rest.put(
                     Routes.applicationGuildCommands(env.CLIENT_ID, env.GUILD_ID),
-                    { body: slashCommands }
-                );
-                logger.success(`Successfully reloaded ${slashCommands.length} guild-specific (/) commands.`);
-            } else {
-                await client.rest.put(
-                    Routes.applicationCommands(env.CLIENT_ID),
-                    { body: slashCommands }
-                );
-                logger.success(`Successfully reloaded ${slashCommands.length} global (/) commands.`);
+                    { body: [] }
+                ).catch(() => {});
             }
 
         } catch (error) {

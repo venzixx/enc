@@ -16,6 +16,8 @@ export default class Avatar extends Command {
 			category: 'utility',
 			cooldown: 3,
 			slashCommand: true,
+			integration_types: [0, 1], // GuildInstall, UserInstall
+			contexts: [0, 1, 2], // Guild, BotDM, PrivateChannel
 			options: [
 				{
 					name: 'user',
