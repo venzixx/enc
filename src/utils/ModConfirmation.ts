@@ -143,6 +143,17 @@ export class ModConfirmation {
 
             if (confirmation.customId.startsWith('mod_confirm_')) {
                 await confirmation.deferUpdate().catch(() => {});
+
+                // Delete or clear confirmation prompt so only the final done embed remains
+                if (!ctx.isInteraction && msg) {
+                    if (msg.deletable) {
+                        await msg.delete().catch(() => {});
+                    }
+                    (ctx as any).response = null;
+                } else if (ctx.isInteraction && ctx.interaction) {
+                    await ctx.interaction.editReply({ components: [] }).catch(() => {});
+                }
+
                 return true;
             } else {
                 await confirmation.deferUpdate().catch(() => {});
