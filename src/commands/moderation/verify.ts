@@ -106,6 +106,21 @@ export default class Verify extends Command {
                 }
             }
 
+            // Record in database AuditLog
+            await client.prisma.auditLog.create({
+                data: {
+                    guildId: ctx.guild.id,
+                    type: "VERIFICATION",
+                    event: "MANUAL_VERIFY",
+                    status: "SUCCESS",
+                    executorId: ctx.author.id,
+                    executorTag: ctx.author.tag,
+                    targetId: member.id,
+                    targetName: member.user.tag,
+                    details: `Manually verified by ${ctx.author.tag} • Role: ${role.name}`
+                }
+            }).catch(() => {});
+
             return await ctx.replyV2({
                 description: `${client.emoji.success || '✅'} Successfully verified <@${member.id}> and assigned <@&${role.id}>!`,
                 borderless: true

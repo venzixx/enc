@@ -77,6 +77,19 @@ export default class VerifyButton extends Component {
 					}
 				}
 
+				// Record in database AuditLog
+				await this.client.prisma.auditLog.create({
+					data: {
+						guildId: interaction.guildId,
+						type: "VERIFICATION",
+						event: "NORMAL_VERIFY",
+						status: "SUCCESS",
+						targetId: member.id,
+						targetName: member.user.tag,
+						details: `Passed 1-Click Verification Gate • Role: ${role.name}`
+					}
+				}).catch(() => {});
+
 				return await interaction.reply({
 					content: `${this.client.emoji.success} You have been verified successfully! Welcome to **${interaction.guild.name}**.`,
 					ephemeral: true

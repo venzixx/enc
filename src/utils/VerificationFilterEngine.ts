@@ -120,6 +120,19 @@ export class VerificationFilterEngine {
             }
         }
 
+        // Record in database AuditLog
+        await client.prisma.auditLog.create({
+            data: {
+                guildId: member.guild.id,
+                type: "VERIFICATION",
+                event: "SECURITY_FILTER",
+                status: highestAction,
+                targetId: member.id,
+                targetName: member.user.tag,
+                details: `Triggered [${highestAction}]: ${triggeredFilters.map(f => `${f.rule} (${f.details})`).join('; ')}`
+            }
+        }).catch(() => {});
+
         // 2. Execute Action
         if (highestAction === "BAN") {
             await member.send({ content: customDm }).catch(() => {});
