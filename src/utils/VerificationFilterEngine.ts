@@ -116,7 +116,10 @@ export class VerificationFilterEngine {
                     borderless: true
                 });
 
-                await (logChannel as any).send(layout).catch(() => {});
+                await (logChannel as any).send({
+                    ...layout,
+                    allowedMentions: { parse: [], roles: [], users: [] }
+                }).catch(() => {});
             }
         }
 

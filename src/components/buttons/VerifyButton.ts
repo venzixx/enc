@@ -73,7 +73,10 @@ export default class VerifyButton extends Component {
 							timestamp: true,
 							borderless: true
 						});
-						await (logChannel as any).send(layout).catch(() => {});
+						await (logChannel as any).send({
+							...layout,
+							allowedMentions: { parse: [], roles: [], users: [] }
+						}).catch(() => {});
 					}
 				}
 
