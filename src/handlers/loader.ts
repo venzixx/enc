@@ -132,13 +132,23 @@ export async function loadCommands(client: ExtendedClient) {
             }
 
             // Register ALL commands to guilds the bot is in (guild limit is 100 per guild)
-            // If we have > 100 slash commands, we need to trim to fit the guild limit
-            const guildSlashCommands = slashCommands.length > 100 
-                ? slashCommands.slice(0, 100) 
-                : slashCommands;
+            // Sort commands: user-installable commands first, then by name
+            // This ensures important cross-server commands survive the 100-command trim
+            const sortedSlashCommands = [...slashCommands].sort((a: any, b: any) => {
+                const aUserInstall = a.integration_types?.includes(1) ? 0 : 1;
+                const bUserInstall = b.integration_types?.includes(1) ? 0 : 1;
+                if (aUserInstall !== bUserInstall) return aUserInstall - bUserInstall;
+                return (a.name || '').localeCompare(b.name || '');
+            });
 
-            if (guildSlashCommands.length < slashCommands.length) {
-                logger.warn(`Trimmed guild commands from ${slashCommands.length} to ${guildSlashCommands.length} (Discord 100 limit). Consider removing some slash commands.`);
+            // If we have > 100 slash commands, trim to fit the guild limit
+            const guildSlashCommands = sortedSlashCommands.length > 100 
+                ? sortedSlashCommands.slice(0, 100) 
+                : sortedSlashCommands;
+
+            if (guildSlashCommands.length < sortedSlashCommands.length) {
+                const trimmedNames = sortedSlashCommands.slice(100).map((c: any) => c.name);
+                logger.warn(`Trimmed guild commands from ${sortedSlashCommands.length} to ${guildSlashCommands.length} (Discord 100 limit). Dropped: ${trimmedNames.join(', ')}`);
             }
 
             // Register to all guilds the bot is in
