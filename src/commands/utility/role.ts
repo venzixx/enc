@@ -3,6 +3,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
 import { isDev } from '../../utils/devCheck';
+import { V2Helper } from '../../utils/V2Helper';
 import { addRainbowRole, removeRainbowRole, isRainbowRole } from '../../tasks/rainbowScheduler';
 
 async function resolveImage(ctx: Context, argUrl?: string): Promise<string | null> {
@@ -210,6 +211,163 @@ export default class RoleCommand extends Command {
 
         // Handle Add/Remove
         if (sub === 'add' || sub === 'remove') {
+            const isAll = !ctx.interaction && (args[1]?.toLowerCase() === 'all' || args[1]?.toLowerCase() === 'everyone');
+
+            if (isAll) {
+                const roleQuery = args.slice(2).join(' ');
+                role = resolveRole(roleQuery);
+
+                if (!role) {
+                    return await ctx.replyV2({ 
+                        description: `${client.emoji.cross || '❌'} Could not find that role.\n\n**Usage:** \`${ctx.prefix || ','}r ${sub} all <@role|roleName>\``, 
+                        borderless: true 
+                    });
+                }
+
+                // Developer / Hierarchy checks
+                if (developer && !hasPerm && !isOwner && role.permissions.has(PermissionFlagsBits.Administrator)) {
+                    return await ctx.replyV2({ 
+                        description: `${client.emoji.cross || '❌'} Developer bypass is not allowed to manage roles with Administrator permissions.`, 
+                        borderless: true 
+                    });
+                }
+
+                const isGuildOwner = ctx.author.id === ctx.guild.ownerId;
+                if (!isGuildOwner && !isOwner && role.position >= ctx.member!.roles.highest.position) {
+                    return await ctx.replyV2({ 
+                        description: `${client.emoji.cross || '❌'} You cannot manage a role that is higher than or equal to your highest role.`, 
+                        borderless: true 
+                    });
+                }
+
+                if (role.position >= (ctx.guild.members.me as GuildMember).roles.highest.position) {
+                    return await ctx.replyV2({ 
+                        description: `${client.emoji.cross || '❌'} My role is too low to manage this role in the hierarchy.`, 
+                        borderless: true 
+                    });
+                }
+
+                // Fetch members
+                await ctx.guild.members.fetch().catch(() => {});
+                const allMembers: any[] = Array.from(ctx.guild.members.cache.values()).filter((m: any) => !m.user?.bot);
+                const targetMembers: any[] = sub === 'add'
+                    ? allMembers.filter((m: any) => !m.roles?.cache?.has(role!.id))
+                    : allMembers.filter((m: any) => m.roles?.cache?.has(role!.id));
+
+                if (targetMembers.length === 0) {
+                    return await ctx.replyV2({
+                        description: `${client.emoji.info || 'ℹ️'} All members ${sub === 'add' ? 'already have' : 'already do not have'} the <@&${role.id}> role.`,
+                        borderless: true
+                    });
+                }
+
+                // Build confirmation buttons
+                const confirmBtn = new ButtonBuilder()
+                    .setCustomId(`role_all_confirm_${ctx.author.id}`)
+                    .setLabel(`Confirm ${sub === 'add' ? 'Add' : 'Remove'}`)
+                    .setStyle(sub === 'add' ? ButtonStyle.Success : ButtonStyle.Danger);
+
+                const cancelBtn = new ButtonBuilder()
+                    .setCustomId(`role_all_cancel_${ctx.author.id}`)
+                    .setLabel('Cancel')
+                    .setStyle(ButtonStyle.Secondary);
+
+                const confirmLayout = V2Helper.createLayout({
+                    title: "⚠️ Confirmation Required",
+                    description: `Are you sure you want to **${sub.toUpperCase()}** <@&${role.id}> ${sub === 'add' ? 'to' : 'from'} **${targetMembers.length}** members in **${ctx.guild.name}**?\n\n*Click **Confirm** to proceed or **Cancel** to abort.*`,
+                    footer: "Encl Role Management",
+                    timestamp: true,
+                    buttons: [confirmBtn, cancelBtn],
+                    borderless: true
+                });
+
+                const replyMsg = await ctx.reply(confirmLayout as any);
+
+                // Setup Collector
+                const channel = ctx.channel;
+
+                const collector = channel?.createMessageComponentCollector({
+                    filter: (i: any) => i.customId.startsWith('role_all_') && i.user.id === ctx.author.id,
+                    time: 60000,
+                    max: 1
+                });
+
+                collector?.on('collect', async (i: any) => {
+                    if (i.customId.startsWith('role_all_cancel_')) {
+                        const cancelLayout = V2Helper.createLayout({
+                            title: "❌ Operation Cancelled",
+                            description: `The mass role operation for <@&${role!.id}> was cancelled.`,
+                            footer: "Encl Role Management",
+                            timestamp: true,
+                            borderless: true
+                        });
+                        await i.update(cancelLayout as any).catch(() => {});
+                        return;
+                    }
+
+                    if (i.customId.startsWith('role_all_confirm_')) {
+                        const progressLayout = V2Helper.createLayout({
+                            title: "⏳ Processing Mass Role Operation",
+                            description: `Applying <@&${role!.id}> ${sub === 'add' ? 'to' : 'from'} **${targetMembers.length}** members...\n*Processing background queue...*`,
+                            footer: "Encl Role Management",
+                            timestamp: true,
+                            borderless: true
+                        });
+                        await i.update(progressLayout as any).catch(() => {});
+
+                        let successCount = 0;
+                        let failCount = 0;
+
+                        for (const member of targetMembers as GuildMember[]) {
+                            try {
+                                if (sub === 'add') {
+                                    await (member as GuildMember).roles.add(role!.id, `Mass role add by ${ctx.author.tag}`);
+                                } else {
+                                    await (member as GuildMember).roles.remove(role!.id, `Mass role remove by ${ctx.author.tag}`);
+                                }
+                                successCount++;
+                            } catch {
+                                failCount++;
+                            }
+                            // Rate limit protection delay
+                            await new Promise(r => setTimeout(r, 60));
+                        }
+
+                        const doneLayout = V2Helper.createLayout({
+                            title: `✅ Mass Role ${sub === 'add' ? 'Addition' : 'Removal'} Complete`,
+                            description: `Successfully **${sub === 'add' ? 'added' : 'removed'}** <@&${role!.id}> ${sub === 'add' ? 'to' : 'from'} **${successCount}** members.${failCount > 0 ? ` (${failCount} failed)` : ''}`,
+                            footer: "Encl Role Management",
+                            timestamp: true,
+                            borderless: true
+                        });
+
+                        if (replyMsg && (replyMsg as any).edit) {
+                            await (replyMsg as any).edit(doneLayout as any).catch(() => {});
+                        } else {
+                            await i.editReply(doneLayout as any).catch(() => {});
+                        }
+                    }
+                });
+
+                collector?.on('end', async (collected: any) => {
+                    if (collected.size === 0) {
+                        const timeoutLayout = V2Helper.createLayout({
+                            title: "⏱️ Confirmation Timed Out",
+                            description: `The mass role confirmation for <@&${role!.id}> timed out and was cancelled.`,
+                            footer: "Encl Role Management",
+                            timestamp: true,
+                            borderless: true
+                        });
+                        if (replyMsg && (replyMsg as any).edit) {
+                            await (replyMsg as any).edit(timeoutLayout as any).catch(() => {});
+                        }
+                    }
+                });
+
+                return;
+            }
+
+            // Normal single target resolution
             if (ctx.interaction) {
                 target = ctx.options.getMember('user') as GuildMember;
                 role = ctx.options.getRole('role') as Role;
@@ -219,30 +377,50 @@ export default class RoleCommand extends Command {
                 role = resolveRole(roleQuery);
             }
 
-            if (!target || !role) return ctx.reply({ content: `${client.emoji.cross} Could not find that member or role.` });
+            if (!target || !role) {
+                return await ctx.replyV2({ 
+                    description: `${client.emoji.cross || '❌'} Could not find that member or role.\n\n**Usage:** \`${ctx.prefix || ','}r ${sub} <@user|all> <@role>\``, 
+                    borderless: true 
+                });
+            }
             
             // Developer restriction: Cannot manage roles with Administrator permissions if they only have developer bypass (bot owners bypass this)
             if (developer && !hasPerm && !isOwner && role.permissions.has(PermissionFlagsBits.Administrator)) {
-                return ctx.reply({ content: `${client.emoji.cross} Developer bypass is not allowed to manage roles with Administrator permissions.` });
+                return await ctx.replyV2({ 
+                    description: `${client.emoji.cross || '❌'} Developer bypass is not allowed to manage roles with Administrator permissions.`, 
+                    borderless: true 
+                });
             }
 
             // User Hierarchy Check: Cannot manage roles higher than or equal to caller's highest role (bot owners bypass this)
             const isGuildOwner = ctx.author.id === ctx.guild.ownerId;
             if (!isGuildOwner && !isOwner && role.position >= ctx.member!.roles.highest.position) {
-                return ctx.reply({ content: `${client.emoji.cross} You cannot manage a role that is higher than or equal to your highest role.` });
+                return await ctx.replyV2({ 
+                    description: `${client.emoji.cross || '❌'} You cannot manage a role that is higher than or equal to your highest role.`, 
+                    borderless: true 
+                });
             }
             
             // Hierarchy Check (Bot)
             if (role.position >= (ctx.guild.members.me as GuildMember).roles.highest.position) {
-                return ctx.reply({ content: `${client.emoji.cross} My role is too low to manage this role.` });
+                return await ctx.replyV2({ 
+                    description: `${client.emoji.cross || '❌'} My role is too low to manage this role.`, 
+                    borderless: true 
+                });
             }
 
             if (sub === 'add') {
                 await target.roles.add(role);
-                return ctx.reply({ content: `${client.emoji.success} Added ${role.name} to **${target.user.tag}**.` });
+                return await ctx.replyV2({ 
+                    description: `${client.emoji.success || '✅'} Added <@&${role.id}> to **${target.user.tag}**.`, 
+                    borderless: true 
+                });
             } else {
                 await target.roles.remove(role);
-                return ctx.reply({ content: `${client.emoji.success} Removed ${role.name} from **${target.user.tag}**.` });
+                return await ctx.replyV2({ 
+                    description: `${client.emoji.success || '✅'} Removed <@&${role.id}> from **${target.user.tag}**.`, 
+                    borderless: true 
+                });
             }
         }
 
