@@ -3,6 +3,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
 import { isDev } from '../../utils/devCheck';
+import { V2Helper } from '../../utils/V2Helper';
 
 export default class Verify extends Command {
     constructor(client: ExtendedClient) {
@@ -94,12 +95,14 @@ export default class Verify extends Command {
             if (guildData.verificationLogChannelId) {
                 const logChannel = ctx.guild.channels.cache.get(guildData.verificationLogChannelId);
                 if (logChannel && logChannel.isTextBased()) {
-                    const logEmbed = new EmbedBuilder()
-                        .setColor(0x10b981)
-                        .setTitle("🛡️ Member Manually Verified")
-                        .setDescription(`**Member:** <@${member.id}> (${member.user.tag})\n**Verified By:** <@${ctx.author.id}> (${ctx.author.tag})\n**Role Given:** <@&${role.id}>`)
-                        .setTimestamp();
-                    await logChannel.send({ embeds: [logEmbed] }).catch(() => {});
+                    const layout = V2Helper.createLayout({
+                        title: "🛡️ Member Manually Verified",
+                        description: `**Member:** <@${member.id}> (${member.user.tag})\n**Status:** Manually Verified\n**Verified By:** <@${ctx.author.id}> (${ctx.author.tag})\n**Role Given:** <@&${role.id}>`,
+                        footer: "Encl Security Engine",
+                        timestamp: true,
+                        borderless: true
+                    });
+                    await (logChannel as any).send(layout).catch(() => {});
                 }
             }
 

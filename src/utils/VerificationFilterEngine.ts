@@ -1,5 +1,6 @@
 import { GuildMember, EmbedBuilder, TextChannel } from "discord.js";
 import { ExtendedClient } from "../client";
+import { V2Helper } from "./V2Helper";
 
 export interface FilterResult {
     passed: boolean;
@@ -18,128 +19,104 @@ export class VerificationFilterEngine {
     ): Promise<FilterResult> {
         // Bypass for Server Owner, Admins, or Bot Owners
         const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
-        if (
-            member.id === member.guild.ownerId ||
-            member.permissions.has('Administrator') ||
-            BOT_OWNERS.has(member.id)
-        ) {
+        if (member.id === member.guild.ownerId || member.permissions.has("Administrator") || BOT_OWNERS.has(member.id)) {
             return { passed: true, actionTaken: "NONE" };
         }
 
-        const triggeredFilters: { rule: string; action: string; details: string }[] = [];
+        const triggeredFilters: { rule: string; action: "BLOCK" | "KICK" | "BAN" | "INFORM"; details: string }[] = [];
 
         // 1. Account Age Filter
         const minAgeDays = guildData.verificationMinAgeDays || 0;
-        if (minAgeDays > 0) {
-            const ageDays = (Date.now() - member.user.createdTimestamp) / (1000 * 60 * 60 * 24);
-            if (ageDays < minAgeDays) {
-                const action = (guildData.verificationMinAgeAction || "BLOCK").toUpperCase();
-                triggeredFilters.push({
-                    rule: "Account Age Limit",
-                    action,
-                    details: `Account is **${ageDays.toFixed(1)} days old** (Server requires **${minAgeDays}+ days**).`
-                });
-            }
+        const minAgeAction = (guildData.verificationMinAgeAction || "BLOCK") as "BLOCK" | "KICK" | "BAN" | "INFORM";
+        const accountAgeMs = Date.now() - member.user.createdTimestamp;
+        const accountAgeDays = accountAgeMs / (1000 * 60 * 60 * 24);
+
+        if (minAgeDays > 0 && accountAgeDays < minAgeDays) {
+            triggeredFilters.push({
+                rule: "Account Age Requirement",
+                action: minAgeAction,
+                details: `Account is **${accountAgeDays.toFixed(1)} days old** (Required: **${minAgeDays}+ days**)`
+            });
         }
 
         // 2. Default Avatar / No PFP Filter
-        if (guildData.verificationNoPfpFilter) {
-            const hasCustomAvatar = Boolean(member.user.avatar);
-            if (!hasCustomAvatar) {
-                const action = (guildData.verificationNoPfpAction || "BLOCK").toUpperCase();
-                triggeredFilters.push({
-                    rule: "No Custom Avatar (Default PFP)",
-                    action,
-                    details: "Member is using a default Discord avatar without a custom profile picture."
-                });
-            }
+        const noPfpFilter = guildData.verificationNoPfpFilter || false;
+        const noPfpAction = (guildData.verificationNoPfpAction || "BLOCK") as "BLOCK" | "KICK" | "BAN" | "INFORM";
+        if (noPfpFilter && !member.user.avatar) {
+            triggeredFilters.push({
+                rule: "Default Avatar (No Custom PFP)",
+                action: noPfpAction,
+                details: "Account is using a default Discord avatar"
+            });
         }
 
-        // 3. Suspicious Account / Pattern Filter
-        if (guildData.verificationSuspiciousFilter) {
+        // 3. Suspicious Username / Bio Patterns
+        const suspiciousFilter = guildData.verificationSuspiciousFilter || false;
+        const suspiciousAction = (guildData.verificationSuspiciousAction || "INFORM") as "BLOCK" | "KICK" | "BAN" | "INFORM";
+        if (suspiciousFilter) {
+            const username = `${member.user.username} ${member.displayName}`.toLowerCase();
             let isSuspicious = false;
-            let suspiciousReason = "";
 
-            const ageHours = (Date.now() - member.user.createdTimestamp) / (1000 * 60 * 60);
-            const hasCustomAvatar = Boolean(member.user.avatar);
-
-            // Heuristic A: Brand new account (< 24 hours) with default avatar
-            if (ageHours < 24 && !hasCustomAvatar) {
-                isSuspicious = true;
-                suspiciousReason = "Brand new account (<24h) with default avatar.";
-            }
-
-            // Heuristic B: Username matches scam regex or custom keyword blacklist
-            const username = `${member.user.username} ${member.user.displayName || ''}`;
+            // Regex check
             if (this.DEFAULT_SUSPICIOUS_REGEX.test(username)) {
                 isSuspicious = true;
-                suspiciousReason = "Username matches known scam/phishing patterns.";
             }
 
-            // Check custom keywords if configured
-            if (guildData.verificationFilterKeywords) {
-                const keywords = guildData.verificationFilterKeywords
-                    .split(",")
-                    .map((k: string) => k.trim().toLowerCase())
-                    .filter((k: string) => k.length > 0);
-
-                for (const kw of keywords) {
-                    if (username.toLowerCase().includes(kw)) {
-                        isSuspicious = true;
-                        suspiciousReason = `Username matches flagged keyword: \`${kw}\``;
-                        break;
-                    }
+            // Keyword check
+            if (!isSuspicious && guildData.verificationFilterKeywords) {
+                const keywords = guildData.verificationFilterKeywords.split(',').map((k: string) => k.trim().toLowerCase()).filter((k: string) => k.length > 0);
+                if (keywords.some((k: string) => username.includes(k))) {
+                    isSuspicious = true;
                 }
             }
 
+            // New account without avatar heuristic
+            if (accountAgeDays < 1 && !member.user.avatar) {
+                isSuspicious = true;
+            }
+
             if (isSuspicious) {
-                const action = (guildData.verificationSuspiciousAction || "INFORM").toUpperCase();
                 triggeredFilters.push({
-                    rule: "Suspicious Account Filter",
-                    action,
-                    details: suspiciousReason
+                    rule: "Suspicious Account Flag",
+                    action: suspiciousAction,
+                    details: "Account triggered suspicious profile or username heuristics"
                 });
             }
         }
 
-        // If no filters triggered, member passes
+        // If no filters triggered, member passes gatekeeper
         if (triggeredFilters.length === 0) {
             return { passed: true, actionTaken: "NONE" };
         }
 
-        // Determine highest severity action: BAN > KICK > BLOCK > INFORM
-        const severityOrder = ["INFORM", "BLOCK", "KICK", "BAN"];
-        triggeredFilters.sort((a, b) => severityOrder.indexOf(b.action) - severityOrder.indexOf(a.action));
-        const highestAction = (triggeredFilters[0].action as "BLOCK" | "KICK" | "BAN" | "INFORM") || "BLOCK";
-        const primaryReason = triggeredFilters.map(f => `• **${f.rule}**: ${f.details}`).join("\n");
+        // Determine highest severity action
+        const actionSeverity: Record<string, number> = { "INFORM": 1, "BLOCK": 2, "KICK": 3, "BAN": 4 };
+        triggeredFilters.sort((a, b) => (actionSeverity[b.action] || 0) - (actionSeverity[a.action] || 0));
 
-        // Format custom DM notification if available
-        let customDm = guildData.verificationKickReasonDm || 
-            `You have been rejected from **{server}** during verification.\n**Reason:** {reason}`;
-        
+        const highestAction = triggeredFilters[0].action;
+        const primaryReason = triggeredFilters.map(f => `• **${f.rule}**: ${f.details}`).join('\n');
+
+        // Custom DM template parsing
+        let customDm = guildData.verificationFilterCustomDm || "Your verification in **{server}** was rejected because: {reason}";
         customDm = customDm
             .replace(/{user}/g, member.user.username)
             .replace(/{server}/g, member.guild.name)
             .replace(/{reason}/g, triggeredFilters[0].details.replace(/\*\*/g, ''))
             .replace(/{min_age}/g, `${minAgeDays} days`);
 
-        // 1. Dispatch Security Log Embed to Log Channel
+        // 1. Dispatch Security Log Embed to Log Channel (Borderless V2)
         if (guildData.verificationLogChannelId) {
             const logChannel = member.guild.channels.cache.get(guildData.verificationLogChannelId) as TextChannel;
             if (logChannel && logChannel.isTextBased()) {
-                const logEmbed = new EmbedBuilder()
-                    .setTitle("🛡️ Security Filter Triggered")
-                    .setColor(highestAction === "BAN" || highestAction === "KICK" ? 0xef4444 : highestAction === "BLOCK" ? 0xf59e0b : 0x3b82f6)
-                    .setDescription(
-                        `**Member:** <@${member.id}> (${member.user.tag})\n` +
-                        `**Account Created:** <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>\n` +
-                        `**Action Enforced:** \`${highestAction}\`\n\n` +
-                        `**Triggered Filter Rules:**\n${primaryReason}`
-                    )
-                    .setFooter({ text: "Encl Gatekeeper & Verification Engine" })
-                    .setTimestamp();
+                const layout = V2Helper.createLayout({
+                    title: "🛡️ Security Filter Triggered",
+                    description: `**Member:** <@${member.id}> (${member.user.tag})\n**Account Created:** <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>\n**Action Enforced:** \`${highestAction}\`\n\n**Triggered Filter Rules:**\n${primaryReason}`,
+                    footer: "Encl Gatekeeper & Verification Engine",
+                    timestamp: true,
+                    borderless: true
+                });
 
-                await logChannel.send({ embeds: [logEmbed] }).catch(() => {});
+                await (logChannel as any).send(layout).catch(() => {});
             }
         }
 

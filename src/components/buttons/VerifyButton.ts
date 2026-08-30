@@ -3,6 +3,7 @@ import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
 import { CaptchaManager } from "../../utils/CaptchaManager";
 import { VerificationFilterEngine } from "../../utils/VerificationFilterEngine";
+import { V2Helper } from "../../utils/V2Helper";
 import crypto from "crypto";
 
 export default class VerifyButton extends Component {
@@ -65,12 +66,14 @@ export default class VerifyButton extends Component {
 				if (guildData.verificationLogChannelId) {
 					const logChannel = interaction.guild.channels.cache.get(guildData.verificationLogChannelId);
 					if (logChannel && logChannel.isTextBased()) {
-						const logEmbed = new EmbedBuilder()
-							.setColor(0x10b981)
-							.setTitle("🛡️ Member Verified")
-							.setDescription(`**Member:** <@${member.id}> (${member.user.tag})\n**Method:** Normal (1-Click Gate)\n**Role Given:** <@&${role.id}>`)
-							.setTimestamp();
-						await logChannel.send({ embeds: [logEmbed] }).catch(() => {});
+						const layout = V2Helper.createLayout({
+							title: "🛡️ Member Verified",
+							description: `**Member:** <@${member.id}> (${member.user.tag})\n**Status:** Verified\n**Method:** Normal (1-Click Gate)\n**Role Given:** <@&${role.id}>`,
+							footer: "Encl Security Engine",
+							timestamp: true,
+							borderless: true
+						});
+						await (logChannel as any).send(layout).catch(() => {});
 					}
 				}
 
