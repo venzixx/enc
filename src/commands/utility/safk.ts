@@ -29,7 +29,7 @@ export default class Safk extends Command {
 
 	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
 		if (!ctx.guild) {
-			return await ctx.sendMessage({ content: 'This command can only be used in a server.' });
+			return await ctx.replyV2({ description: 'This command can only be used in a server.', borderless: true });
 		}
 
 		const reason = ctx.options?.getString?.('reason') || args.join(' ') || 'AFK';
@@ -37,12 +37,9 @@ export default class Safk extends Command {
 		// Check if already Server AFK in this guild
 		const existing = AfkManager.getServerAfk(ctx.guild.id, ctx.author.id);
 		if (existing) {
-			return await ctx.sendMessage({
-				embeds: [
-					client.embed()
-						.setColor(client.color.main)
-						.setDescription(` You are already Server AFK in this server: **${existing.reason.split('|')[0]}**\n\nSend any message in this server to remove your Server AFK status.`)
-				]
+			return await ctx.replyV2({
+				description: `You are already Server AFK in this server: **${existing.reason.split('|')[0]}**\n\nSend any message in this server to remove your Server AFK status.`,
+				borderless: true
 			});
 		}
 
@@ -51,13 +48,8 @@ export default class Safk extends Command {
 		const isDirectMedia = isUrl && (reason.includes('giphy.com') || reason.includes('tenor.com') || reason.match(/\.(gif|jpe?g|png|webp)$/i));
 		
 		const displayReasonText = isDirectMedia ? '[Media]' : (isUrl ? reason : `**${reason}**`);
-		const embed = new EmbedBuilder()
-			.setColor(client.color.main)
-			.setDescription(` **${name}** is now AFK in this server: ${displayReasonText}`)
-			.setFooter({ text: 'Send any message in this server to remove your Server AFK status' })
-			.setTimestamp();
-
 		let finalReason = reason;
+		let directMediaUrl: string | undefined = undefined;
 
 		if (isDirectMedia) {
 			try {
@@ -68,17 +60,17 @@ export default class Safk extends Command {
 					if (data && data.thumbnail_url) {
 						let directUrl = data.thumbnail_url.replace(/\.png$/, '.gif').replace(/AAAAN/, 'AAAAC');
 						finalReason = `${reason}|${directUrl}`;
-						embed.setImage(directUrl);
+						directMediaUrl = directUrl;
 					}
 				} else if (reason.includes('giphy.com/gifs/')) {
 					const id = reason.split('-').pop();
 					if (id) {
 						const directUrl = `https://media.giphy.com/media/${id}/giphy.gif`;
 						finalReason = `${reason}|${directUrl}`;
-						embed.setImage(directUrl);
+						directMediaUrl = directUrl;
 					}
 				} else {
-					embed.setImage(reason);
+					directMediaUrl = reason;
 				}
 			} catch (e) {
 				console.error('[SAFK] Failed to resolve direct media:', e);
@@ -87,6 +79,11 @@ export default class Safk extends Command {
 
 		await AfkManager.setServerAfk(client, ctx.author.id, ctx.guild.id, ctx.member, finalReason);
 
-		return await ctx.sendMessage({ embeds: [embed] });
+		return await ctx.replyV2({
+			description: `**${name}** is now AFK in this server: ${displayReasonText}`,
+			footer: 'Send any message in this server to remove your Server AFK status',
+			image: directMediaUrl,
+			borderless: true
+		});
 	}
 }

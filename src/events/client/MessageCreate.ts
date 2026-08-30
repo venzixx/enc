@@ -24,6 +24,7 @@ import { getAIResponse } from "../../handlers/aiHandler";
 import { StreakManager } from "../../utils/StreakManager";
 import { isDev } from "../../utils/devCheck";
 import { AfkManager } from "../../utils/AfkManager";
+import { V2Helper } from "../../utils/V2Helper";
 
 export default class MessageCreate extends Event {
 	constructor(client: ExtendedClient, file: string) {
@@ -223,12 +224,12 @@ export default class MessageCreate extends Event {
 				const durationText = formatAfkDuration(timeSinceAfk);
 				const afkTime = Math.floor(authorGlobalAfk.timestamp.getTime() / 1000);
 
-				const embed = new EmbedBuilder()
-					.setColor(this.client.color.main)
-					.setDescription(`👋 Welcome back **${message.author.displayName || message.author.username}**!\nYou were AFK for **${durationText}** (<t:${afkTime}:R>). Your global AFK status has been removed.${mentionSummary}`)
-					.setTimestamp();
+				const layout = V2Helper.createLayout({
+					description: `👋 Welcome back **${message.author.displayName || message.author.username}**!\nYou were AFK for **${durationText}** (<t:${afkTime}:R>). Your global AFK status has been removed.${mentionSummary}`,
+					borderless: true
+				});
 
-				await message.reply({ embeds: [embed] }).catch(() => { });
+				await message.reply(layout as any).catch(() => { });
 			}
 		} else if (authorServerAfk && message.guildId) {
 			const timeSinceAfk = Date.now() - authorServerAfk.timestamp;
@@ -250,12 +251,12 @@ export default class MessageCreate extends Event {
 				const durationText = formatAfkDuration(timeSinceAfk);
 				const afkTime = Math.floor(authorServerAfk.timestamp / 1000);
 
-				const embed = new EmbedBuilder()
-					.setColor(this.client.color.main)
-					.setDescription(`👋 Welcome back **${message.author.displayName || message.author.username}**!\nYou were Server AFK for **${durationText}** (<t:${afkTime}:R>). Your Server AFK status in this server has been removed.${mentionSummary}`)
-					.setTimestamp();
+				const layout = V2Helper.createLayout({
+					description: `👋 Welcome back **${message.author.displayName || message.author.username}**!\nYou were Server AFK for **${durationText}** (<t:${afkTime}:R>). Your Server AFK status in this server has been removed.${mentionSummary}`,
+					borderless: true
+				});
 
-				await message.reply({ embeds: [embed] }).catch(() => { });
+				await message.reply(layout as any).catch(() => { });
 			}
 		}
 
@@ -304,20 +305,13 @@ export default class MessageCreate extends Event {
 					const isMediaReason = fullReason.includes('|') || (isUrl && (displayReason.includes('giphy.com') || displayReason.includes('tenor.com') || displayReason.match(/\.(gif|jpe?g|png|webp)$/i)));
 					const afkLabel = (activeAfk as any).isServerAfk ? 'Server AFK' : 'AFK';
 
-					if (isMediaReason) {
-						const afkEmbed = new EmbedBuilder()
-							.setColor(this.client.color.main)
-							.setDescription(` **${displayName}** is ${afkLabel}: [Media] <t:${afkTimestamp}:R>`)
-							.setImage(directUrl);
+					const layout = V2Helper.createLayout({
+						description: `**${displayName}** is ${afkLabel}: ${isMediaReason ? '[Media]' : (isUrl ? displayReason : `**${displayReason}**`)} <t:${afkTimestamp}:R>`,
+						image: isMediaReason ? directUrl : undefined,
+						borderless: true
+					});
 
-						await message.reply({ embeds: [afkEmbed], allowedMentions: { repliedUser: false } }).catch(() => { });
-					} else {
-						const finalReason = isUrl ? displayReason : `**${displayReason}**`;
-						await message.reply({
-							content: ` **${displayName}** is ${afkLabel}: ${finalReason}  <t:${afkTimestamp}:R>`,
-							allowedMentions: { repliedUser: false }
-						}).catch(() => { });
-					}
+					await message.reply({ ...layout, allowedMentions: { repliedUser: false } } as any).catch(() => { });
 				}
 			}
 		}

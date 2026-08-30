@@ -36,12 +36,9 @@ export default class Afk extends Command {
 		const existing = await AfkManager.getGlobalAfk(client, ctx.author.id);
 
 		if (existing) {
-			return await ctx.sendMessage({
-				embeds: [
-					client.embed()
-						.setColor(client.color.main)
-						.setDescription(` You are already AFK: **${existing.reason.split('|')[0]}**\n\nSend any message in any server to remove your AFK status.`)
-				]
+			return await ctx.replyV2({
+				description: `You are already AFK: **${existing.reason.split('|')[0]}**\n\nSend any message in any server to remove your AFK status.`,
+				borderless: true
 			});
 		}
 
@@ -50,13 +47,8 @@ export default class Afk extends Command {
 		const isDirectMedia = isUrl && (reason.includes('giphy.com') || reason.includes('tenor.com') || reason.match(/\.(gif|jpe?g|png|webp)$/i));
 		
 		const displayReasonText = isDirectMedia ? '[Media]' : (isUrl ? reason : `**${reason}**`);
-		const embed = new EmbedBuilder()
-			.setColor(client.color.main)
-			.setDescription(` **${name}** is now AFK: ${displayReasonText}`)
-			.setFooter({ text: 'Send any message in any server to remove your AFK status' })
-			.setTimestamp();
-
 		let finalReason = reason;
+		let directMediaUrl: string | undefined = undefined;
 
 		if (isDirectMedia) {
 			try {
@@ -67,17 +59,17 @@ export default class Afk extends Command {
 					if (data && data.thumbnail_url) {
 						let directUrl = data.thumbnail_url.replace(/\.png$/, '.gif').replace(/AAAAN/, 'AAAAC'); 
 						finalReason = `${reason}|${directUrl}`;
-						embed.setImage(directUrl);
+						directMediaUrl = directUrl;
 					}
 				} else if (reason.includes('giphy.com/gifs/')) {
 					const id = reason.split('-').pop();
 					if (id) {
 						const directUrl = `https://media.giphy.com/media/${id}/giphy.gif`;
 						finalReason = `${reason}|${directUrl}`;
-						embed.setImage(directUrl);
+						directMediaUrl = directUrl;
 					}
 				} else {
-					embed.setImage(reason);
+					directMediaUrl = reason;
 				}
 			} catch (e) {
 				console.error('[AFK] Failed to resolve direct media:', e);
@@ -86,6 +78,11 @@ export default class Afk extends Command {
 
 		await AfkManager.setGlobalAfk(client, ctx.author.id, ctx.member, finalReason);
 
-		return await ctx.sendMessage({ embeds: [embed] });
+		return await ctx.replyV2({
+			description: `**${name}** is now AFK: ${displayReasonText}`,
+			footer: 'Send any message in any server to remove your AFK status',
+			image: directMediaUrl,
+			borderless: true
+		});
 	}
 }
