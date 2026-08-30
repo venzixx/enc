@@ -111,65 +111,12 @@ export async function loadCommands(client: ExtendedClient) {
         try {
             logger.info(`Started refreshing ${slashCommands.length} application (/) commands.`);
             
-            // Split commands: user-installable commands go global, all commands go to primary guild
-            const globalCommands = slashCommands.filter((cmd: any) => 
-                cmd.integration_types && cmd.integration_types.includes(1) // UserInstall
+            // All commands (currently 99, well within the 100 Discord limit) are registered globally
+            await client.rest.put(
+                Routes.applicationCommands(env.CLIENT_ID),
+                { body: slashCommands }
             );
-
-            // Register user-installable commands globally (for cross-server & DM use)
-            if (globalCommands.length > 0 && globalCommands.length <= 100) {
-                await client.rest.put(
-                    Routes.applicationCommands(env.CLIENT_ID),
-                    { body: globalCommands }
-                );
-                logger.success(`Successfully registered ${globalCommands.length} global user-installable (/) commands.`);
-            } else {
-                // Clear stale global commands
-                await client.rest.put(
-                    Routes.applicationCommands(env.CLIENT_ID),
-                    { body: [] }
-                ).catch(() => {});
-            }
-
-            // Register ALL commands to guilds the bot is in (guild limit is 100 per guild)
-            // Sort commands: user-installable commands first, then by name
-            // This ensures important cross-server commands survive the 100-command trim
-            const sortedSlashCommands = [...slashCommands].sort((a: any, b: any) => {
-                const aUserInstall = a.integration_types?.includes(1) ? 0 : 1;
-                const bUserInstall = b.integration_types?.includes(1) ? 0 : 1;
-                if (aUserInstall !== bUserInstall) return aUserInstall - bUserInstall;
-                return (a.name || '').localeCompare(b.name || '');
-            });
-
-            // If we have > 100 slash commands, trim to fit the guild limit
-            const guildSlashCommands = sortedSlashCommands.length > 100 
-                ? sortedSlashCommands.slice(0, 100) 
-                : sortedSlashCommands;
-
-            if (guildSlashCommands.length < sortedSlashCommands.length) {
-                const trimmedNames = sortedSlashCommands.slice(100).map((c: any) => c.name);
-                logger.warn(`Trimmed guild commands from ${sortedSlashCommands.length} to ${guildSlashCommands.length} (Discord 100 limit). Dropped: ${trimmedNames.join(', ')}`);
-            }
-
-            // Register to all guilds the bot is in
-            const guilds = client.guilds.cache;
-            if (guilds.size > 0) {
-                const guildIds = guilds.map(g => g.id);
-                let registeredCount = 0;
-                const batchSize = 5;
-                for (let i = 0; i < guildIds.length; i += batchSize) {
-                    const batch = guildIds.slice(i, i + batchSize);
-                    await Promise.allSettled(
-                        batch.map(gid =>
-                            client.rest.put(
-                                Routes.applicationGuildCommands(env.CLIENT_ID, gid),
-                                { body: guildSlashCommands }
-                            ).then(() => { registeredCount++; })
-                        )
-                    );
-                }
-                logger.success(`Successfully registered ${guildSlashCommands.length} guild (/) commands to ${registeredCount}/${guildIds.length} guilds.`);
-            }
+            logger.success(`Successfully registered ${slashCommands.length} global application (/) commands.`);
 
         } catch (error) {
             logger.error('Error refreshing application (/) commands:', error);
