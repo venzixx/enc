@@ -4,7 +4,8 @@ import {
     EmbedBuilder, 
     ActionRowBuilder, 
     ButtonBuilder, 
-    ButtonStyle 
+    ButtonStyle,
+    Routes
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
@@ -28,23 +29,58 @@ export default class ServerIcon extends Command {
     }
 
     public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
-        const rawGuild = (ctx.interaction as any)?.guild || (ctx.interaction as any)?.data?.guild || ctx.guild;
-        const guildId = ctx.guild?.id || ctx.interaction?.guildId || rawGuild?.id;
-        const guildName = ctx.guild?.name || rawGuild?.name || 'Server';
-        const iconHash = ctx.guild?.icon || rawGuild?.icon;
+        const guildId = ctx.guild?.id || ctx.interaction?.guildId;
 
         if (!guildId) {
             return await ctx.replyV2({ 
                 description: 'Please run this command inside a Discord server.', 
-                isAlert: true 
+                isAlert: true,
+                ephemeral: true
             });
         }
 
+        let guildName = ctx.guild?.name;
+        let iconHash = ctx.guild?.icon;
+
+        // 1. Check client cache or fetch if bot is in the server
+        let targetGuild = ctx.guild || client.guilds.cache.get(guildId);
+        if (!targetGuild) {
+            targetGuild = await client.guilds.fetch(guildId).catch(() => null);
+        }
+
+        if (targetGuild) {
+            guildName = targetGuild.name;
+            iconHash = targetGuild.icon;
+        } else {
+            // 2. Bot is not in the guild (User-Installed execution) -> Fetch via Guild Preview (Community servers)
+            const preview = await client.rest.get(Routes.guildPreview(guildId)).catch(() => null) as any;
+            if (preview) {
+                guildName = preview.name;
+                iconHash = preview.icon;
+            } else {
+                // 3. Fallback: Check if widget is enabled
+                const widget = await fetch(`https://discord.com/api/v10/guilds/${guildId}/widget.json`)
+                    .then(r => r.ok ? r.json() : null)
+                    .catch(() => null);
+                if (widget && widget.name) {
+                    guildName = widget.name;
+                }
+            }
+        }
+
         if (!iconHash) {
-            return await ctx.replyV2({ 
-                description: `**${guildName}** does not have a server icon set.`, 
-                isAlert: true 
-            });
+            if (targetGuild) {
+                return await ctx.replyV2({ 
+                    description: `**${guildName || 'This server'}** does not have a server icon set.`, 
+                    isAlert: true 
+                });
+            } else {
+                return await ctx.replyV2({ 
+                    description: `Unable to access this server's icon. Because the bot is not joined in this server and Community Preview is disabled, Discord restricts external access. Invite **${client.user?.username || 'the bot'}** to this server to unlock full server information!`, 
+                    isAlert: true,
+                    ephemeral: true
+                });
+            }
         }
 
         const isAnimated = typeof iconHash === 'string' && iconHash.startsWith('a_');
@@ -59,7 +95,7 @@ export default class ServerIcon extends Command {
         if (gifUrl) formatLinks += ` • [GIF](${gifUrl})`;
 
         const embed = new EmbedBuilder()
-            .setTitle(`${guildName}'s Icon`)
+            .setTitle(`${guildName || 'Server'}'s Icon`)
             .setDescription(formatLinks)
             .setImage(iconUrl)
             .setColor(client.color.main)
