@@ -1,4 +1,3 @@
-import { EmbedBuilder } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
@@ -67,7 +66,7 @@ export default class Verify extends Command {
         const role = ctx.guild.roles.cache.get(guildData.verificationRoleId);
         if (!role) {
             return await ctx.replyV2({ 
-                description: `${client.emoji.cross || '❌'} The configured verification role (<@&${guildData.verificationRoleId}>) was not found in this server.`, 
+                description: `${client.emoji.cross || '❌'} The configured verification role (\`${guildData.verificationRoleId}\`) was not found in this server.`, 
                 borderless: true
             });
         }
@@ -97,7 +96,7 @@ export default class Verify extends Command {
                 if (logChannel && logChannel.isTextBased()) {
                     const layout = V2Helper.createLayout({
                         title: "🛡️ Member Manually Verified",
-                        description: `**Member:** <@${member.id}> (${member.user.tag})\n**Status:** Manually Verified\n**Verified By:** <@${ctx.author.id}> (${ctx.author.tag})\n**Role Given:** <@&${role.id}>`,
+                        description: `**Member:** **${member.user.tag}** (\`${member.id}\`)\n**Status:** Manually Verified\n**Verified By:** **${ctx.author.tag}** (\`${ctx.author.id}\`)\n**Role Given:** \`@${role.name}\` (\`${role.id}\`)`,
                         footer: "Encl Security Engine",
                         timestamp: true,
                         borderless: true
@@ -124,10 +123,15 @@ export default class Verify extends Command {
                 }
             }).catch(() => {});
 
-            return await ctx.replyV2({
-                description: `${client.emoji.success || '✅'} Successfully verified <@${member.id}> and assigned <@&${role.id}>!`,
+            const replyLayout = V2Helper.createLayout({
+                description: `${client.emoji.success || '✅'} Successfully verified **${member.user.tag}** (\`${member.id}\`) and assigned \`@${role.name}\`!`,
                 borderless: true
             });
+
+            return await ctx.reply({
+                ...replyLayout,
+                allowedMentions: { parse: [], roles: [], users: [] }
+            } as any);
         } catch (err: any) {
             return await ctx.replyV2({
                 description: `${client.emoji.cross || '❌'} Failed to assign verification role: ${err.message}`,
