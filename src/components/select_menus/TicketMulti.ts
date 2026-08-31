@@ -143,10 +143,20 @@ export default class TicketMulti extends Component {
             console.error("Failed to parse welcomeFields", e);
         }
 
+        const rawDesc = (targetConfig.welcomeDescription || targetConfig.welcomeMessage || 'Hello {userMention}, welcome to your support ticket. Our staff will be with you shortly.')
+            .replace(/{userMention}/g, interaction.user.toString())
+            .replace(/{user_mention}/g, interaction.user.toString())
+            .replace(/{user\.mention}/g, interaction.user.toString())
+            .replace(/{user}/g, interaction.user.toString())
+            .replace(/{username}/g, interaction.user.username)
+            .replace(/{user\.name}/g, interaction.user.username)
+            .replace(/{server}/g, interaction.guild.name)
+            .replace(/{guild}/g, interaction.guild.name);
+
         // Always render as clean Borderless V2 Component Dashboard Card
         const ticketLayout = V2Helper.createLayout({
             title: targetConfig.welcomeTitle || 'Ticket Dashboard',
-            description: (targetConfig.welcomeDescription || targetConfig.welcomeMessage || 'Hello {user}, welcome to your support ticket. Our staff will be with you shortly.').replace('{user}', interaction.user.toString()),
+            description: rawDesc,
             fields: [
                 { name: 'Creator', value: interaction.user.toString(), inline: true },
                 { name: 'Category', value: optionInfo.label, inline: true },

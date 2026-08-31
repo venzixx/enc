@@ -6,7 +6,7 @@ export default class Placeholder extends Command {
         super(client, {
             name: 'placeholder',
             description: {
-                content: 'Shows variable placeholders available in welcome and greeter messages.',
+                content: 'Shows variable placeholders available in custom embeds, welcome, greeter, and autoresponder messages.',
                 usage: 'placeholder',
                 examples: ['placeholder']
             },
@@ -18,15 +18,22 @@ export default class Placeholder extends Command {
 
     public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
         return ctx.replyV2({
-            title: `${client.emoji.placeholder_puzzle} Available Message Placeholders`,
-            description: `You can use these placeholders in custom messages (e.g. Welcome Messages, Greeters).\n\n` + 
-                         `• \`{user}\` - Mentions the user (same as \`{mentionID}\`)\n` +
-                         `• \`{server}\` - The name of the server\n` + 
-                         `• \`{inviter}\` - The tag of the user who invited them\n` +
-                         `• \`{mentionID}\` - Mentions the user exactly\n\n` +
-                         `**Example:**\n` +
-                         `\`Welcome to {server}, {user}! You were invited by {inviter}.\``,
-            color: client.color.main
+            title: `🧩 Available Message Placeholders`,
+            description: `You can use these dynamic variables in custom messages, welcome/leave cards, custom embeds, tickets, and autoresponders:\n\n` + 
+                         `• \`{userMention}\` - Mentions the user with a ping (\`<@userId>\`)\n` +
+                         `• \`{user}\` - Mentions or displays the user\n` +
+                         `• \`{user.name}\` / \`{username}\` - User's username without ping\n` +
+                         `• \`{user.tag}\` - User's full username/tag\n` +
+                         `• \`{user.id}\` - User's unique Discord ID\n` +
+                         `• \`{user.avatar}\` - User's avatar image URL\n` +
+                         `• \`{server}\` / \`{guild}\` - Name of the server\n` + 
+                         `• \`{count}\` / \`{member.count}\` - Current server member count\n` +
+                         `• \`{inviter}\` - Username of the member who invited them\n\n` +
+                         `**Examples:**\n` +
+                         `\`Welcome to {server}, {userMention}! You are member #{count}.\`\n` +
+                         `\`Hello {username}, welcome to your support ticket!\``,
+            color: client.color.main,
+            borderless: true
         });
     }
 }

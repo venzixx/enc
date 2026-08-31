@@ -77,13 +77,19 @@ export class PlaceholderManager {
         let flags = 0;
 
         // Find all tags in { }
-        const tags = content.match(/{[a-zA-Z0-9_]+}/g) || [];
+        const tags = content.match(/{[a-zA-Z0-9_.]+}/g) || [];
         
         for (const tag of tags) {
             const tagName = tag.slice(1, -1);
             
             // Skip standard placeholders already handled
-            if (['user', 'server', 'count', 'tag', 'inviter', 'mentionID'].includes(tagName)) continue;
+            if ([
+                'user', 'userMention', 'user_mention', 'user.mention', 
+                'server', 'server.id', 'server.name', 'server.member_count', 'server.icon',
+                'guild', 'guild.name', 'count', 'tag', 'inviter', 'mentionID', 
+                'username', 'member.count', 'user.name', 'user.id', 'user.tag', 'user.avatar',
+                'user.created', 'user.joined', 'user.level'
+            ].includes(tagName)) continue;
 
             // Check if this is a saved embed
             const savedEmbed = await client.prisma.savedEmbed.findUnique({
@@ -176,10 +182,14 @@ export class PlaceholderManager {
     public static simpleResolve(text: string | undefined, member: GuildMember, guild: Guild): string | undefined {
         if (!text) return undefined;
         return text
+            .replace(/{userMention}/g, `<@${member.id}>`)
+            .replace(/{user_mention}/g, `<@${member.id}>`)
+            .replace(/{user\.mention}/g, `<@${member.id}>`)
+            .replace(/{mentionID}/g, `<@${member.id}>`)
             .replace(/{user}/g, member.toString())
             .replace(/{user\.name}/g, member.user.username)
+            .replace(/{username}/g, member.user.username)
             .replace(/{user\.id}/g, member.id)
-            .replace(/{user\.mention}/g, member.toString())
             .replace(/{user\.tag}/g, member.user.tag || member.user.username)
             .replace(/{user\.avatar}/g, member.user.displayAvatarURL({ extension: 'png', size: 256 }))
             .replace(/{user\.created}/g, `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`)
@@ -188,13 +198,14 @@ export class PlaceholderManager {
             .replace(/{server}/g, guild.name)
             .replace(/{server\.id}/g, guild.id)
             .replace(/{server\.name}/g, guild.name)
+            .replace(/{guild}/g, guild.name)
+            .replace(/{guild\.name}/g, guild.name)
             .replace(/{server\.member_count}/g, guild.memberCount.toString())
             .replace(/{server\.icon}/g, guild.iconURL({ extension: 'png', size: 256 }) || '')
             .replace(/{server\.boost_count}/g, (guild.premiumSubscriptionCount || 0).toString())
             .replace(/{server\.boost_tier}/g, guild.premiumTier.toString())
             .replace(/{count}/g, guild.memberCount.toString())
             .replace(/{tag}/g, member.user.tag || member.user.username)
-            .replace(/{member\.count}/g, guild.memberCount.toString())
-            .replace(/{mentionID}/g, `<@${member.id}>`);
+            .replace(/{member\.count}/g, guild.memberCount.toString());
     }
 }
