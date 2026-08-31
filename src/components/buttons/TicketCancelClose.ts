@@ -43,10 +43,10 @@ export default class TicketCancelClose extends Component {
             });
         }
 
-        const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        const member = interaction.member ? interaction.member as any : await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
         const isCreator = ticket.userId === interaction.user.id;
         const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) || interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels);
-        const isStaff = config?.supportRoleId ? member?.roles.cache.has(config.supportRoleId) : false;
+        const isStaff = config?.supportRoleId ? member?.roles?.cache?.has(config.supportRoleId) : false;
 
         if (!isCreator && !isAdmin && !isStaff) {
             return await interaction.reply({ 
@@ -55,14 +55,17 @@ export default class TicketCancelClose extends Component {
             });
         }
 
-        await interaction.update({ 
-            ...V2Helper.createLayout({
-                title: '✅ Ticket Closure Cancelled',
-                description: 'The ticket will remain open.',
-                color: 0x22c55e,
-                borderless: true
-            }) as any,
-            components: [] 
-        }).catch(() => {});
+        const cancelLayout = V2Helper.createLayout({
+            title: '✅ Ticket Closure Cancelled',
+            description: 'The ticket will remain open.',
+            color: 0x22c55e,
+            borderless: true
+        });
+
+        await interaction.update(cancelLayout as any).catch(async () => {
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.deferUpdate().catch(() => {});
+            }
+        });
 	}
 }

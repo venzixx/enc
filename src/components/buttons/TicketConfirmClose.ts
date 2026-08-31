@@ -20,11 +20,7 @@ export default class TicketConfirmClose extends Component {
 
         if (!ticket) {
             return await interaction.reply({ 
-                ...V2Helper.createLayout({
-                    description: `${this.client.emoji.cross || '❌'} Ticket data not found in database. This channel might not be a registered ticket.`,
-                    isAlert: true,
-                    borderless: true
-                }) as any, 
+                content: `${this.client.emoji.cross || '❌'} Ticket data not found in database. This channel might not be a registered ticket.`,
                 ephemeral: true 
             });
         }
@@ -54,10 +50,10 @@ export default class TicketConfirmClose extends Component {
             });
         }
 
-        const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        const member = interaction.member ? interaction.member as any : await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
         const isCreator = ticket.userId === interaction.user.id;
         const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) || interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels);
-        const isStaff = config?.supportRoleId ? member?.roles.cache.has(config.supportRoleId) : false;
+        const isStaff = config?.supportRoleId ? member?.roles?.cache?.has(config.supportRoleId) : false;
 
         if (!isCreator && !isAdmin && !isStaff) {
             return await interaction.reply({ 
@@ -70,17 +66,20 @@ export default class TicketConfirmClose extends Component {
         const transcriptDM = config ? config.transcriptDM : true;
         const transcriptChannelId = config ? config.transcriptChannelId : null;
 
-        // Update close message to closing state
-        await interaction.update({
-            ...V2Helper.createLayout({
-                title: '⏳ Closing Ticket',
-                description: 'Generating transcript and closing channel in 5 seconds...',
-                isAlert: true,
-                color: 0xFFA500,
-                borderless: true
-            }) as any,
-            components: []
-        }).catch(() => {});
+        // Immediately update interaction to Closing State (removes buttons automatically)
+        const closingLayout = V2Helper.createLayout({
+            title: '⏳ Closing Ticket',
+            description: 'Generating transcript and closing channel...',
+            isAlert: true,
+            color: 0xFFA500,
+            borderless: true
+        });
+
+        await interaction.update(closingLayout as any).catch(async () => {
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.deferUpdate().catch(() => {});
+            }
+        });
 
         const channel = interaction.channel as any;
         if (!channel) return;
@@ -89,12 +88,14 @@ export default class TicketConfirmClose extends Component {
         let transcriptFile: AttachmentBuilder | null = null;
         if (transcriptEnabled) {
             try {
-                const messages = await channel.messages.fetch({ limit: 100 });
-                const transcriptContent = messages.reverse().map((m: any) => 
-                    `[${m.createdAt.toLocaleString()}] ${m.author.tag}: ${m.content || (m.embeds.length > 0 ? '[Embed]' : '[No Content]')}`
-                ).join('\n');
+                const messages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+                if (messages) {
+                    const transcriptContent = Array.from(messages.values()).reverse().map((m: any) => 
+                        `[${m.createdAt.toLocaleString()}] ${m.author.tag}: ${m.content || (m.embeds?.length > 0 ? '[Embed]' : '[No Content]')}`
+                    ).join('\n');
 
-                transcriptFile = new AttachmentBuilder(Buffer.from(transcriptContent), { name: `transcript-${channel.name}.txt` });
+                    transcriptFile = new AttachmentBuilder(Buffer.from(transcriptContent), { name: `transcript-${channel.name}.txt` });
+                }
             } catch (err) {
                 console.error('Failed to generate transcript:', err);
             }
@@ -138,9 +139,9 @@ export default class TicketConfirmClose extends Component {
             data: { status: 'CLOSED' }
         }).catch(() => {});
 
-        // Delete Channel after 4 seconds
+        // Delete Channel after 3 seconds
         setTimeout(async () => {
             await channel.delete(`Ticket closed by ${interaction.user.tag}`).catch(() => {});
-        }, 4000);
+        }, 3000);
 	}
 }
