@@ -102,69 +102,76 @@ export class V2Helper {
         if (thumbnail) {
             container.components.push({
                 type: 9, // Section
-                components: [ // Required by validator: components[0].components[0].components
+                components: [
                     {
                         type: 10, // Text Display
-                        content: primaryChunks[0] || "\u200b"
+                        content: primaryChunks[0]
                     }
                 ],
                 accessory: {
-                    type: 11, // Thumbnail accessory
-                    media: { // Required by validator: accessory.media
+                    type: 11, // Thumbnail/Icon
+                    media: {
                         url: thumbnail
                     }
                 }
             });
 
-            // If primaryContent exceeded 3900 chars, push remaining chunks as subsequent text components
+            // If primary content spanned multiple chunks, add the rest as standalone Text Displays
             for (let i = 1; i < primaryChunks.length; i++) {
                 container.components.push({
                     type: 10,
                     content: primaryChunks[i]
                 });
             }
-        } else if (primaryContent) {
+        } else {
+            // Normal Text Display for primary text chunks
             for (const chunk of primaryChunks) {
                 container.components.push({
-                    type: 10, // Text Display
+                    type: 10,
                     content: chunk
                 });
             }
         }
 
-        // Add fields as compact text
+        // Add Fields (Grouped or formatted)
         if (fields && fields.length > 0) {
-            const fieldContent = fields.map(f => `**${f.name}**: ${f.value}`).join("\n");
-            const fieldChunks = V2Helper.chunkText(fieldContent);
-            for (const fChunk of fieldChunks) {
-                container.components.push({
-                    type: 10,
-                    content: fChunk
-                });
+            const inlineFields = fields.filter(f => f.inline);
+            const blockFields = fields.filter(f => !f.inline);
+
+            if (inlineFields.length > 0) {
+                const inlineContent = inlineFields.map(f => `**${f.name}**\n${f.value}`).join('\n\n');
+                const fieldChunks = V2Helper.chunkText(inlineContent);
+                for (const chunk of fieldChunks) {
+                    container.components.push({
+                        type: 10,
+                        content: chunk
+                    });
+                }
+            }
+
+            for (const f of blockFields) {
+                const blockContent = `**${f.name}**\n${f.value}`;
+                const blockChunks = V2Helper.chunkText(blockContent);
+                for (const chunk of blockChunks) {
+                    container.components.push({
+                        type: 10,
+                        content: chunk
+                    });
+                }
             }
         }
 
-        if (footer) {
-            let footerText = `-# ${footer}`;
-            if (timestamp) {
-                footerText += ` • <t:${Math.floor(Date.now() / 1000)}:R>`;
-            }
-            container.components.push({
-                type: 10,
-                content: footerText
-            });
-        } else if (timestamp) {
-             container.components.push({
-                type: 10,
-                content: `-# <t:${Math.floor(Date.now() / 1000)}:R>`
-            });
+        // Add Footer / Timestamp
+        let footerText = footer || "";
+        if (timestamp) {
+            const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            footerText = footerText ? `${footerText} • Today at ${timeString}` : `Today at ${timeString}`;
         }
 
-        // Ensure container is never empty
-        if (container.components.length === 0) {
+        if (footerText) {
             container.components.push({
                 type: 10,
-                content: "\u200b"
+                content: `-# ${footerText}`
             });
         }
 
@@ -194,7 +201,8 @@ export class V2Helper {
         return {
             content: null as any,
             components: [container],
-            flags
+            flags,
+            allowedMentions: { parse: [], roles: [], users: [] }
         };
     }
 

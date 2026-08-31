@@ -1,4 +1,3 @@
-import { EmbedBuilder } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
@@ -42,9 +41,7 @@ export default class Unverify extends Command {
         const targetStr = args[0];
         if (!targetStr) {
             return await ctx.replyV2({ 
-                description: `${client.emoji.cross || '❌'} Please specify a user to unverify.
-
-**Usage:** \`${ctx.prefix || ','}unverify <@user|userId> [reason]\``, 
+                description: `${client.emoji.cross || '❌'} Please specify a user to unverify.\n\n**Usage:** \`${ctx.prefix || ','}unverify <@user|userId> [reason]\``, 
                 borderless: true
             });
         }
@@ -98,11 +95,7 @@ export default class Unverify extends Command {
                 if (logChannel && logChannel.isTextBased()) {
                     const layout = V2Helper.createLayout({
                         title: "🚫 Member Unverified",
-                        description: `**Member:** <@${member.id}> (${member.user.tag})
-**Status:** Unverified & Access Revoked
-**Unverified By:** <@${ctx.author.id}> (${ctx.author.tag})
-**Reason:** ${reason}
-**Role Removed:** ${role ? `<@&${role.id}>` : 'None'}`,
+                        description: `**Member:** **${member.user.tag}** (\`${member.id}\`)\n**Status:** Unverified & Access Revoked\n**Unverified By:** **${ctx.author.tag}** (\`${ctx.author.id}\`)\n**Reason:** ${reason}\n**Role Removed:** ${role ? `\`@${role.name}\` (\`${role.id}\`)` : 'None'}`,
                         footer: "Encl Security Engine",
                         timestamp: true,
                         borderless: true
@@ -129,11 +122,15 @@ export default class Unverify extends Command {
                 }
             }).catch(() => {});
 
-            return await ctx.replyV2({
-                description: `${client.emoji.success || '✅'} Successfully unverified **<@${member.id}>** and reset their verification roles.
-**Reason:** ${reason}`,
+            const replyLayout = V2Helper.createLayout({
+                description: `${client.emoji.success || '✅'} Successfully unverified **${member.user.tag}** (\`${member.id}\`) and reset their verification roles.\n**Reason:** ${reason}`,
                 borderless: true
             });
+
+            return await ctx.reply({
+                ...replyLayout,
+                allowedMentions: { parse: [], roles: [], users: [] }
+            } as any);
         } catch (err: any) {
             return await ctx.replyV2({
                 description: `${client.emoji.cross || '❌'} Failed to unverify member: ${err.message}`,
