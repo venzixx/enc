@@ -1,4 +1,4 @@
-import { type ButtonInteraction, ChannelType, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, resolveColor } from "discord.js";
+import { type ButtonInteraction, ChannelType, PermissionFlagsBits, ButtonBuilder, ButtonStyle } from "discord.js";
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
 import { V2Helper } from "../../utils/V2Helper";
@@ -46,7 +46,10 @@ export default class TicketOpen extends Component {
         }
 
         if (!config) {
-            return await interaction.reply({ content: `${this.client.emoji.cross} This ticket panel is no longer configured.`, ephemeral: true });
+            return await interaction.reply({ 
+                content: `${this.client.emoji.cross || '❌'} This ticket panel is no longer configured.`, 
+                ephemeral: true 
+            });
         }
 
         // Fetch option config if multi-panel option button clicked
@@ -141,77 +144,26 @@ export default class TicketOpen extends Component {
             console.error("Failed to parse welcomeFields", e);
         }
 
-		let ticketLayout: any;
-        if (targetConfig.useV2) {
-            ticketLayout = V2Helper.createLayout({
-                title: targetConfig.welcomeTitle || 'Ticket Dashboard',
-                description: (targetConfig.welcomeDescription || targetConfig.welcomeMessage || '').replace('{user}', interaction.user.toString()),
-                fields: [
-                    { name: 'Creator', value: interaction.user.toString(), inline: true },
-                    { name: optionInfo ? 'Category' : 'Panel', value: optionInfo ? optionInfo.label : config.name, inline: true },
-                    { name: 'Claimed By', value: 'Unclaimed', inline: true },
-                    ...customFields
-                ],
-                color: targetConfig.welcomeColor || this.client.color.main,
-                image: targetConfig.welcomeImage,
-                thumbnail: targetConfig.welcomeThumbnail,
-                footer: targetConfig.welcomeFooterText,
-                authorName: targetConfig.welcomeAuthorName,
-                authorIcon: targetConfig.welcomeAuthorIcon,
-                authorUrl: targetConfig.welcomeAuthorUrl,
-                timestamp: targetConfig.welcomeTimestamp,
-                buttons: [
-                    new ButtonBuilder()
-                        .setCustomId(`ticket_claim_${ticket.id}`)
-                        .setLabel('Claim')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId(`ticket_close`)
-                        .setLabel('Close')
-                        .setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder()
-                        .setCustomId(`ticket_rename`)
-                        .setLabel('Rename')
-                        .setEmoji(this.client.emoji.edit)
-                        .setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder()
-                        .setCustomId(`ticket_add`)
-                        .setLabel('Add User')
-                        .setStyle(ButtonStyle.Secondary)
-                ]
-            });
-        } else {
-            const embed = new EmbedBuilder()
-                .setTitle(targetConfig.welcomeTitle || 'Ticket Dashboard')
-                .setDescription((targetConfig.welcomeDescription || targetConfig.welcomeMessage || '').replace('{user}', interaction.user.toString()))
-                .setColor(resolveColor(targetConfig.welcomeColor || this.client.color.main))
-                .addFields(
-                    { name: 'Creator', value: interaction.user.toString(), inline: true },
-                    { name: optionInfo ? 'Category' : 'Panel', value: optionInfo ? optionInfo.label : config.name, inline: true },
-                    { name: 'Claimed By', value: 'Unclaimed', inline: true }
-                );
-
-            if (targetConfig.welcomeImage) embed.setImage(targetConfig.welcomeImage);
-            if (targetConfig.welcomeThumbnail) embed.setThumbnail(targetConfig.welcomeThumbnail);
-            if (targetConfig.welcomeFooterText) {
-                embed.setFooter({ 
-                    text: targetConfig.welcomeFooterText, 
-                    iconURL: targetConfig.welcomeFooterIcon || undefined 
-                });
-            }
-            if (targetConfig.welcomeAuthorName) {
-                embed.setAuthor({ 
-                    name: targetConfig.welcomeAuthorName, 
-                    iconURL: targetConfig.welcomeAuthorIcon || undefined, 
-                    url: targetConfig.welcomeAuthorUrl || undefined 
-                });
-            }
-            if (targetConfig.welcomeTimestamp) embed.setTimestamp();
-            if (customFields && customFields.length > 0) {
-                embed.addFields(customFields);
-            }
-
-            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        // Always render as clean Borderless V2 Component Dashboard Card
+        const ticketLayout = V2Helper.createLayout({
+            title: targetConfig.welcomeTitle || 'Ticket Dashboard',
+            description: (targetConfig.welcomeDescription || targetConfig.welcomeMessage || 'Hello {user}, welcome to your support ticket. Our staff will be with you shortly.').replace('{user}', interaction.user.toString()),
+            fields: [
+                { name: 'Creator', value: interaction.user.toString(), inline: true },
+                { name: optionInfo ? 'Category' : 'Panel', value: optionInfo ? optionInfo.label : config.name, inline: true },
+                { name: 'Claimed By', value: 'Unclaimed', inline: true },
+                ...customFields
+            ],
+            color: targetConfig.welcomeColor || this.client.color.main,
+            image: targetConfig.welcomeImage,
+            thumbnail: targetConfig.welcomeThumbnail,
+            footer: targetConfig.welcomeFooterText || 'Encl Ticket System',
+            authorName: targetConfig.welcomeAuthorName,
+            authorIcon: targetConfig.welcomeAuthorIcon,
+            authorUrl: targetConfig.welcomeAuthorUrl,
+            timestamp: true,
+            borderless: true,
+            buttons: [
                 new ButtonBuilder()
                     .setCustomId(`ticket_claim_${ticket.id}`)
                     .setLabel('Claim')
@@ -223,19 +175,14 @@ export default class TicketOpen extends Component {
                 new ButtonBuilder()
                     .setCustomId(`ticket_rename`)
                     .setLabel('Rename')
-                    .setEmoji(this.client.emoji.edit)
+                    .setEmoji(this.client.emoji?.edit || '📝')
                     .setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder()
                     .setCustomId(`ticket_add`)
                     .setLabel('Add User')
                     .setStyle(ButtonStyle.Secondary)
-            );
-
-            ticketLayout = {
-                embeds: [embed],
-                components: [row]
-            };
-        }
+            ]
+        });
 
 		// Send mention ping first (separate from V2 message)
 		const pingContent = supportRole ? `${interaction.user} | <@&${supportRole}>` : `${interaction.user}`;
@@ -246,10 +193,11 @@ export default class TicketOpen extends Component {
 
 		await interaction.reply({ 
             ...V2Helper.createLayout({
-                title: `${this.client.emoji.success} Ticket Opened`,
+                title: `${this.client.emoji.success || '✅'} Ticket Opened`,
                 description: `Your ticket has been opened in ${ticketChannel}!`,
                 isAlert: true,
                 color: this.client.color.main,
+                borderless: true,
                 ephemeral: true
             }) as any
         });
