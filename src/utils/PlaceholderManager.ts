@@ -14,6 +14,7 @@ export class PlaceholderManager {
         if (!text) return { content: '', embeds: [], components: [] };
 
         const trimmed = text.trim();
+        const containsMentionTag = trimmed.includes('{userMention}') || trimmed.includes('{user_mention}') || trimmed.includes('{user.mention}') || trimmed.includes('{mentionID}') || trimmed.includes('{user}');
 
         // 1. Direct JSON / Discohook Payload Handling
         if (trimmed.startsWith('{') && (trimmed.includes('"embeds"') || trimmed.includes('"content"'))) {
@@ -22,6 +23,13 @@ export class PlaceholderManager {
                 if (typeof parsed === 'string') parsed = JSON.parse(parsed);
 
                 let rawContent = parsed.content ? this.simpleResolve(parsed.content, member, guild) : '';
+                
+                // If the message has embeds and user used mention tags, but rawContent is empty,
+                // ensure rawContent has the user mention so Discord triggers a notification ping!
+                if (!rawContent && containsMentionTag) {
+                    rawContent = `<@${member.id}>`;
+                }
+
                 const embeds: any[] = [];
                 const components: any[] = [];
 
@@ -112,6 +120,11 @@ export class PlaceholderManager {
                     }
                     if (Array.isArray(embedData)) {
                         embedData = embedData[0];
+                    }
+                    
+                    const embedContainsMention = savedEmbed.data.includes('{userMention}') || savedEmbed.data.includes('{user_mention}') || savedEmbed.data.includes('{user.mention}') || savedEmbed.data.includes('{mentionID}') || savedEmbed.data.includes('{user}');
+                    if (!content && embedContainsMention) {
+                        content = `<@${member.id}>`;
                     }
                     
                     if (embedData.isV2) {

@@ -36,6 +36,7 @@ export interface V2Options {
     selectMenu?: AnySelectMenuBuilder;
     ephemeral?: boolean;
     isAlert?: boolean;
+    allowedMentions?: any;
 }
 
 export class V2Helper {
@@ -198,12 +199,17 @@ export class V2Helper {
             flags.push(MessageFlags.Ephemeral);
         }
 
-        return {
+        const payload: any = {
             content: null as any,
             components: [container],
-            flags,
-            allowedMentions: { parse: [], roles: [], users: [] }
+            flags
         };
+
+        if (options.allowedMentions !== undefined) {
+            payload.allowedMentions = options.allowedMentions;
+        }
+
+        return payload;
     }
 
     public static chunkText(text: string, maxLen = 3900): string[] {

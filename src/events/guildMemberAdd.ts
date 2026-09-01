@@ -98,10 +98,13 @@ export default class GuildMemberAdd extends Event {
             if (guildData?.greeterChannelId) {
                 const greeterChannel = guild.channels.cache.get(guildData.greeterChannelId) as any;
                 if (greeterChannel && greeterChannel.isTextBased()) {
-                    const resolved = await PlaceholderManager.resolve(this.client, guildData.greeterMessage || "Welcome {user}!", member, guild);
+                    const greeterRaw = guildData.greeterMessage || "Welcome {user}!";
+                    const resolved = await PlaceholderManager.resolve(this.client, greeterRaw, member, guild);
+                    const shouldPing = greeterRaw.includes('{userMention}') || greeterRaw.includes('{user_mention}') || greeterRaw.includes('{user.mention}') || greeterRaw.includes('{mentionID}') || greeterRaw.includes('{user}');
+                    const finalContent = resolved.content ? resolved.content : (shouldPing ? `<@${member.id}>` : undefined);
                     
                     greeterChannel.send({
-                        content: resolved.content || undefined,
+                        content: finalContent,
                         embeds: resolved.embeds,
                         components: resolved.components
                     }).then((sentMsg: any) => {
@@ -122,11 +125,13 @@ export default class GuildMemberAdd extends Event {
                     const welcomePreProcessed = welcomeRaw.replace(/{inviter}/g, usedInvite?.inviter?.tag || 'Unknown');
                     
                     const resolved = await PlaceholderManager.resolve(this.client, welcomePreProcessed, member, guild);
+                    const shouldPing = welcomeRaw.includes('{userMention}') || welcomeRaw.includes('{user_mention}') || welcomeRaw.includes('{user.mention}') || welcomeRaw.includes('{mentionID}') || welcomeRaw.includes('{user}');
 
-                    if (resolved.embeds && resolved.embeds.length > 0) {
-                        // Custom embeds configured by user
+                    if ((resolved.embeds && resolved.embeds.length > 0) || (resolved.components && resolved.components.length > 0)) {
+                        // Custom embeds configured by user or V2 layout
+                        const finalContent = resolved.content ? resolved.content : (shouldPing ? `<@${member.id}>` : undefined);
                         await welcomeChannel.send({
-                            content: resolved.content || undefined,
+                            content: finalContent,
                             embeds: resolved.embeds,
                             components: resolved.components
                         }).catch(() => {});
@@ -156,7 +161,10 @@ export default class GuildMemberAdd extends Event {
                                     .setColor(guildData.welcomeCardColor ? parseInt(guildData.welcomeCardColor.replace('#', ''), 16) || this.client.color.main : this.client.color.main)
                                     .setTimestamp();
 
+                                const pingHeader = shouldPing ? `<@${member.id}>` : undefined;
+
                                 await welcomeChannel.send({
+                                    content: pingHeader,
                                     embeds: [embed],
                                     components: resolved.components,
                                     files: [attachment]
