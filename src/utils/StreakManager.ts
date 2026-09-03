@@ -146,7 +146,11 @@ export class StreakManager {
                                     iconURL: embedData.footer.icon_url 
                                 });
 
-                                const sendData: any = { embeds: [embed] };
+                                const sendData: any = { 
+                                    content: `<@${userId}>`,
+                                    embeds: [embed],
+                                    allowedMentions: { parse: ['users'], users: [userId], roles: [] }
+                                };
 
                                 // Attach image card if configured
                                 if (tierAny.imageUrl) {
@@ -171,7 +175,10 @@ export class StreakManager {
                                 continue;
                             }
 
-                            (streakChannel as any).send({ content }).catch(() => {});
+                            (streakChannel as any).send({ 
+                                content, 
+                                allowedMentions: { parse: ['users'], users: [userId], roles: [] } 
+                            }).catch(() => {});
                         }
                     }
                 }

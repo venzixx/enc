@@ -156,27 +156,38 @@ export default class Context {
 	}
 
 	public async sendMessage(options: string | MessageCreateOptions | InteractionReplyOptions) {
+        let opt: any;
+        if (typeof options === 'string') {
+            opt = {
+                content: options,
+                allowedMentions: { parse: [], roles: [], users: [], repliedUser: false }
+            };
+        } else {
+            opt = { ...options };
+            if (opt.allowedMentions === undefined) {
+                opt.allowedMentions = { parse: [], roles: [], users: [], repliedUser: false };
+            }
+        }
+
 		if (this.interaction) {
 			if (this.interaction.replied || this.interaction.deferred) {
-				return await this.interaction.editReply(options as InteractionEditReplyOptions);
+				return await this.interaction.editReply(opt as InteractionEditReplyOptions);
 			}
             
-            if (typeof options === 'object') {
-                const opt = options as any;
-                if (opt.ephemeral) {
-                    const { ephemeral, ...rest } = opt;
-                    const existingFlags = rest.flags ? (Array.isArray(rest.flags) ? rest.flags : [rest.flags]) : [];
-                    const finalFlags = Array.from(new Set([...existingFlags, MessageFlags.Ephemeral]));
-                    const resp = await this.interaction.reply({ ...rest, flags: finalFlags });
-                    this.replied = true;
-                    return resp;
-                }
+            if (opt.ephemeral) {
+                const { ephemeral, ...rest } = opt;
+                const existingFlags = rest.flags ? (Array.isArray(rest.flags) ? rest.flags : [rest.flags]) : [];
+                const finalFlags = Array.from(new Set([...existingFlags, MessageFlags.Ephemeral]));
+                const resp = await this.interaction.reply({ ...rest, flags: finalFlags });
+                this.replied = true;
+                return resp;
             }
-			const resp = await this.interaction.reply(options as InteractionReplyOptions);
+            
+			const resp = await this.interaction.reply(opt as InteractionReplyOptions);
             this.replied = true;
             return resp;
 		}
-		const response = await this.channel?.send(options as MessageCreateOptions);
+		const response = await this.channel?.send(opt as MessageCreateOptions);
         if (response) this.response = response;
         return response;
 	}
@@ -186,15 +197,28 @@ export default class Context {
     }
 
 	public async editMessage(options: string | MessageCreateOptions | InteractionEditReplyOptions) {
+        let opt: any;
+        if (typeof options === 'string') {
+            opt = {
+                content: options,
+                allowedMentions: { parse: [], roles: [], users: [], repliedUser: false }
+            };
+        } else {
+            opt = { ...options };
+            if (opt.allowedMentions === undefined) {
+                opt.allowedMentions = { parse: [], roles: [], users: [], repliedUser: false };
+            }
+        }
+
 		if (this.interaction) {
-			return await this.interaction.editReply(options as InteractionEditReplyOptions);
+			return await this.interaction.editReply(opt as InteractionEditReplyOptions);
 		}
 		if (this.response) {
-			return await this.response.edit(options as any);
+			return await this.response.edit(opt as any);
 		}
         // Fallback for logic where editMessage might be called before sendMessage
         if (this.message) {
-            const response = await this.channel?.send(options as MessageCreateOptions);
+            const response = await this.channel?.send(opt as MessageCreateOptions);
             if (response) this.response = response;
             return response;
         }
@@ -253,9 +277,22 @@ export default class Context {
     }
 
 	public async followUp(options: string | InteractionReplyOptions) {
+        let opt: any;
+        if (typeof options === 'string') {
+            opt = {
+                content: options,
+                allowedMentions: { parse: [], roles: [], users: [], repliedUser: false }
+            };
+        } else {
+            opt = { ...options };
+            if (opt.allowedMentions === undefined) {
+                opt.allowedMentions = { parse: [], roles: [], users: [], repliedUser: false };
+            }
+        }
+
 		if (this.interaction) {
-			return await this.interaction.followUp(options);
+			return await this.interaction.followUp(opt);
 		}
-		return await this.channel?.send(options as MessageCreateOptions);
+		return await this.channel?.send(opt as MessageCreateOptions);
 	}
 }

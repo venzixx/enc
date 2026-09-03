@@ -205,9 +205,9 @@ export class V2Helper {
             flags
         };
 
-        if (options.allowedMentions !== undefined) {
-            payload.allowedMentions = options.allowedMentions;
-        }
+        payload.allowedMentions = options.allowedMentions !== undefined
+            ? options.allowedMentions
+            : { parse: [], roles: [], users: [], repliedUser: false };
 
         return payload;
     }

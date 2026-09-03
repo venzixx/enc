@@ -73,7 +73,14 @@ export class PlaceholderManager {
                     }
                 }
 
-                return { content: rawContent || '', embeds, components, flags: 0 };
+                const shouldPing = containsMentionTag;
+                return { 
+                    content: rawContent || '', 
+                    embeds, 
+                    components, 
+                    flags: 0,
+                    allowedMentions: shouldPing ? { parse: ['users'], users: [member.id] } : { parse: [], users: [], roles: [] }
+                };
             } catch (jsonErr) {
                 // If invalid JSON, fallback to standard text replacement
             }
@@ -189,7 +196,14 @@ export class PlaceholderManager {
             }
         }
 
-        return { content: content.trim(), embeds, components, flags };
+        const shouldPing = containsMentionTag;
+        return { 
+            content: content.trim(), 
+            embeds, 
+            components, 
+            flags,
+            allowedMentions: shouldPing ? { parse: ['users'], users: [member.id] } : { parse: [], users: [], roles: [] }
+        };
     }
 
     public static simpleResolve(text: string | undefined, member: GuildMember, guild: Guild): string | undefined {

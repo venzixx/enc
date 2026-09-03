@@ -25,6 +25,12 @@ const client = new ExtendedClient({
         Partials.User,
         Partials.Channel,
     ],
+    allowedMentions: {
+        parse: [],
+        users: [],
+        roles: [],
+        repliedUser: false
+    }
 });
 
 async function main() {

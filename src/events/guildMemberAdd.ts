@@ -106,7 +106,8 @@ export default class GuildMemberAdd extends Event {
                     greeterChannel.send({
                         content: finalContent,
                         embeds: resolved.embeds,
-                        components: resolved.components
+                        components: resolved.components,
+                        allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
                     }).then((sentMsg: any) => {
                         if (guildData.greeterTime && guildData.greeterTime > 0) {
                             setTimeout(() => {
@@ -133,7 +134,8 @@ export default class GuildMemberAdd extends Event {
                         await welcomeChannel.send({
                             content: finalContent,
                             embeds: resolved.embeds,
-                            components: resolved.components
+                            components: resolved.components,
+                            allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
                         }).catch(() => {});
                     } else {
                         // Standard Welcome Banner + Text
@@ -167,18 +169,21 @@ export default class GuildMemberAdd extends Event {
                                     content: pingHeader,
                                     embeds: [embed],
                                     components: resolved.components,
-                                    files: [attachment]
+                                    files: [attachment],
+                                    allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
                                 }).catch(() => {});
                             } else {
                                 await welcomeChannel.send({
                                     content: resolved.content || `Welcome ${member.toString()} to **${guild.name}**!`,
                                     embeds: resolved.embeds,
-                                    components: resolved.components
+                                    components: resolved.components,
+                                    allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
                                 }).catch(() => {});
                             }
                         } catch {
                             await welcomeChannel.send({
-                                content: resolved.content || `Welcome ${member.toString()} to **${guild.name}**!`
+                                content: resolved.content || `Welcome ${member.toString()} to **${guild.name}**!`,
+                                allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
                             }).catch(() => {});
                         }
                     }
