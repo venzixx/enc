@@ -1,4 +1,6 @@
 import { PermissionFlagsBits, EmbedBuilder, AttachmentBuilder, GuildMember } from "discord.js";
+import * as path from "path";
+import * as fs from "fs";
 import { ExtendedClient } from "../../client";
 import { Command, Context } from "../../structures";
 import { PlaceholderManager } from "../../utils/PlaceholderManager";
@@ -132,38 +134,66 @@ export default class Test extends Command {
         if (subCommand === 'welcome') {
             const targetMember = (ctx.isInteraction ? ctx.options.getMember('user') : null) as GuildMember || ctx.member as GuildMember;
             try {
-                const { generateWelcomeImage } = await import('../../services/imageBuilder');
-                const avatarUrl = targetMember.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
-                const imageBuffer = await generateWelcomeImage({
-                    avatarUrl,
-                    username: targetMember.user.username,
-                    memberCount: guild.memberCount,
-                    serverName: guild.name,
-                    background: guildData.welcomeCardBackground,
-                    color: guildData.welcomeCardColor,
-                    font: guildData.welcomeCardFont,
-                    style: guildData.welcomeCardStyle,
-                    title: guildData.welcomeCardTitle
-                });
-                const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome-card.png' });
-
                 const welcomeRaw = guildData.welcomeMessage || `Welcome to **{guild}**, {user}! We're thrilled to have you here.`;
                 const resolved = await PlaceholderManager.resolve(client, welcomeRaw, targetMember, guild);
+
+                const getOrdinal = (n: number) => {
+                    const s = ["th", "st", "nd", "rd"];
+                    const v = n % 100;
+                    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+                };
+                const ordinal = getOrdinal(guild.memberCount);
+
+                let description: string;
+                if (resolved.content && resolved.content.trim()) {
+                    description = resolved.content;
+                    if (!description.includes(guild.memberCount.toString()) && !description.toLowerCase().includes('member')) {
+                        description += `\n\n*You are our **${ordinal}** member (\`#${guild.memberCount}\`)*`;
+                    }
+                } else {
+                    description = `Welcome ${targetMember.toString()} to **${guild.name}**! 🎉\nYou are our **${ordinal}** member (\`#${guild.memberCount}\`).\nWe're thrilled to have you here!`;
+                }
+
+                // Banner image resolution
+                const isCustomBgUrl = guildData.welcomeCardBackground && guildData.welcomeCardBackground.startsWith('http');
+                let bannerUrl: string | undefined = undefined;
+                const files: AttachmentBuilder[] = [];
+
+                if (isCustomBgUrl) {
+                    bannerUrl = guildData.welcomeCardBackground!;
+                } else {
+                    const defaultBannerPaths = [
+                        path.join(process.cwd(), 'src/assets/images/default_welcome.jpg'),
+                        path.join(process.cwd(), 'assets/images/default_welcome.jpg'),
+                        path.join(__dirname, '../assets/images/default_welcome.jpg'),
+                        path.join(__dirname, '../../assets/images/default_welcome.jpg')
+                    ];
+                    for (const p of defaultBannerPaths) {
+                        if (fs.existsSync(p)) {
+                            files.push(new AttachmentBuilder(p, { name: 'welcome.jpg' }));
+                            bannerUrl = 'attachment://welcome.jpg';
+                            break;
+                        }
+                    }
+                }
 
                 const { V2Helper } = await import('../../utils/V2Helper');
                 const v2Layout = V2Helper.createLayout({
                     borderless: true,
                     color: null,
                     title: `👋 Welcome Preview`,
-                    description: resolved.content || `Welcome to **${guild.name}**, ${targetMember.toString()}! We're thrilled to have you here.`,
-                    image: 'attachment://welcome-card.png',
-                    footer: `Enc Welcome System • Member #${guild.memberCount}`,
+                    description: description,
+                    thumbnail: targetMember.user.displayAvatarURL({ extension: 'png', size: 256 }),
+                    image: bannerUrl,
+                    footer: `Enc Welcome Protocol • Member #${guild.memberCount} (${ordinal})`,
                     timestamp: true
                 });
 
                 return await ctx.sendMessage({
+                    content: `<@${targetMember.id}>`,
                     components: v2Layout.components,
-                    files: [attachment]
+                    files: files,
+                    allowedMentions: { parse: ['users'], users: [targetMember.id], roles: [] }
                 });
             } catch (e: any) {
                 return ctx.replyV2({

@@ -1,4 +1,6 @@
 import { Events, GuildMember, Collection, EmbedBuilder, AttachmentBuilder } from 'discord.js';
+import * as path from 'path';
+import * as fs from 'fs';
 import { Event } from '../structures';
 import { LavamusicEventType } from '../types/events';
 import { ExtendedClient } from '../client';
@@ -138,63 +140,74 @@ export default class GuildMemberAdd extends Event {
                             allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
                         }).catch(() => {});
                     } else {
-                        // Standard Welcome Banner + V2 Borderless Card
+                        // Standard Welcome: V2 Borderless Card with Anime Banner & Avatar Thumbnail
                         try {
                             const { V2Helper } = await import('../utils/V2Helper');
-                            const pingHeader = shouldPing ? `<@${member.id}>` : undefined;
+                            const pingHeader = `<@${member.id}>`;
 
-                            if (guildData.welcomeCardEnabled !== false) {
-                                const { generateWelcomeImage } = await import('../services/imageBuilder');
-                                const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 512, forceStatic: true });
-                                const imageBuffer = await generateWelcomeImage({
-                                    avatarUrl,
-                                    username: member.user.username,
-                                    memberCount: guild.memberCount,
-                                    serverName: guild.name,
-                                    background: guildData.welcomeCardBackground,
-                                    color: guildData.welcomeCardColor,
-                                    font: guildData.welcomeCardFont,
-                                    style: guildData.welcomeCardStyle,
-                                    title: guildData.welcomeCardTitle
-                                });
-                                const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome.png' });
+                            const getOrdinal = (n: number) => {
+                                const s = ["th", "st", "nd", "rd"];
+                                const v = n % 100;
+                                return n + (s[(v - 20) % 10] || s[v] || s[0]);
+                            };
+                            const ordinal = getOrdinal(guild.memberCount);
 
-                                const v2Layout = V2Helper.createLayout({
-                                    borderless: true,
-                                    color: null,
-                                    title: `👋 Welcome to ${guild.name}!`,
-                                    description: resolved.content || `Welcome to the server, ${member.toString()}! You are member **#${guild.memberCount}**.`,
-                                    image: 'attachment://welcome.png',
-                                    timestamp: true,
-                                    allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
-                                });
-
-                                await welcomeChannel.send({
-                                    content: pingHeader,
-                                    components: v2Layout.components,
-                                    files: [attachment],
-                                    allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
-                                }).catch(() => {});
+                            let description: string;
+                            if (resolved.content && resolved.content.trim()) {
+                                description = resolved.content;
+                                if (!description.includes(guild.memberCount.toString()) && !description.toLowerCase().includes('member')) {
+                                    description += `\n\n*You are our **${ordinal}** member (\`#${guild.memberCount}\`)*`;
+                                }
                             } else {
-                                const v2Layout = V2Helper.createLayout({
-                                    borderless: true,
-                                    color: null,
-                                    title: `👋 Welcome to ${guild.name}!`,
-                                    description: resolved.content || `Welcome to the server, ${member.toString()}!`,
-                                    timestamp: true,
-                                    allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
-                                });
-
-                                await welcomeChannel.send({
-                                    content: pingHeader,
-                                    components: v2Layout.components,
-                                    allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
-                                }).catch(() => {});
+                                description = `Welcome ${member.toString()} to **${guild.name}**! 🎉\nYou are our **${ordinal}** member (\`#${guild.memberCount}\`).\nWe're thrilled to have you here!`;
                             }
-                        } catch {
+
+                            // Banner image resolution
+                            const isCustomBgUrl = guildData.welcomeCardBackground && guildData.welcomeCardBackground.startsWith('http');
+                            let bannerUrl: string | undefined = undefined;
+                            const files: AttachmentBuilder[] = [];
+
+                            if (isCustomBgUrl) {
+                                bannerUrl = guildData.welcomeCardBackground!;
+                            } else {
+                                const defaultBannerPaths = [
+                                    path.join(process.cwd(), 'src/assets/images/default_welcome.jpg'),
+                                    path.join(process.cwd(), 'assets/images/default_welcome.jpg'),
+                                    path.join(__dirname, '../assets/images/default_welcome.jpg'),
+                                    path.join(__dirname, '../../assets/images/default_welcome.jpg')
+                                ];
+                                for (const p of defaultBannerPaths) {
+                                    if (fs.existsSync(p)) {
+                                        files.push(new AttachmentBuilder(p, { name: 'welcome.jpg' }));
+                                        bannerUrl = 'attachment://welcome.jpg';
+                                        break;
+                                    }
+                                }
+                            }
+
+                            const v2Layout = V2Helper.createLayout({
+                                borderless: true,
+                                color: null,
+                                title: `👋 Welcome to ${guild.name}!`,
+                                description: description,
+                                thumbnail: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
+                                image: bannerUrl,
+                                footer: `Enc Welcome Protocol • Member #${guild.memberCount} (${ordinal})`,
+                                timestamp: true,
+                                allowedMentions: { parse: ['users'], users: [member.id], roles: [] }
+                            });
+
                             await welcomeChannel.send({
-                                content: resolved.content || `Welcome ${member.toString()} to **${guild.name}**!`,
-                                allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
+                                content: pingHeader,
+                                components: v2Layout.components,
+                                files: files,
+                                allowedMentions: { parse: ['users'], users: [member.id], roles: [] }
+                            }).catch(() => {});
+                        } catch (err) {
+                            console.error('[WELCOME_DISPATCH_ERROR]', err);
+                            await welcomeChannel.send({
+                                content: `<@${member.id}> Welcome ${member.toString()} to **${guild.name}**! You are member #${guild.memberCount}.`,
+                                allowedMentions: { parse: ['users'], users: [member.id], roles: [] }
                             }).catch(() => {});
                         }
                     }

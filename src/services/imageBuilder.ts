@@ -83,9 +83,6 @@ export async function generateWelcomeImage(
 
     if (!isCustomUrl) {
         // --- 1. DEFAULT ANIME TEMPLATE (1024x576) ---
-        const canvas = createCanvas(1024, 576);
-        const ctx = canvas.getContext('2d');
-
         const defaultBgPaths = [
             path.join(process.cwd(), 'src/assets/images/default_welcome.jpg'),
             path.join(process.cwd(), 'assets/images/default_welcome.jpg'),
@@ -93,57 +90,11 @@ export async function generateWelcomeImage(
             path.join(__dirname, '../../assets/images/default_welcome.jpg')
         ];
 
-        let bgImage: any = null;
         for (const p of defaultBgPaths) {
             if (fs.existsSync(p)) {
-                try {
-                    bgImage = await loadImage(p);
-                    break;
-                } catch {}
+                return fs.readFileSync(p);
             }
         }
-
-        if (bgImage) {
-            ctx.drawImage(bgImage, 0, 0, 1024, 576);
-        } else {
-            // Fallback gradient if file missing
-            const bgGrad = ctx.createLinearGradient(0, 0, 1024, 576);
-            bgGrad.addColorStop(0, '#0a0b10');
-            bgGrad.addColorStop(1, '#0e111a');
-            ctx.fillStyle = bgGrad;
-            ctx.fillRect(0, 0, 1024, 576);
-        }
-
-        // Draw Avatar in circle replacing "Welcome!" text
-        // Circle center: (265, 300), radius: 198
-        const cx = 265;
-        const cy = 300;
-        const r = 198;
-
-        try {
-            const avatar = await loadImage(avatarUrl);
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, Math.PI * 2, true);
-            ctx.closePath();
-            ctx.clip();
-            ctx.drawImage(avatar, cx - r, cy - r, r * 2, r * 2);
-            ctx.restore();
-
-            // Smooth subtle ring matching aesthetic palette
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, Math.PI * 2, true);
-            ctx.lineWidth = 3.5;
-            ctx.strokeStyle = accentColor;
-            ctx.stroke();
-        } catch (e) {
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, Math.PI * 2, true);
-            ctx.fillStyle = '#1e2438';
-            ctx.fill();
-        }
-
-        return canvas.toBuffer('image/png');
     }
 
     // --- 2. CUSTOM BACKGROUND CARD (880x280) ---
