@@ -202,7 +202,6 @@ export default class Test extends Command {
                 });
 
                 return await ctx.sendMessage({
-                    content: pingHeader,
                     components: v2Layout.components,
                     flags: v2Layout.flags,
                     files: files,
@@ -312,7 +311,6 @@ export default class Test extends Command {
                             content: `📋 **Welcome Preview:**`,
                         });
                         await ctx.channel.send({
-                            content: pingHeader,
                             components: v2Layout.components,
                             flags: v2Layout.flags,
                             files: files,

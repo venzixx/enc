@@ -198,7 +198,6 @@ export default class GuildMemberAdd extends Event {
                             });
 
                             await welcomeChannel.send({
-                                content: pingHeader,
                                 components: v2Layout.components,
                                 flags: v2Layout.flags,
                                 files: files,

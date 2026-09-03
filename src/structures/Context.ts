@@ -186,6 +186,9 @@ export default class Context {
             if (!existingFlags.includes(MessageFlags.IsComponentsV2) && !existingFlags.includes(32768)) {
                 opt.flags = [...existingFlags, MessageFlags.IsComponentsV2];
             }
+            // Discord API error: The 'content' and 'embeds' fields cannot be used with MessageFlags.IS_COMPONENTS_V2
+            delete opt.content;
+            delete opt.embeds;
         }
 
 		if (this.interaction) {
@@ -244,6 +247,8 @@ export default class Context {
             if (!existingFlags.includes(MessageFlags.IsComponentsV2) && !existingFlags.includes(32768)) {
                 opt.flags = [...existingFlags, MessageFlags.IsComponentsV2];
             }
+            delete opt.content;
+            delete opt.embeds;
         }
 
 		if (this.interaction) {

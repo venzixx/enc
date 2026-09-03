@@ -200,7 +200,6 @@ export class V2Helper {
         }
 
         const payload: any = {
-            content: null as any,
             components: [container],
             flags
         };
