@@ -109,7 +109,7 @@ export default class GuildMemberAdd extends Event {
                         content: finalContent,
                         embeds: resolved.embeds,
                         components: resolved.components,
-                        allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
+                        allowedMentions: shouldPing ? { users: [member.id], parse: [], roles: [] } : { parse: [], users: [], roles: [] }
                     }).then((sentMsg: any) => {
                         if (guildData.greeterTime && guildData.greeterTime > 0) {
                             setTimeout(() => {
@@ -137,7 +137,7 @@ export default class GuildMemberAdd extends Event {
                             content: finalContent,
                             embeds: resolved.embeds,
                             components: resolved.components,
-                            allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
+                            allowedMentions: shouldPing ? { users: [member.id], parse: [], roles: [] } : { parse: [], users: [], roles: [] }
                         }).catch(() => {});
                     } else {
                         // Standard Welcome: V2 Borderless Card with Anime Banner & Avatar Thumbnail
@@ -194,20 +194,21 @@ export default class GuildMemberAdd extends Event {
                                 image: bannerUrl,
                                 footer: `Enc Welcome Protocol • Member #${guild.memberCount} (${ordinal})`,
                                 timestamp: true,
-                                allowedMentions: { parse: ['users'], users: [member.id], roles: [] }
+                                allowedMentions: { users: [member.id], parse: [], roles: [] }
                             });
 
                             await welcomeChannel.send({
                                 content: pingHeader,
                                 components: v2Layout.components,
+                                flags: v2Layout.flags,
                                 files: files,
-                                allowedMentions: { parse: ['users'], users: [member.id], roles: [] }
+                                allowedMentions: { users: [member.id], parse: [], roles: [] }
                             }).catch(() => {});
                         } catch (err) {
                             console.error('[WELCOME_DISPATCH_ERROR]', err);
                             await welcomeChannel.send({
                                 content: `<@${member.id}> Welcome ${member.toString()} to **${guild.name}**! You are member #${guild.memberCount}.`,
-                                allowedMentions: { parse: ['users'], users: [member.id], roles: [] }
+                                allowedMentions: { users: [member.id], parse: [], roles: [] }
                             }).catch(() => {});
                         }
                     }

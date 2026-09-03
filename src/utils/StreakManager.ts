@@ -149,7 +149,7 @@ export class StreakManager {
                                 const sendData: any = { 
                                     content: `<@${userId}>`,
                                     embeds: [embed],
-                                    allowedMentions: { parse: ['users'], users: [userId], roles: [] }
+                                    allowedMentions: { users: [userId], parse: [], roles: [] }
                                 };
 
                                 // Attach image card if configured
@@ -177,7 +177,7 @@ export class StreakManager {
 
                             (streakChannel as any).send({ 
                                 content, 
-                                allowedMentions: { parse: ['users'], users: [userId], roles: [] } 
+                                allowedMentions: { users: [userId], parse: [], roles: [] } 
                             }).catch(() => {});
                         }
                     }

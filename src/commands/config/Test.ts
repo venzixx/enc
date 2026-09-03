@@ -118,8 +118,6 @@ export default class Test extends Command {
             });
         }
 
-        await ctx.deferReply();
-
         const guild = ctx.guild!;
         const guildData = await client.prisma.guild.findUnique({ where: { id: guild.id } });
 
@@ -153,7 +151,7 @@ export default class Test extends Command {
                         content: finalContent,
                         embeds: resolved.embeds,
                         components: resolved.components,
-                        allowedMentions: { parse: ['users'], users: [targetMember.id], roles: [] }
+                        allowedMentions: { users: [targetMember.id], parse: [], roles: [] }
                     });
                 }
 
@@ -206,8 +204,9 @@ export default class Test extends Command {
                 return await ctx.sendMessage({
                     content: pingHeader,
                     components: v2Layout.components,
+                    flags: v2Layout.flags,
                     files: files,
-                    allowedMentions: { parse: ['users'], users: [targetMember.id], roles: [] }
+                    allowedMentions: { users: [targetMember.id], parse: [], roles: [] }
                 });
             } catch (e: any) {
                 return ctx.replyV2({
@@ -238,7 +237,7 @@ export default class Test extends Command {
                         content: resolved.content || undefined,
                         embeds: resolved.embeds,
                         components: resolved.components,
-                        allowedMentions: { parse: ['users'], users: [member.id], roles: [] }
+                        allowedMentions: { users: [member.id], parse: [], roles: [] }
                     });
                     results.push('✅ Greeter message previewed');
                 } else {
@@ -268,7 +267,7 @@ export default class Test extends Command {
                             content: resolved.content ? resolved.content : pingHeader,
                             embeds: resolved.embeds,
                             components: resolved.components,
-                            allowedMentions: { parse: ['users'], users: [member.id], roles: [] }
+                            allowedMentions: { users: [member.id], parse: [], roles: [] }
                         });
                     } else {
                         const defaultBannerPaths = [
@@ -315,8 +314,9 @@ export default class Test extends Command {
                         await ctx.channel.send({
                             content: pingHeader,
                             components: v2Layout.components,
+                            flags: v2Layout.flags,
                             files: files,
-                            allowedMentions: { parse: ['users'], users: [member.id], roles: [] }
+                            allowedMentions: { users: [member.id], parse: [], roles: [] }
                         });
                     }
                     results.push('✅ Welcome previewed');

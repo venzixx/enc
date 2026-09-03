@@ -169,6 +169,25 @@ export default class Context {
             }
         }
 
+        // Sanitize allowedMentions: Discord API rejects if parse and explicit array both contain users or roles
+        if (opt.allowedMentions) {
+            if (Array.isArray(opt.allowedMentions.parse) && opt.allowedMentions.parse.includes('users') && Array.isArray(opt.allowedMentions.users) && opt.allowedMentions.users.length > 0) {
+                opt.allowedMentions.parse = opt.allowedMentions.parse.filter((p: string) => p !== 'users');
+            }
+            if (Array.isArray(opt.allowedMentions.parse) && opt.allowedMentions.parse.includes('roles') && Array.isArray(opt.allowedMentions.roles) && opt.allowedMentions.roles.length > 0) {
+                opt.allowedMentions.parse = opt.allowedMentions.parse.filter((p: string) => p !== 'roles');
+            }
+        }
+
+        // Auto-detect V2 components (Type 17 Container, Type 9 Section, etc.) and ensure MessageFlags.IsComponentsV2 is included
+        const hasV2Component = Array.isArray(opt.components) && opt.components.some((c: any) => c.type === 17 || c.type === 9 || c.type === 10 || c.type === 12);
+        if (hasV2Component) {
+            const existingFlags = opt.flags ? (Array.isArray(opt.flags) ? opt.flags : [opt.flags]) : [];
+            if (!existingFlags.includes(MessageFlags.IsComponentsV2) && !existingFlags.includes(32768)) {
+                opt.flags = [...existingFlags, MessageFlags.IsComponentsV2];
+            }
+        }
+
 		if (this.interaction) {
 			if (this.interaction.replied || this.interaction.deferred) {
 				return await this.interaction.editReply(opt as InteractionEditReplyOptions);
@@ -207,6 +226,23 @@ export default class Context {
             opt = { ...options };
             if (opt.allowedMentions === undefined) {
                 opt.allowedMentions = { parse: [], roles: [], users: [], repliedUser: false };
+            }
+        }
+
+        if (opt.allowedMentions) {
+            if (Array.isArray(opt.allowedMentions.parse) && opt.allowedMentions.parse.includes('users') && Array.isArray(opt.allowedMentions.users) && opt.allowedMentions.users.length > 0) {
+                opt.allowedMentions.parse = opt.allowedMentions.parse.filter((p: string) => p !== 'users');
+            }
+            if (Array.isArray(opt.allowedMentions.parse) && opt.allowedMentions.parse.includes('roles') && Array.isArray(opt.allowedMentions.roles) && opt.allowedMentions.roles.length > 0) {
+                opt.allowedMentions.parse = opt.allowedMentions.parse.filter((p: string) => p !== 'roles');
+            }
+        }
+
+        const hasV2Component = Array.isArray(opt.components) && opt.components.some((c: any) => c.type === 17 || c.type === 9 || c.type === 10 || c.type === 12);
+        if (hasV2Component) {
+            const existingFlags = opt.flags ? (Array.isArray(opt.flags) ? opt.flags : [opt.flags]) : [];
+            if (!existingFlags.includes(MessageFlags.IsComponentsV2) && !existingFlags.includes(32768)) {
+                opt.flags = [...existingFlags, MessageFlags.IsComponentsV2];
             }
         }
 

@@ -79,7 +79,7 @@ export class PlaceholderManager {
                     embeds, 
                     components, 
                     flags: 0,
-                    allowedMentions: shouldPing ? { parse: ['users'], users: [member.id] } : { parse: [], users: [], roles: [] }
+                    allowedMentions: shouldPing ? { users: [member.id], parse: [], roles: [] } : { parse: [], users: [], roles: [] }
                 };
             } catch (jsonErr) {
                 // If invalid JSON, fallback to standard text replacement
@@ -202,7 +202,7 @@ export class PlaceholderManager {
             embeds, 
             components, 
             flags,
-            allowedMentions: shouldPing ? { parse: ['users'], users: [member.id] } : { parse: [], users: [], roles: [] }
+            allowedMentions: shouldPing ? { users: [member.id], parse: [], roles: [] } : { parse: [], users: [], roles: [] }
         };
     }
 
