@@ -107,11 +107,12 @@ export default class Test extends Command {
         }
 
         if (subCommand === 'welcomer') subCommand = 'welcome';
+        if (subCommand === 'level') subCommand = 'levelup';
 
         if (!['welcome', 'greeter', 'levelup', 'streak'].includes(subCommand)) {
             return ctx.replyV2({
                 title: `${client.emoji.cross} Error`,
-                description: 'Please specify a valid module to test: `welcome`, `greeter`, `levelup`, or `streak`.\n\n*Example:* `e!test welcome`',
+                description: 'Please specify a valid module to test: `welcome`, `greeter`, `levelup`, or `streak`.\n\n*Example:* `,test welcome`',
                 isAlert: true,
                 color: client.color.red
             });
@@ -143,7 +144,20 @@ export default class Test extends Command {
                     return n + (s[(v - 20) % 10] || s[v] || s[0]);
                 };
                 const ordinal = getOrdinal(guild.memberCount);
+                const pingHeader = `<@${targetMember.id}>`;
 
+                if ((resolved.embeds && resolved.embeds.length > 0) || (resolved.components && resolved.components.length > 0)) {
+                    // Custom embeds configured by user
+                    const finalContent = resolved.content ? resolved.content : pingHeader;
+                    return await ctx.sendMessage({
+                        content: finalContent,
+                        embeds: resolved.embeds,
+                        components: resolved.components,
+                        allowedMentions: { parse: ['users'], users: [targetMember.id], roles: [] }
+                    });
+                }
+
+                // Default Modern V2 Borderless Card
                 let description: string;
                 if (resolved.content && resolved.content.trim()) {
                     description = resolved.content;
@@ -190,7 +204,7 @@ export default class Test extends Command {
                 });
 
                 return await ctx.sendMessage({
-                    content: `<@${targetMember.id}>`,
+                    content: pingHeader,
                     components: v2Layout.components,
                     files: files,
                     allowedMentions: { parse: ['users'], users: [targetMember.id], roles: [] }
@@ -223,7 +237,8 @@ export default class Test extends Command {
                     await ctx.channel.send({
                         content: resolved.content || undefined,
                         embeds: resolved.embeds,
-                        components: resolved.components
+                        components: resolved.components,
+                        allowedMentions: { parse: ['users'], users: [member.id], roles: [] }
                     });
                     results.push('✅ Greeter message previewed');
                 } else {
@@ -234,32 +249,79 @@ export default class Test extends Command {
             // --- Welcome Image Preview ---
             if (type === 'welcome' || type === 'all') {
                 try {
-                    const { generateWelcomeImage } = await import('../../services/imageBuilder');
-                    const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
-                    const imageBuffer = await generateWelcomeImage(avatarUrl, member.user.username, guild.memberCount, guild.name);
-                    const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome-preview.png' });
-
-                    const welcomeRaw = guildData.welcomeMessage || `Welcome to the server, {user}!`;
+                    const welcomeRaw = guildData.welcomeMessage || `Welcome to **{guild}**, {user}! We're thrilled to have you here.`;
                     const resolved = await PlaceholderManager.resolve(client, welcomeRaw, member, guild);
 
-                    const embed = new EmbedBuilder()
-                        .setTitle('👋 Welcome!')
-                        .setDescription(resolved.content || null)
-                        .setImage('attachment://welcome-preview.png')
-                        .setColor(client.color.main)
-                        .setTimestamp();
+                    const getOrdinal = (n: number) => {
+                        const s = ["th", "st", "nd", "rd"];
+                        const v = n % 100;
+                        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+                    };
+                    const ordinal = getOrdinal(guild.memberCount);
+                    const pingHeader = `<@${member.id}>`;
 
-                    await ctx.channel.send({
-                        content: `📋 **Welcome Image Preview:**`,
-                    });
-                    await ctx.channel.send({
-                        embeds: [embed, ...resolved.embeds],
-                        components: resolved.components,
-                        files: [attachment]
-                    });
-                    results.push('✅ Welcome image previewed');
+                    if ((resolved.embeds && resolved.embeds.length > 0) || (resolved.components && resolved.components.length > 0)) {
+                        await ctx.channel.send({
+                            content: `📋 **Welcome Preview:**`,
+                        });
+                        await ctx.channel.send({
+                            content: resolved.content ? resolved.content : pingHeader,
+                            embeds: resolved.embeds,
+                            components: resolved.components,
+                            allowedMentions: { parse: ['users'], users: [member.id], roles: [] }
+                        });
+                    } else {
+                        const defaultBannerPaths = [
+                            path.join(process.cwd(), 'src/assets/images/default_welcome.jpg'),
+                            path.join(process.cwd(), 'assets/images/default_welcome.jpg'),
+                            path.join(__dirname, '../assets/images/default_welcome.jpg'),
+                            path.join(__dirname, '../../assets/images/default_welcome.jpg')
+                        ];
+                        const files: AttachmentBuilder[] = [];
+                        let bannerUrl: string | undefined = undefined;
+                        for (const p of defaultBannerPaths) {
+                            if (fs.existsSync(p)) {
+                                files.push(new AttachmentBuilder(p, { name: 'welcome.jpg' }));
+                                bannerUrl = 'attachment://welcome.jpg';
+                                break;
+                            }
+                        }
+
+                        let description: string;
+                        if (resolved.content && resolved.content.trim()) {
+                            description = resolved.content;
+                            if (!description.includes(guild.memberCount.toString()) && !description.toLowerCase().includes('member')) {
+                                description += `\n\n*You are our **${ordinal}** member (\`#${guild.memberCount}\`)*`;
+                            }
+                        } else {
+                            description = `Welcome ${member.toString()} to **${guild.name}**! 🎉\nYou are our **${ordinal}** member (\`#${guild.memberCount}\`).\nWe're thrilled to have you here!`;
+                        }
+
+                        const { V2Helper } = await import('../../utils/V2Helper');
+                        const v2Layout = V2Helper.createLayout({
+                            borderless: true,
+                            color: null,
+                            title: `👋 Welcome Preview`,
+                            description: description,
+                            thumbnail: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
+                            image: bannerUrl,
+                            footer: `Enc Welcome Protocol • Member #${guild.memberCount} (${ordinal})`,
+                            timestamp: true
+                        });
+
+                        await ctx.channel.send({
+                            content: `📋 **Welcome Preview:**`,
+                        });
+                        await ctx.channel.send({
+                            content: pingHeader,
+                            components: v2Layout.components,
+                            files: files,
+                            allowedMentions: { parse: ['users'], users: [member.id], roles: [] }
+                        });
+                    }
+                    results.push('✅ Welcome previewed');
                 } catch (e: any) {
-                    results.push(`❌ Welcome image error: ${e.message}`);
+                    results.push(`❌ Welcome error: ${e.message}`);
                 }
             }
 
