@@ -74,14 +74,82 @@ export async function generateWelcomeImage(
     }
 
     const { avatarUrl, username, memberCount, serverName } = options;
-    const accentColor = options.color || '#38bdf8';
+    const accentColor = options.color || '#a5c4f7';
     const fontChoice = options.font || 'Exo2';
     const fontStack = `"${fontChoice}", "NotoSans", "Inter", sans-serif`;
 
+    // Check if custom background URL is provided
+    const isCustomUrl = options.background && options.background.startsWith('http');
+
+    if (!isCustomUrl) {
+        // --- 1. DEFAULT ANIME TEMPLATE (1024x576) ---
+        const canvas = createCanvas(1024, 576);
+        const ctx = canvas.getContext('2d');
+
+        const defaultBgPaths = [
+            path.join(process.cwd(), 'src/assets/images/default_welcome.jpg'),
+            path.join(process.cwd(), 'assets/images/default_welcome.jpg'),
+            path.join(__dirname, '../assets/images/default_welcome.jpg'),
+            path.join(__dirname, '../../assets/images/default_welcome.jpg')
+        ];
+
+        let bgImage: any = null;
+        for (const p of defaultBgPaths) {
+            if (fs.existsSync(p)) {
+                try {
+                    bgImage = await loadImage(p);
+                    break;
+                } catch {}
+            }
+        }
+
+        if (bgImage) {
+            ctx.drawImage(bgImage, 0, 0, 1024, 576);
+        } else {
+            // Fallback gradient if file missing
+            const bgGrad = ctx.createLinearGradient(0, 0, 1024, 576);
+            bgGrad.addColorStop(0, '#0a0b10');
+            bgGrad.addColorStop(1, '#0e111a');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, 1024, 576);
+        }
+
+        // Draw Avatar in circle replacing "Welcome!" text
+        // Circle center: (265, 300), radius: 198
+        const cx = 265;
+        const cy = 300;
+        const r = 198;
+
+        try {
+            const avatar = await loadImage(avatarUrl);
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2, true);
+            ctx.closePath();
+            ctx.clip();
+            ctx.drawImage(avatar, cx - r, cy - r, r * 2, r * 2);
+            ctx.restore();
+
+            // Smooth subtle ring matching aesthetic palette
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2, true);
+            ctx.lineWidth = 3.5;
+            ctx.strokeStyle = accentColor;
+            ctx.stroke();
+        } catch (e) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2, true);
+            ctx.fillStyle = '#1e2438';
+            ctx.fill();
+        }
+
+        return canvas.toBuffer('image/png');
+    }
+
+    // --- 2. CUSTOM BACKGROUND CARD (880x280) ---
     const canvas = createCanvas(880, 280);
     const ctx = canvas.getContext('2d');
 
-    // 1. Background (Custom Image OR Preset Gradient)
     let bgDrawn = false;
     if (options.background && options.background.startsWith('http')) {
         try {
@@ -99,40 +167,14 @@ export async function generateWelcomeImage(
 
     if (!bgDrawn) {
         const bgGrad = ctx.createLinearGradient(0, 0, 880, 280);
-        const preset = (options.background || 'obsidian').toLowerCase();
-
-        if (preset === 'cyberpunk') {
-            bgGrad.addColorStop(0, '#130924');
-            bgGrad.addColorStop(0.5, '#0d081f');
-            bgGrad.addColorStop(1, '#080b1e');
-        } else if (preset === 'ocean') {
-            bgGrad.addColorStop(0, '#061325');
-            bgGrad.addColorStop(0.5, '#041624');
-            bgGrad.addColorStop(1, '#021b2b');
-        } else if (preset === 'crimson') {
-            bgGrad.addColorStop(0, '#1f080c');
-            bgGrad.addColorStop(0.5, '#160609');
-            bgGrad.addColorStop(1, '#100508');
-        } else if (preset === 'emerald') {
-            bgGrad.addColorStop(0, '#051a14');
-            bgGrad.addColorStop(0.5, '#04140f');
-            bgGrad.addColorStop(1, '#04100c');
-        } else if (preset === 'gold') {
-            bgGrad.addColorStop(0, '#1c1608');
-            bgGrad.addColorStop(0.5, '#140f05');
-            bgGrad.addColorStop(1, '#0d0b04');
-        } else {
-            // Obsidian default
-            bgGrad.addColorStop(0, '#0a0b10');
-            bgGrad.addColorStop(0.5, '#0e111a');
-            bgGrad.addColorStop(1, '#090a0e');
-        }
-
+        bgGrad.addColorStop(0, '#0a0b10');
+        bgGrad.addColorStop(0.5, '#0e111a');
+        bgGrad.addColorStop(1, '#090a0e');
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // 2. Ambient Accent Glows
+    // Ambient Accent Glows
     const ambientGlow = ctx.createRadialGradient(130, 140, 0, 130, 140, 220);
     ambientGlow.addColorStop(0, hexToRgba(accentColor, 0.16));
     ambientGlow.addColorStop(0.6, hexToRgba(accentColor, 0.04));
@@ -140,13 +182,7 @@ export async function generateWelcomeImage(
     ctx.fillStyle = ambientGlow;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const cornerGlow = ctx.createRadialGradient(800, 40, 0, 800, 40, 250);
-    cornerGlow.addColorStop(0, hexToRgba(accentColor, 0.08));
-    cornerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = cornerGlow;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // 3. Ultra-Glass Inner Panel
+    // Glass Inner Panel
     ctx.save();
     ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
     ctx.shadowBlur = 20;
@@ -155,49 +191,26 @@ export async function generateWelcomeImage(
     ctx.fill();
     ctx.restore();
 
-    // Subtle Glass Rim Border
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.lineWidth = 1.5;
     drawRoundedRect(ctx, 16, 16, 848, 248, 24);
     ctx.stroke();
 
-    // Top Rim Specular Gloss
-    const rimGrad = ctx.createLinearGradient(0, 16, 0, 100);
-    rimGrad.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
-    rimGrad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
-    ctx.fillStyle = rimGrad;
-    drawRoundedRect(ctx, 16, 16, 848, 248, 24);
-    ctx.fill();
-
-    // Decorative Geometric Watermark lines on right
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-    ctx.lineWidth = 1;
-    for (let i = 600; i < 840; i += 30) {
-        ctx.beginPath();
-        ctx.moveTo(i, 30);
-        ctx.lineTo(i + 40, 250);
-        ctx.stroke();
-    }
-
-    // 4. Avatar (Circular Crop with Dual Glowing Rings)
+    // Avatar
     try {
         const avatar = await loadImage(avatarUrl);
-        
-        // Outer Accent Glow Ring
         ctx.beginPath();
         ctx.arc(130, 140, 80, 0, Math.PI * 2, true);
         ctx.lineWidth = 4;
         ctx.strokeStyle = hexToRgba(accentColor, 0.5);
         ctx.stroke();
 
-        // Inner White Ring
         ctx.beginPath();
         ctx.arc(130, 140, 74, 0, Math.PI * 2, true);
         ctx.lineWidth = 2.5;
         ctx.strokeStyle = '#FFFFFF';
         ctx.stroke();
 
-        // Draw Avatar Clipped
         ctx.save();
         ctx.beginPath();
         ctx.arc(130, 140, 71, 0, Math.PI * 2, true);
@@ -206,15 +219,13 @@ export async function generateWelcomeImage(
         ctx.drawImage(avatar, 59, 69, 142, 142);
         ctx.restore();
     } catch (e) {
-        // Fallback Circle if avatar fetch fails
         ctx.beginPath();
         ctx.arc(130, 140, 71, 0, Math.PI * 2, true);
         ctx.fillStyle = '#1e2438';
         ctx.fill();
     }
 
-    // 5. Typography & Badges
-    // Sub-header / Category
+    // Typography & Badges
     let subtitle = options.title;
     if (!subtitle) {
         subtitle = serverName 
@@ -225,7 +236,6 @@ export async function generateWelcomeImage(
     ctx.fillStyle = accentColor;
     ctx.fillText(subtitle, 245, 95);
 
-    // Username (with automatic ellipsis if too long)
     ctx.font = `700 36px ${fontStack}`;
     ctx.fillStyle = '#FFFFFF';
 
@@ -238,7 +248,6 @@ export async function generateWelcomeImage(
     }
     ctx.fillText(displayUser, 245, 148);
 
-    // Pill 1: Member Count Badge
     const pill1X = 245;
     const pill1Y = 175;
     const pill1W = 160;
@@ -257,26 +266,6 @@ export async function generateWelcomeImage(
     ctx.font = `700 13px ${fontStack}`;
     ctx.fillStyle = '#e2e8f0';
     ctx.fillText(`MEMBER #${memberCount || 1}`, pill1X + 22, pill1Y + 22);
-
-    // Pill 2: Community Badge with accent tint
-    const pill2X = pill1X + pill1W + 12;
-    const pill2Y = 175;
-    const pill2W = 135;
-    const pill2H = 34;
-    const pill2R = 17;
-
-    ctx.fillStyle = hexToRgba(accentColor, 0.08);
-    drawRoundedRect(ctx, pill2X, pill2Y, pill2W, pill2H, pill2R);
-    ctx.fill();
-
-    ctx.strokeStyle = hexToRgba(accentColor, 0.28);
-    ctx.lineWidth = 1;
-    drawRoundedRect(ctx, pill2X, pill2Y, pill2W, pill2H, pill2R);
-    ctx.stroke();
-
-    ctx.font = `700 13px ${fontStack}`;
-    ctx.fillStyle = accentColor;
-    ctx.fillText('COMMUNITY', pill2X + 20, pill2Y + 22);
 
     return canvas.toBuffer('image/png');
 }

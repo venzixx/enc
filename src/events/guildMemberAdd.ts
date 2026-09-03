@@ -138,11 +138,14 @@ export default class GuildMemberAdd extends Event {
                             allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
                         }).catch(() => {});
                     } else {
-                        // Standard Welcome Banner + Text
+                        // Standard Welcome Banner + V2 Borderless Card
                         try {
+                            const { V2Helper } = await import('../utils/V2Helper');
+                            const pingHeader = shouldPing ? `<@${member.id}>` : undefined;
+
                             if (guildData.welcomeCardEnabled !== false) {
                                 const { generateWelcomeImage } = await import('../services/imageBuilder');
-                                const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
+                                const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 512, forceStatic: true });
                                 const imageBuffer = await generateWelcomeImage({
                                     avatarUrl,
                                     username: member.user.username,
@@ -156,27 +159,35 @@ export default class GuildMemberAdd extends Event {
                                 });
                                 const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome.png' });
 
-                                const embed = new EmbedBuilder()
-                                    .setTitle('👋 Welcome!')
-                                    .setDescription(resolved.content || `Welcome to the server, ${member.toString()}!`)
-                                    .setImage('attachment://welcome.png')
-                                    .setColor(guildData.welcomeCardColor ? parseInt(guildData.welcomeCardColor.replace('#', ''), 16) || this.client.color.main : this.client.color.main)
-                                    .setTimestamp();
-
-                                const pingHeader = shouldPing ? `<@${member.id}>` : undefined;
+                                const v2Layout = V2Helper.createLayout({
+                                    borderless: true,
+                                    color: null,
+                                    title: `👋 Welcome to ${guild.name}!`,
+                                    description: resolved.content || `Welcome to the server, ${member.toString()}! You are member **#${guild.memberCount}**.`,
+                                    image: 'attachment://welcome.png',
+                                    timestamp: true,
+                                    allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
+                                });
 
                                 await welcomeChannel.send({
                                     content: pingHeader,
-                                    embeds: [embed],
-                                    components: resolved.components,
+                                    components: v2Layout.components,
                                     files: [attachment],
                                     allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
                                 }).catch(() => {});
                             } else {
+                                const v2Layout = V2Helper.createLayout({
+                                    borderless: true,
+                                    color: null,
+                                    title: `👋 Welcome to ${guild.name}!`,
+                                    description: resolved.content || `Welcome to the server, ${member.toString()}!`,
+                                    timestamp: true,
+                                    allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
+                                });
+
                                 await welcomeChannel.send({
-                                    content: resolved.content || `Welcome ${member.toString()} to **${guild.name}**!`,
-                                    embeds: resolved.embeds,
-                                    components: resolved.components,
+                                    content: pingHeader,
+                                    components: v2Layout.components,
                                     allowedMentions: shouldPing ? { parse: ['users'], users: [member.id], roles: [] } : { parse: [], users: [], roles: [] }
                                 }).catch(() => {});
                             }

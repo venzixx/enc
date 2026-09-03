@@ -150,17 +150,19 @@ export default class Test extends Command {
                 const welcomeRaw = guildData.welcomeMessage || `Welcome to **{guild}**, {user}! We're thrilled to have you here.`;
                 const resolved = await PlaceholderManager.resolve(client, welcomeRaw, targetMember, guild);
 
-                const embed = new EmbedBuilder()
-                    .setTitle('👋 Welcome Preview')
-                    .setDescription(resolved.content || null)
-                    .setImage('attachment://welcome-card.png')
-                    .setColor(client.color.main)
-                    .setFooter({ text: `Enc Welcome System • Member #${guild.memberCount}` })
-                    .setTimestamp();
+                const { V2Helper } = await import('../../utils/V2Helper');
+                const v2Layout = V2Helper.createLayout({
+                    borderless: true,
+                    color: null,
+                    title: `👋 Welcome Preview`,
+                    description: resolved.content || `Welcome to **${guild.name}**, ${targetMember.toString()}! We're thrilled to have you here.`,
+                    image: 'attachment://welcome-card.png',
+                    footer: `Enc Welcome System • Member #${guild.memberCount}`,
+                    timestamp: true
+                });
 
                 return await ctx.sendMessage({
-                    embeds: [embed, ...resolved.embeds],
-                    components: resolved.components,
+                    components: v2Layout.components,
                     files: [attachment]
                 });
             } catch (e: any) {
