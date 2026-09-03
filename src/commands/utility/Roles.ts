@@ -56,7 +56,22 @@ export default class Roles extends Command {
 
 		const guild = ctx.guild;
 		// Fetch all guild members to ensure accurate member counts
-		await guild.members.fetch();
+		try {
+			await guild.members.fetch();
+		} catch (err: any) {
+			const isRateLimit = err?.name === 'GatewayRateLimitError' || 
+				(typeof err?.message === 'string' && (err.message.includes('opcode 8') || err.message.includes('rate limited')));
+			if (isRateLimit) {
+				const match = err.message?.match(/retry after ([\d.]+)\s*seconds/i);
+				const retrySeconds = match ? Math.ceil(parseFloat(match[1])) : 20;
+				return await ctx.replyV2({
+					title: `${client.emoji.cross} Discord Gateway Rate Limited`,
+					description: `Discord is temporarily rate-limiting member requests (\`Opcode 8\`).\n\nPlease retry this command after **${retrySeconds} seconds**.`,
+					isAlert: true,
+					color: client.color.red
+				});
+			}
+		}
 		const roles = guild.roles.cache
 			.filter((role: Role) => role.id !== guild.id)
 			.sort((a: Role, b: Role) => b.position - a.position);

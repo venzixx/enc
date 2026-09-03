@@ -21,7 +21,9 @@ export default class MemberCount extends Command {
     public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
         await ctx.deferReply();
         
-        await ctx.guild.members.fetch(); // Ensure accurate counts
+        try {
+            await ctx.guild.members.fetch(); // Ensure accurate counts
+        } catch {}
 
         const total = ctx.guild.memberCount;
         const bots = (ctx.guild.members.cache as any).filter((m: any) => m.user.bot).size;

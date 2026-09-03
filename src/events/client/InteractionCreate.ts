@@ -296,6 +296,23 @@ export default class InteractionCreate extends Event {
 				await command.run(this.client, ctx, args);
 			} catch (error: any) {
 				logger.error(error);
+
+				const isGatewayRateLimit = error?.name === 'GatewayRateLimitError' || 
+					(typeof error?.message === 'string' && (error.message.includes('opcode 8') || error.message.includes('rate limited')));
+
+				if (isGatewayRateLimit) {
+					const match = error.message?.match(/retry after ([\d.]+)\s*seconds/i);
+					const retrySeconds = match ? Math.ceil(parseFloat(match[1])) : 20;
+					try {
+						return await ctx.replyV2({
+							title: `${this.client.emoji.cross} Discord Gateway Rate Limited`,
+							description: `Discord is temporarily rate-limiting member requests (\`Opcode 8\`).\n\nPlease retry this command after **${retrySeconds} seconds**.`,
+							isAlert: true,
+							color: this.client.color.red
+						});
+					} catch {}
+				}
+
 				const { ErrorReporter } = await import('../../utils/ErrorReporter');
 				ErrorReporter.reportCommandError(this.client, {
 					commandName: interaction.commandName,
@@ -308,13 +325,12 @@ export default class InteractionCreate extends Event {
 				}).catch(() => {});
 
 				try {
-					if (!interaction.replied && !interaction.deferred) {
-						await ctx.replyV2({
-							description: t(I18N.events.interaction.error, { lng: locale, error }),
-							isAlert: true,
-							color: this.client.color.red,
-						});
-					}
+					await ctx.replyV2({
+						title: `${this.client.emoji.cross} Command Error`,
+						description: t(I18N.events.interaction.error, { lng: locale, error }),
+						isAlert: true,
+						color: this.client.color.red,
+					});
 				} catch {
 					// Interaction already expired or was acknowledged  ignore
 				}

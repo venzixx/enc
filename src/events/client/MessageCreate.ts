@@ -1266,6 +1266,21 @@ export default class MessageCreate extends Event {
 			return await command.run(this.client, ctx, args);
 		} catch (error: any) {
 			logger.error(error);
+
+			const isGatewayRateLimit = error?.name === 'GatewayRateLimitError' || 
+				(typeof error?.message === 'string' && (error.message.includes('opcode 8') || error.message.includes('rate limited')));
+
+			if (isGatewayRateLimit) {
+				const match = error.message?.match(/retry after ([\d.]+)\s*seconds/i);
+				const retrySeconds = match ? Math.ceil(parseFloat(match[1])) : 20;
+				return await ctx.replyV2({
+					title: `${this.client.emoji.cross} Discord Gateway Rate Limited`,
+					description: `Discord is temporarily rate-limiting member requests (\`Opcode 8\`).\n\nPlease retry this command after **${retrySeconds} seconds**.`,
+					isAlert: true,
+					color: this.client.color.red
+				}).catch(() => {});
+			}
+
 			const { ErrorReporter } = await import('../../utils/ErrorReporter');
 			ErrorReporter.reportCommandError(this.client, {
 				commandName: command.name,
@@ -1277,11 +1292,21 @@ export default class MessageCreate extends Event {
 				type: 'PREFIX'
 			}).catch(() => {});
 
-			await message.reply({
-				content: t(I18N.events.message.error, {
+			await ctx.replyV2({
+				title: `${this.client.emoji.cross} Command Error`,
+				description: t(I18N.events.message.error, {
 					lng: locale,
 					error: error.message || "Unknown error",
 				}),
+				isAlert: true,
+				color: this.client.color.red
+			}).catch(() => {
+				message.reply({
+					content: t(I18N.events.message.error, {
+						lng: locale,
+						error: error.message || "Unknown error",
+					}),
+				}).catch(() => {});
 			});
 		}
 	}

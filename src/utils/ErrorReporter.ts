@@ -37,6 +37,11 @@ export class ErrorReporter {
      */
     public static async reportCommandError(client: ExtendedClient, info: CommandErrorInfo): Promise<void> {
         try {
+            // Ignore Discord Gateway opcode 8 rate limits (normal Discord limitation, not a code bug)
+            const isGatewayRateLimit = info.error?.name === 'GatewayRateLimitError' || 
+                (typeof info.error?.message === 'string' && (info.error.message.includes('opcode 8') || info.error.message.includes('rate limited')));
+            if (isGatewayRateLimit) return;
+
             const errKey = `${info.commandName}:${info.error?.message || 'unknown'}`;
             if (this.isRateLimited(errKey)) return;
 
