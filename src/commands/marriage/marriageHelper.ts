@@ -93,7 +93,7 @@ export const marriageHelper = {
 
             await i.deferUpdate();
 
-            if (i.customId === 'marry_deny') {
+            if (i.customId.startsWith('marry_deny')) {
                 await i.editReply({
                     content: '',
                     embeds: [
@@ -200,7 +200,7 @@ export const marriageHelper = {
 
             await i.deferUpdate();
 
-            if (i.customId === 'divorce_cancel') {
+            if (i.customId.startsWith('divorce_cancel')) {
                 await i.editReply({
                     embeds: [
                         new EmbedBuilder()
@@ -363,7 +363,7 @@ export const marriageHelper = {
 
             await i.deferUpdate();
 
-            if (i.customId === 'adopt_deny') {
+            if (i.customId.startsWith('adopt_deny')) {
                 await i.editReply({
                     content: '',
                     embeds: [
