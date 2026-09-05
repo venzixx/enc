@@ -294,118 +294,111 @@ export const marriageHelper = {
     // 5. ADOPT
     async adopt(client: ExtendedClient, ctx: Context, targetUser: User | null): Promise<any> {
         if (!targetUser) {
-            return ctx.replyV2({ description: 'Please mention a user to adopt.\n**Usage:** `.adopt <@user>` or `/marriage adopt <user>`', isAlert: true });
+            return ctx.replyV2({
+                title: '👶 Adopt a User',
+                description: 'Please mention or provide the ID of the user you wish to adopt.\n\n**Usage:** `.adopt <@user>` or `/adopt user:<@user>`',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         if (targetUser.id === ctx.author.id) {
-            return ctx.replyV2({ description: 'You cannot adopt yourself.', isAlert: true });
+            return ctx.replyV2({
+                title: '❌ Invalid Adoption',
+                description: 'You cannot adopt yourself!',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         if (targetUser.bot) {
-            return ctx.replyV2({ description: 'You cannot adopt a bot.', isAlert: true });
-        }
-
-        // Check if target is already parent/child of sender
-        const relationCheck = await client.prisma.familyRelation.findFirst({
-            where: {
-                OR: [
-                    { parentId: ctx.author.id, childId: targetUser.id },
-                    { parentId: targetUser.id, childId: ctx.author.id }
-                ]
-            }
-        });
-
-        if (relationCheck) {
-            return ctx.replyV2({ description: 'A family relationship already exists between you two.', isAlert: true });
+            return ctx.replyV2({
+                title: '🤖 Bots Cannot Be Adopted',
+                description: 'Bots are not eligible to be adopted into families.',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         // Check if proposer is married
         const marriage = await client.prisma.marriage.findFirst({
             where: { OR: [{ user1Id: ctx.author.id }, { user2Id: ctx.author.id }] }
         });
-
         const spouseId = marriage ? (marriage.user1Id === ctx.author.id ? marriage.user2Id : marriage.user1Id) : null;
+
+        if (spouseId && targetUser.id === spouseId) {
+            return ctx.replyV2({
+                title: '💍 Spouse Conflict',
+                description: 'You cannot adopt your spouse into your family!',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
+        }
+
+        // Check if target is already parent/child of sender or spouse
+        const relationCheck = await client.prisma.familyRelation.findFirst({
+            where: {
+                OR: [
+                    { parentId: ctx.author.id, childId: targetUser.id },
+                    { parentId: targetUser.id, childId: ctx.author.id },
+                    ...(spouseId ? [
+                        { parentId: spouseId, childId: targetUser.id },
+                        { parentId: targetUser.id, childId: spouseId }
+                    ] : [])
+                ]
+            }
+        });
+
+        if (relationCheck) {
+            return ctx.replyV2({
+                title: '👪 Relationship Exists',
+                description: 'A direct family relationship already exists between you and this user.',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
+        }
+
+        // Check existing parents count for target
+        const existingParents = await client.prisma.familyRelation.findMany({
+            where: { childId: targetUser.id }
+        });
+
+        if (existingParents.length >= 2) {
+            return ctx.replyV2({
+                title: '👶 Maximum Parents Reached',
+                description: `<@${targetUser.id}> already has 2 parents in their family tree.\nThey must abandon their current parents before being adopted again.`,
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
+        }
 
         const acceptBtn = new ButtonBuilder()
             .setCustomId(`adopt_accept_${ctx.author.id}_${targetUser.id}`)
-            .setLabel('Accept')
+            .setLabel('Accept Adoption')
+            .setEmoji('👶')
             .setStyle(ButtonStyle.Success);
 
         const denyBtn = new ButtonBuilder()
             .setCustomId(`adopt_deny_${ctx.author.id}_${targetUser.id}`)
             .setLabel('Decline')
+            .setEmoji('✖️')
             .setStyle(ButtonStyle.Danger);
 
-        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(acceptBtn, denyBtn);
-
         const proposerMention = spouseId ? `<@${ctx.author.id}> and <@${spouseId}>` : `<@${ctx.author.id}>`;
-        const response = await ctx.reply({
-            content: `<@${targetUser.id}>`,
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle('👶 Adoption Proposal')
-                    .setDescription(`${proposerMention} would like to adopt you as their child!\n\nDo you accept?`)
-                    .setColor(client.color.main)
-                    .setTimestamp()
-            ],
-            components: [row]
-        }) as any;
 
-        const collector = response.createMessageComponentCollector({
-            componentType: ComponentType.Button,
-            time: 60000
-        });
-
-        collector.on('collect', async (i: ButtonInteraction) => {
-            if (i.user.id !== targetUser.id) {
-                return i.reply({ content: 'Only the recipient of the adoption proposal can reply.', ephemeral: true });
-            }
-
-            await i.deferUpdate();
-
-            if (i.customId.startsWith('adopt_deny')) {
-                await i.editReply({
-                    content: '',
-                    embeds: [
-                        new EmbedBuilder()
-                            .setTitle('👶 Proposal Declined')
-                            .setDescription(`<@${targetUser.id}> declined the adoption proposal.`)
-                            .setColor(client.color.red)
-                    ],
-                    components: []
-                });
-                return collector.stop();
-            }
-
-            // Create relations
-            await client.prisma.familyRelation.create({
-                data: {
-                    parentId: ctx.author.id,
-                    childId: targetUser.id
-                }
-            });
-
-            if (spouseId) {
-                await client.prisma.familyRelation.create({
-                    data: {
-                        parentId: spouseId,
-                        childId: targetUser.id
-                    }
-                }).catch(() => {}); // catch unique constraint failures if already exists
-            }
-
-            await i.editReply({
-                content: '',
-                embeds: [
-                    new EmbedBuilder()
-                        .setTitle('👪 Adoption Complete')
-                        .setDescription(`🎉 Congratulations! <@${targetUser.id}> has been adopted by ${proposerMention}!`)
-                        .setColor(client.color.main)
-                ],
-                components: []
-            });
-
-            collector.stop();
+        return ctx.replyV2({
+            title: '👶 Adoption Proposal',
+            description: `${proposerMention} would like to adopt you as their child, <@${targetUser.id}>!\n\nDo you accept their offer to join the family?`,
+            thumbnail: targetUser.displayAvatarURL({ forceStatic: false }),
+            borderless: true,
+            color: null,
+            buttons: [acceptBtn, denyBtn]
         });
     },
 

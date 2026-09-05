@@ -219,18 +219,22 @@ export class PersistentComponentRouter {
                 await interaction.deferUpdate();
 
                 if (!isAccept) {
-                    await interaction.editReply({
-                        content: '',
-                        embeds: [
-                            new EmbedBuilder()
-                                .setTitle('👶 Proposal Declined')
-                                .setDescription(`<@${childId}> declined the adoption proposal.`)
-                                .setColor(client.color.red)
-                        ],
-                        components: []
+                    const layout = V2Helper.createLayout({
+                        title: '👶 Proposal Declined',
+                        description: `<@${childId}> declined the adoption proposal.`,
+                        isAlert: true,
+                        borderless: true,
+                        color: null,
+                        buttons: []
                     });
+                    await interaction.editReply(layout as any);
                     return true;
                 }
+
+                const marriage = await client.prisma.marriage.findFirst({
+                    where: { OR: [{ user1Id: parentId }, { user2Id: parentId }] }
+                });
+                const spouseId = marriage ? (marriage.user1Id === parentId ? marriage.user2Id : marriage.user1Id) : null;
 
                 await client.prisma.familyRelation.create({
                     data: {
@@ -239,17 +243,24 @@ export class PersistentComponentRouter {
                     }
                 }).catch(() => {});
 
-                await interaction.editReply({
-                    content: '',
-                    embeds: [
-                        new EmbedBuilder()
-                            .setTitle('🎉 Adoption Complete!')
-                            .setDescription(`<@${childId}> has been adopted by <@${parentId}>!`)
-                            .setColor(client.color.main)
-                            .setTimestamp()
-                    ],
-                    components: []
+                if (spouseId) {
+                    await client.prisma.familyRelation.create({
+                        data: {
+                            parentId: spouseId,
+                            childId: childId
+                        }
+                    }).catch(() => {});
+                }
+
+                const parentsMention = spouseId ? `<@${parentId}> and <@${spouseId}>` : `<@${parentId}>`;
+                const layout = V2Helper.createLayout({
+                    title: '🎉 Adoption Complete!',
+                    description: `Welcome to the family, <@${childId}>!\nYou have been officially adopted by ${parentsMention}.`,
+                    borderless: true,
+                    color: null,
+                    buttons: []
                 });
+                await interaction.editReply(layout as any);
                 return true;
             }
 

@@ -9,18 +9,20 @@ export default class Adopt extends Command {
         super(client, {
             name: 'adopt',
             description: {
-                content: 'Adopt a user into your family.',
-                usage: 'adopt <@user>'
+                content: 'Adopt a user into your family tree.',
+                usage: 'adopt <@user>',
+                examples: ['adopt @user', 'adopt 123456789012345678']
             },
+            aliases: ['parent', 'foster'],
             category: 'marriage',
-            cooldown: 3,
+            cooldown: 5,
             slashCommand: true,
             integration_types: [ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall],
             contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],
             options: [
                 {
                     name: 'user',
-                    description: 'The user to adopt',
+                    description: 'The user to adopt into your family',
                     type: 6, // USER
                     required: true
                 }
