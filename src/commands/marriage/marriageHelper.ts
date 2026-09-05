@@ -405,7 +405,23 @@ export const marriageHelper = {
     // 6. DISOWN
     async disown(client: ExtendedClient, ctx: Context, targetUser: User | null): Promise<any> {
         if (!targetUser) {
-            return ctx.replyV2({ description: 'Please mention a child to disown.\n**Usage:** `.disown <@user>` or `/marriage disown <user>`', isAlert: true });
+            return ctx.replyV2({
+                title: '💔 Disown a Child',
+                description: 'Please mention or provide the ID of the child you wish to disown.\n\n**Usage:** `.disown <@user>` or `/disown user:<@user>`',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
+        }
+
+        if (targetUser.id === ctx.author.id) {
+            return ctx.replyV2({
+                title: '❌ Invalid Target',
+                description: 'You cannot disown yourself! If you want to leave your family, use `/abandon`.',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         const relation = await client.prisma.familyRelation.findFirst({
@@ -413,20 +429,34 @@ export const marriageHelper = {
         });
 
         if (!relation) {
-            return ctx.replyV2({ description: `${targetUser.username} is not your child.`, isAlert: true });
+            return ctx.replyV2({
+                title: '👪 Not Your Child',
+                description: `<@${targetUser.id}> is not registered as your child in the family tree.`,
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
-        await client.prisma.familyRelation.delete({
-            where: { id: relation.id }
-        });
+        const confirmBtn = new ButtonBuilder()
+            .setCustomId(`disown_confirm_${ctx.author.id}_${targetUser.id}`)
+            .setLabel('Disown Child')
+            .setEmoji('💔')
+            .setStyle(ButtonStyle.Danger);
 
-        return ctx.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle('👪 Family Update')
-                    .setDescription(`You have disowned <@${targetUser.id}>.`)
-                    .setColor(client.color.red)
-            ]
+        const cancelBtn = new ButtonBuilder()
+            .setCustomId(`disown_cancel_${ctx.author.id}_${targetUser.id}`)
+            .setLabel('Cancel')
+            .setEmoji('✖️')
+            .setStyle(ButtonStyle.Secondary);
+
+        return ctx.replyV2({
+            title: '💔 Disown Confirmation',
+            description: `Are you sure you want to disown <@${targetUser.id}> from your family?\n\n⚠️ **Warning:** This will sever their family ties and remove them as your child from the family tree.`,
+            thumbnail: targetUser.displayAvatarURL({ forceStatic: false }),
+            borderless: true,
+            color: null,
+            buttons: [confirmBtn, cancelBtn]
         });
     },
 

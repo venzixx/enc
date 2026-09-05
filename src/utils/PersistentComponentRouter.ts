@@ -373,6 +373,73 @@ export class PersistentComponentRouter {
                 return true;
             }
 
+            // ─── 8. DISOWN CHILD CONFIRMATIONS ────────────────────────────────────
+            if (customId.startsWith('disown_confirm_') || customId.startsWith('disown_cancel_')) {
+                const isConfirm = customId.startsWith('disown_confirm_');
+                const parts = customId.split('_');
+                const parentId = parts[2];
+                const childId = parts[3];
+
+                if (interaction.user.id !== parentId) {
+                    await interaction.reply({
+                        content: 'Only the parent initiating the disownment can decide.',
+                        flags: MessageFlags.Ephemeral
+                    });
+                    return true;
+                }
+
+                await interaction.deferUpdate();
+
+                if (!isConfirm) {
+                    const cancelLayout = V2Helper.createLayout({
+                        title: '🏠 Decision Cancelled',
+                        description: `You decided not to disown <@${childId}>. They remain in the family!`,
+                        borderless: true,
+                        color: null,
+                        buttons: []
+                    });
+                    await interaction.editReply(cancelLayout as any);
+                    return true;
+                }
+
+                const marriage = await client.prisma.marriage.findFirst({
+                    where: { OR: [{ user1Id: parentId }, { user2Id: parentId }] }
+                });
+                const spouseId = marriage ? (marriage.user1Id === parentId ? marriage.user2Id : marriage.user1Id) : null;
+                const parentIds = spouseId ? [parentId, spouseId] : [parentId];
+
+                const relations = await client.prisma.familyRelation.findMany({
+                    where: { parentId: { in: parentIds }, childId }
+                });
+
+                if (relations.length === 0) {
+                    const notChildLayout = V2Helper.createLayout({
+                        title: '👪 Not Your Child',
+                        description: `<@${childId}> is no longer listed as your child.`,
+                        isAlert: true,
+                        borderless: true,
+                        color: null,
+                        buttons: []
+                    });
+                    await interaction.editReply(notChildLayout as any);
+                    return true;
+                }
+
+                await client.prisma.familyRelation.deleteMany({
+                    where: { parentId: { in: parentIds }, childId }
+                });
+
+                const confirmLayout = V2Helper.createLayout({
+                    title: '💔 Child Disowned',
+                    description: `You have officially disowned <@${childId}>.\nThey have been removed from your family tree.`,
+                    borderless: true,
+                    color: null,
+                    buttons: []
+                });
+                await interaction.editReply(confirmLayout as any);
+                return true;
+            }
+
             return false;
         } catch (error: any) {
             if (error.code === 10062) return true; // Interaction already expired, ignored
