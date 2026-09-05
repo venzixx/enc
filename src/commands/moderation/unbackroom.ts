@@ -1,12 +1,17 @@
-import { PermissionFlagsBits } from 'discord.js';
+import { 
+    PermissionFlagsBits, 
+    ApplicationCommandOptionType 
+} from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { ModConfirmation } from '../../utils/ModConfirmation';
+import { logModerationAction } from '../../utils/Logger';
 
 export default class Unbackroom extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'unbackroom',
+            aliases: ['rescue', 'freebackroom'],
             description: {
                 content: 'Restores user roles and unbanishes them from the backrooms.',
                 usage: 'unbackroom <user>',
@@ -14,14 +19,18 @@ export default class Unbackroom extends Command {
             },
             category: 'moderation',
             cooldown: 5,
-            slashCommand: false,
-            hidden: true,
+            slashCommand: true,
             permissions: {
                 user: [PermissionFlagsBits.Administrator],
                 client: [PermissionFlagsBits.ManageRoles]
             },
             options: [
-                { name: 'user', description: 'The user to rescue', type: 6, required: true }
+                { 
+                    name: 'user', 
+                    description: 'The member to rescue from the backrooms', 
+                    type: ApplicationCommandOptionType.User, 
+                    required: true 
+                }
             ]
         });
     }
@@ -29,24 +38,52 @@ export default class Unbackroom extends Command {
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
         await ctx.deferReply();
 
-        const memberId = ctx.options.getMember('user') || args[0]?.replace(/[<@!>]/g, '');
-        if (!memberId) return ctx.replyV2({ description: 'Please specify a user to rescue.', color: client.color.red, isAlert: true });
+        const targetUser = ctx.isInteraction 
+            ? ctx.options.getUser('user') 
+            : (ctx.message?.mentions.users.first() || (args[0] ? await client.users.fetch(args[0].replace(/[<@!>]/g, '')).catch(() => null) : null));
 
-        const target = await ctx.guild.members.fetch(memberId).catch(() => null);
-        if (!target) return ctx.replyV2({ description: 'Could not fetch member from server.', color: client.color.red, isAlert: true });
+        if (!targetUser) {
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross} Missing User`,
+                description: 'Please specify a member to rescue from the backrooms.', 
+                borderless: true,
+                isAlert: true,
+                color: null 
+            });
+        }
+
+        const target = await ctx.guild.members.fetch(targetUser.id).catch(() => null);
+        if (!target) {
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross} Member Not Found`,
+                description: 'Could not fetch that member from this server.', 
+                borderless: true,
+                isAlert: true,
+                color: null 
+            });
+        }
 
         const config = await client.prisma.guild.findUnique({ where: { id: ctx.guild.id } });
         if (!config?.backroomRoleId) {
-            return ctx.replyV2({ description: 'The backrooms have not been set up.', color: client.color.red, isAlert: true });
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross} Not Configured`,
+                description: 'The backrooms have not been set up in this server. Run `/backroom setup` first.', 
+                borderless: true,
+                isAlert: true,
+                color: null 
+            });
         }
 
-        const history = await (client.prisma as any).backroomHistory.findUnique({
-            where: { guildId_userId: { guildId: ctx.guild.id, userId: target.id } }
+        // Find active backroom case for this member
+        const activeCase = await client.prisma.case.findFirst({
+            where: {
+                guildId: ctx.guild.id,
+                targetId: target.id,
+                type: 'BACKROOM',
+                active: true
+            },
+            orderBy: { createdAt: 'desc' }
         });
-
-        if (!history) {
-            return ctx.replyV2({ description: `${target} has no backroom history record. I cannot restore their original roles automatically.`, color: client.color.red, isAlert: true });
-        }
 
         const force = args.includes('--force') || args.includes('-f');
         const confirmed = await ModConfirmation.ask({
@@ -64,22 +101,39 @@ export default class Unbackroom extends Command {
 
         if (!confirmed) return;
 
-        const rolesToRestore = JSON.parse(history.roleIds) as string[];
-        
-        // Remove backroom role and add saved roles
-        await target.roles.set(rolesToRestore.filter(id => id !== config.backroomRoleId)).catch((err: any) => {
-            console.error(err);
-            return null;
-        });
+        let rolesToRestore: string[] = [];
+        if (activeCase?.removedRoles) {
+            try {
+                rolesToRestore = JSON.parse(activeCase.removedRoles);
+            } catch (_) {}
+        }
 
-        await (client.prisma as any).backroomHistory.delete({
-            where: { guildId_userId: { guildId: ctx.guild.id, userId: target.id } }
-        });
+        // Filter valid server roles (excluding backroom role) and preserve current managed roles
+        const validRoles = rolesToRestore.filter(id => id !== config.backroomRoleId && ctx.guild.roles.cache.has(id));
+        const currentManaged = (target.roles.cache as any).filter((r: any) => r.managed).map((r: any) => r.id);
+        const finalRoles = Array.from(new Set([...validRoles, ...currentManaged]));
+
+        await target.roles.set(finalRoles).catch(() => null);
+
+        if (activeCase) {
+            await client.prisma.case.update({
+                where: { id: activeCase.id },
+                data: { active: false }
+            });
+        }
+
+        await logModerationAction(client, ctx.guild, 'Rescue from Backrooms', ctx.author, target.user, 'Rescued from Backrooms');
 
         return ctx.replyV2({
-            title: `${client.emoji.success} User Rescued`,
-            description: `${target} has been un-banished. Their previous roles were restored.`,
-            color: client.color.main
+            title: `${client.emoji.success} Member Rescued from Backrooms`,
+            description: 
+                `${target} has been un-banished and rescued from the Backrooms!\n\n` +
+                `• **Target:** ${target.user.tag} (\`${target.id}\`)\n` +
+                `• **Moderator:** <@${ctx.author.id}>\n` +
+                `• **Restored Roles:** ${validRoles.length} role(s) restored\n` +
+                `• **Quarantine Status:** Removed from quarantine`,
+            borderless: true,
+            color: null
         });
     }
 }

@@ -1,13 +1,12 @@
 import {
-    ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
     ComponentType,
-    EmbedBuilder,
     Message
 } from 'discord.js';
 import { Context } from '../structures';
 import { ExtendedClient } from '../client';
+import { V2Helper } from './V2Helper';
 
 export interface ModConfirmationOptions {
     client: ExtendedClient;
@@ -49,12 +48,6 @@ export class ModConfirmation {
 
         if (force) return true;
 
-        const color = dangerLevel === 'danger'
-            ? (client.color?.red ?? 0xef4444)
-            : dangerLevel === 'warning'
-                ? (client.color?.yellow ?? 0xf59e0b)
-                : (client.color?.main ?? 0x3b82f6);
-
         const buttonStyle = dangerLevel === 'danger'
             ? ButtonStyle.Danger
             : dangerLevel === 'warning'
@@ -84,21 +77,6 @@ export class ModConfirmation {
         descLines.push('');
         descLines.push('*Please confirm below to proceed with this moderation action.*');
 
-        const embed = new EmbedBuilder()
-            .setTitle(emojiHeader + ' Moderation Confirmation: ' + actionName)
-            .setColor(color)
-            .setDescription(descLines.join('\n'))
-            .setFooter({ text: 'Auto-cancelling in ' + Math.round(timeoutMs / 1000) + 's if not confirmed' })
-            .setTimestamp();
-
-        if (targetAvatar) {
-            embed.setThumbnail(targetAvatar);
-        }
-
-        if (fields.length > 0) {
-            embed.addFields(fields);
-        }
-
         const confirmBtn = new ButtonBuilder()
             .setCustomId('mod_confirm_' + Date.now() + '_' + ctx.author.id)
             .setLabel(confirmLabel)
@@ -114,15 +92,25 @@ export class ModConfirmation {
             .setStyle(ButtonStyle.Secondary)
             .setEmoji('✖️');
 
-        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(confirmBtn, cancelBtn);
+        const layout = V2Helper.createLayout({
+            title: `${emojiHeader} Moderation Confirmation: ${actionName}`,
+            description: descLines.join('\n'),
+            borderless: true,
+            color: null,
+            thumbnail: targetAvatar || undefined,
+            fields: fields.length > 0 ? fields : undefined,
+            footer: 'Auto-cancelling in ' + Math.round(timeoutMs / 1000) + 's if not confirmed',
+            buttons: [confirmBtn, cancelBtn]
+        });
 
         let msg: Message | any;
-        if (ctx.isInteraction && ctx.interaction?.deferred) {
-            msg = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-        } else if (ctx.isInteraction && ctx.interaction?.replied) {
-            msg = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+        if (ctx.isInteraction && (ctx.interaction?.deferred || ctx.interaction?.replied)) {
+            msg = await ctx.interaction.editReply(layout as any);
+        } else if (ctx.isInteraction && ctx.interaction) {
+            await ctx.interaction.reply(layout as any);
+            msg = await ctx.interaction.fetchReply();
         } else {
-            msg = await ctx.sendMessage({ embeds: [embed], components: [row] });
+            msg = await ctx.sendMessage(layout as any);
         }
 
         try {
@@ -144,43 +132,44 @@ export class ModConfirmation {
             if (confirmation.customId.startsWith('mod_confirm_')) {
                 await confirmation.deferUpdate().catch(() => {});
 
-                // Delete or clear confirmation prompt so only the final done embed remains
                 if (!ctx.isInteraction && msg) {
                     if (msg.deletable) {
                         await msg.delete().catch(() => {});
                     }
                     (ctx as any).response = null;
-                } else if (ctx.isInteraction && ctx.interaction) {
-                    await ctx.interaction.editReply({ components: [] }).catch(() => {});
                 }
 
                 return true;
             } else {
                 await confirmation.deferUpdate().catch(() => {});
-                const cancelEmbed = new EmbedBuilder()
-                    .setTitle((client.emoji?.cross ?? '❌') + ' Moderation Action Cancelled')
-                    .setDescription('The **' + actionName + '** action against **' + targetName + '** was cancelled. No changes were made.')
-                    .setColor(client.color?.yellow ?? 0xf59e0b)
-                    .setTimestamp();
+                const cancelLayout = V2Helper.createLayout({
+                    title: `${client.emoji?.cross ?? '❌'} Moderation Action Cancelled`,
+                    description: 'The **' + actionName + '** action against **' + targetName + '** was cancelled. No changes were made.',
+                    borderless: true,
+                    color: null,
+                    isAlert: true
+                });
 
                 if (ctx.isInteraction && ctx.interaction) {
-                    await ctx.interaction.editReply({ embeds: [cancelEmbed], components: [] }).catch(() => {});
-                } else if (msg.editable) {
-                    await msg.edit({ embeds: [cancelEmbed], components: [] }).catch(() => {});
+                    await ctx.interaction.editReply(cancelLayout as any).catch(() => {});
+                } else if (msg?.editable) {
+                    await msg.edit(cancelLayout as any).catch(() => {});
                 }
                 return false;
             }
         } catch (e) {
-            const timeoutEmbed = new EmbedBuilder()
-                .setTitle('⏱️ Confirmation Timed Out')
-                .setDescription('The confirmation prompt for **' + actionName + '** on **' + targetName + '** timed out. No action was taken.')
-                .setColor(client.color?.red ?? 0xef4444)
-                .setTimestamp();
+            const timeoutLayout = V2Helper.createLayout({
+                title: '⏱️ Confirmation Timed Out',
+                description: 'The confirmation prompt for **' + actionName + '** on **' + targetName + '** timed out. No action was taken.',
+                borderless: true,
+                color: null,
+                isAlert: true
+            });
 
             if (ctx.isInteraction && ctx.interaction) {
-                await ctx.interaction.editReply({ embeds: [timeoutEmbed], components: [] }).catch(() => {});
-            } else if (msg.editable) {
-                await msg.edit({ embeds: [timeoutEmbed], components: [] }).catch(() => {});
+                await ctx.interaction.editReply(timeoutLayout as any).catch(() => {});
+            } else if (msg?.editable) {
+                await msg.edit(timeoutLayout as any).catch(() => {});
             }
             return false;
         }
