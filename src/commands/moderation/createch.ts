@@ -39,7 +39,13 @@ export default class CreateChannel extends Command {
         }
 
         if (!name) {
-            return ctx.replyV2({ description: 'Please provide a name for the channel.', color: client.color.red, isAlert: true });
+            return ctx.replyV2({
+                description: 'Please provide a name for the channel.',
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+            });
         }
 
         const newChannel = await ctx.guild.channels.create({
@@ -52,7 +58,13 @@ export default class CreateChannel extends Command {
         });
 
         if (!newChannel) {
-            return ctx.replyV2({ description: 'Failed to create channel. Check my permissions or category ID.', color: client.color.red, isAlert: true });
+            return ctx.replyV2({
+                description: 'Failed to create channel. Check my permissions or category ID.',
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+            });
         }
 
         await AuditLogger.log(client, ctx.guild, {
@@ -69,7 +81,9 @@ export default class CreateChannel extends Command {
         return ctx.replyV2({
             title: `${client.emoji.success} Channel Created`,
             description: `Successfully created ${newChannel}.`,
-            color: client.color.main
+            borderless: true,
+            color: null,
+            allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
         });
     }
 }

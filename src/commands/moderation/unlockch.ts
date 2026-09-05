@@ -35,7 +35,13 @@ export default class UnlockChannel extends Command {
         let targetChannel = targetId ? await ctx.guild.channels.fetch(targetId).catch(() => null) : ctx.channel;
 
         if (!targetChannel || targetChannel.isDMBased()) {
-            return ctx.replyV2({ description: 'Invalid channel specified.', color: client.color.red, isAlert: true });
+            return ctx.replyV2({
+                description: 'Invalid channel specified.',
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+            });
         }
 
         const channelName = (targetChannel as any).name;
@@ -99,7 +105,9 @@ export default class UnlockChannel extends Command {
         return ctx.replyV2({
             title: `${client.emoji.success} Channel Unlocked`,
             description: `Successfully unlocked ${targetChannel} for everyone.`,
-            color: client.color.main
+            borderless: true,
+            color: null,
+            allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
         });
     }
 }

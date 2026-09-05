@@ -35,16 +35,34 @@ export default class MoveChannel extends Command {
         let targetChannel = targetId ? await ctx.guild.channels.fetch(targetId).catch(() => null) : ctx.channel;
 
         if (!categoryId) {
-            return ctx.replyV2({ description: 'Please provide a valid Category ID.', color: client.color.red, isAlert: true });
+            return ctx.replyV2({
+                description: 'Please provide a valid Category ID.',
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+            });
         }
 
         if (!targetChannel || targetChannel.isDMBased()) {
-            return ctx.replyV2({ description: 'Invalid channel specified.', color: client.color.red, isAlert: true });
+            return ctx.replyV2({
+                description: 'Invalid channel specified.',
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+            });
         }
 
         const category = await ctx.guild.channels.fetch(categoryId).catch(() => null);
         if (!category || category.type !== 4) {
-            return ctx.replyV2({ description: 'The provided ID is not a valid Category.', color: client.color.red, isAlert: true });
+            return ctx.replyV2({
+                description: 'The provided ID is not a valid Category.',
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+            });
         }
 
         await (targetChannel as TextChannel | VoiceChannel).setParent(category.id, { lockPermissions: true }).catch(err => {
@@ -66,7 +84,9 @@ export default class MoveChannel extends Command {
         return ctx.replyV2({
             title: `${client.emoji.success} Channel Moved`,
             description: `Successfully moved ${targetChannel} to **${category.name}**.`,
-            color: client.color.main
+            borderless: true,
+            color: null,
+            allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
         });
     }
 }

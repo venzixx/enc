@@ -1,15 +1,12 @@
 import {
     ApplicationCommandOptionType,
     PermissionFlagsBits,
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    PermissionsBitField
+    EmbedBuilder
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { isDev } from '../../utils/devCheck';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class UnlockdownCommand extends Command {
     constructor(client: ExtendedClient) {
@@ -85,6 +82,7 @@ export default class UnlockdownCommand extends Command {
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
         if (!ctx.guild) return;
 
+        const allowedMentions = { parse: [], roles: [], users: [ctx.author.id], repliedUser: false };
         const isGuildOwner = ctx.guild.ownerId === ctx.author.id;
         const isBotDev = await isDev(client, ctx.author.id);
 
@@ -111,24 +109,23 @@ export default class UnlockdownCommand extends Command {
 
         // 1. If no subcommand provided, show Overview Hub
         if (!sub) {
-            const embed = new EmbedBuilder()
-                .setTitle(`${client.emoji.mod_unlock} Emergency Unlockdown Protocol Interface`)
-                .setColor(0x22c55e)
-                .setDescription(
+            return await ctx.replyV2({
+                title: `${client.emoji.mod_unlock} Emergency Unlockdown Protocol Interface`,
+                description:
                     `The **Unlockdown Protocol** reverses active containment measures and restores normal server operations.\n\n` +
                     `### ${client.emoji.mod_unlock} Available Unlockdown Modules\n` +
-                    `• ${client.emoji.folder_module} \`e!unlockdown channel\` — Unlocks all text/voice channels for @everyone.\n` +
+                    `• ${client.emoji.folder_module} \`,unlockdown channel\` — Unlocks all text/voice channels for @everyone.\n` +
                     `> *Access: Trusted Admins, Extra Owners, Server Owner*\n\n` +
-                    `• ${client.emoji.shield} \`e!unlockdown roles\` — Restores original permissions to all stripped roles from backup.\n` +
+                    `• ${client.emoji.shield} \`,unlockdown roles\` — Restores original permissions to all stripped roles from backup.\n` +
                     `> *Access: **Extra Owners & Server Owner ONLY***\n\n` +
-                    `• ${client.emoji.antinuke_siren} \`e!unlockdown server\` — Reverses full server lockdown (Channels + Roles).\n` +
+                    `• ${client.emoji.antinuke_siren} \`,unlockdown server\` — Reverses full server lockdown (Channels + Roles).\n` +
                     `> *Access: Extra Owners (all) / Trusted Admins (Channels only)*\n\n` +
-                    `*💡 Tip: Append \`--force\` to bypass the confirmation dialog.*`
-                )
-                .setFooter({ text: `Enc Emergency Restoration System` })
-                .setTimestamp();
-
-            return await ctx.sendMessage({ embeds: [embed] });
+                    `*💡 Tip: Append \`--force\` to bypass the confirmation dialog.*`,
+                borderless: true,
+                color: null,
+                footer: 'Enc Emergency Restoration System',
+                allowedMentions
+            });
         }
 
         // ─── PERMISSION VALIDATION ─────────────────────────────────
@@ -136,100 +133,50 @@ export default class UnlockdownCommand extends Command {
             if (!isExtraOwner) {
                 return await ctx.replyV2({
                     description: `${client.emoji.cross || '❌'} **Access Denied**: Only **Extra Owners** and the **Server Owner** can execute \`unlockdown roles\`.`,
-                    color: client.color.red,
-                    isAlert: true
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    allowedMentions
                 });
             }
         } else if (['channel', 'server'].includes(sub)) {
             if (!isTrusted) {
                 return await ctx.replyV2({
                     description: `${client.emoji.cross || '❌'} **Access Denied**: You must be a **Trusted Admin** or **Extra Owner** to lift lockdown protocols.`,
-                    color: client.color.red,
-                    isAlert: true
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    allowedMentions
                 });
             }
         } else {
             return await ctx.replyV2({
-                description: `${client.emoji.cross || '❌'} Unknown unlockdown module \`${sub}\`. Use \`e!unlockdown\` to view available modules.`,
-                color: client.color.red,
-                isAlert: true
+                description: `${client.emoji.cross || '❌'} Unknown unlockdown module \`${sub}\`. Use \`,unlockdown\` to view available modules.`,
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
 
         // ─── INTERACTIVE CONFIRMATION ─────────────────────────────
-        if (!force) {
-            const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`unlockdown_confirm_${ctx.author.id}`)
-                    .setLabel(`Confirm Unlockdown: ${sub.toUpperCase()}`)
-                    .setStyle(ButtonStyle.Success),
-                new ButtonBuilder()
-                    .setCustomId(`unlockdown_cancel_${ctx.author.id}`)
-                    .setLabel('Cancel')
-                    .setStyle(ButtonStyle.Secondary)
-            );
+        const confirmed = await ModConfirmation.ask({
+            client,
+            ctx,
+            actionName: `Unlockdown (${sub.toUpperCase()})`,
+            targetName: ctx.guild.name,
+            dangerLevel: 'primary',
+            details: sub === 'channel' ? 'Restores send message and connect permissions across all channels for @everyone.'
+                   : sub === 'roles' ? 'Restores original administrative permissions to all stripped roles from backup.'
+                   : 'Fully lifts emergency lockdown across all channels and roles.',
+            confirmLabel: `Confirm Unlockdown: ${sub.toUpperCase()}`,
+            confirmEmoji: '🔓',
+            force
+        });
 
-            const confirmEmbed = new EmbedBuilder()
-                .setTitle(`🔓 Confirm Lockdown Deactivation`)
-                .setColor(0x22c55e)
-                .setDescription(
-                    `Are you ready to lift **Lockdown (${sub.toUpperCase()})** on **${ctx.guild.name}**?\n\n` +
-                    `• **Initiator:** <@${ctx.author.id}>\n` +
-                    `• **Module:** \`${sub}\`\n` +
-                    `• **Effect:** Channel and/or role permissions will be restored to normal.\n\n` +
-                    `*Click **Confirm** below to proceed or **Cancel** to abort. (Auto-cancels in 30 seconds)*`
-                );
+        if (!confirmed) return;
 
-            const promptMsg: any = await ctx.sendMessage({ embeds: [confirmEmbed], components: [confirmRow] });
-
-            const messageObj = promptMsg?.fetch ? await promptMsg.fetch().catch(() => null) : promptMsg;
-            const filter = (i: any) => i.user.id === ctx.author.id && i.customId.startsWith('unlockdown_');
-
-            let collector: any = null;
-            if (messageObj && typeof messageObj.createMessageComponentCollector === 'function') {
-                collector = messageObj.createMessageComponentCollector({ filter, time: 30000, max: 1 });
-            } else if (ctx.channel) {
-                collector = (ctx.channel as any).createMessageComponentCollector({ filter, time: 30000, max: 1 });
-            }
-
-            if (collector) {
-                collector.on('collect', async (i: any) => {
-                    if (i.customId === `unlockdown_confirm_${ctx.author.id}`) {
-                        await i.deferUpdate().catch(() => {});
-                        await this.executeUnlockdown(client, ctx, sub, isExtraOwner);
-                    } else {
-                        await i.update({
-                            embeds: [
-                                new EmbedBuilder()
-                                    .setTitle(`❌ Unlockdown Aborted`)
-                                    .setDescription(`Restoration was cancelled by <@${ctx.author.id}>.`)
-                                    .setColor(client.color.red || 0xef4444)
-                            ],
-                            components: []
-                        }).catch(() => {});
-                    }
-                });
-
-                collector.on('end', async (collected: any, reason: string) => {
-                    if (reason === 'time' && collected.size === 0) {
-                        if (promptMsg && typeof promptMsg.edit === 'function') {
-                            await promptMsg.edit({
-                                embeds: [
-                                    new EmbedBuilder()
-                                        .setTitle(`⏱️ Unlockdown Confirmation Timed Out`)
-                                        .setDescription(`Request expired without confirmation.`)
-                                        .setColor(client.color.red || 0xef4444)
-                                ],
-                                components: []
-                            }).catch(() => {});
-                        }
-                    }
-                });
-                return;
-            }
-        }
-
-        // Force execution
+        // Force / Confirmed execution
         await this.executeUnlockdown(client, ctx, sub, isExtraOwner);
     }
 
@@ -241,6 +188,7 @@ export default class UnlockdownCommand extends Command {
         if (!guild) return;
 
         const results: string[] = [];
+        const allowedMentions = { parse: [], roles: [], users: [ctx.author.id], repliedUser: false };
 
         // 1. UNLOCK CHANNELS
         if (sub === 'channel' || sub === 'server') {
@@ -309,16 +257,15 @@ export default class UnlockdownCommand extends Command {
             results.push(`${client.emoji.cross} *Role restoration skipped (Requires Extra Owner status).*`);
         }
 
-        const successEmbed = new EmbedBuilder()
-            .setTitle(`${client.emoji.mod_unlock} Emergency Lockdown Lifted`)
-            .setColor(0x22c55e)
-            .setDescription(
+        await ctx.replyV2({
+            title: `${client.emoji.mod_unlock} Emergency Lockdown Lifted`,
+            description:
                 `Normalcy has been restored by <@${ctx.author.id}>.\n\n` +
-                results.join('\n\n')
-            )
-            .setFooter({ text: `Enc Server Security Core` })
-            .setTimestamp();
-
-        await ctx.sendMessage({ embeds: [successEmbed], components: [] });
+                results.join('\n\n'),
+            borderless: true,
+            color: null,
+            footer: 'Enc Server Security Core',
+            allowedMentions
+        });
     }
 }

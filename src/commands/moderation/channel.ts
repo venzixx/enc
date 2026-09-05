@@ -1,7 +1,9 @@
-import { ChannelType, EmbedBuilder, CategoryChannel, PermissionFlagsBits, TextChannel, VoiceChannel } from 'discord.js';
+import { ChannelType, CategoryChannel, PermissionFlagsBits, TextChannel, VoiceChannel } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
-import { AuditLogger, AuditLogType, AuditLogStatus } from '../../utils/AuditLogger';
+import { AuditLogger, AuditLogType } from '../../utils/AuditLogger';
+import { ModConfirmation } from '../../utils/ModConfirmation';
+import { V2Helper } from '../../utils/V2Helper';
 
 export default class ChannelManager extends Command {
     constructor(client: ExtendedClient) {
@@ -9,15 +11,16 @@ export default class ChannelManager extends Command {
             name: 'channel',
             aliases: ['ch', 'channels'],
             description: {
-                content: 'Manage channels: create, move, clone, nuke, rename, lock, unlock, hide, unhide.',
-                usage: 'channel <create|move|clone|nuke|rename|lock|unlock|hide|unhide>',
+                content: 'Manage channels: create, move, clone, nuke, rename, lock, unlock, hide, unhide, nsfw.',
+                usage: 'channel <create|move|clone|nuke|rename|lock|unlock|hide|unhide|nsfw>',
                 examples: [
                     'channel clone',
                     'ch clone #general',
                     'ch nuke',
                     'ch create lounge',
                     'ch rename chat',
-                    'ch lock'
+                    'ch lock',
+                    'ch nsfw'
                 ]
             },
             category: 'moderation',
@@ -34,7 +37,7 @@ export default class ChannelManager extends Command {
                     type: 1, // SUB_COMMAND
                     options: [
                         { name: 'name', description: 'Name of the channel', type: 3, required: true },
-                        { name: 'category', description: 'Category to place it in', type: 7, channel_types: [4], required: false } // GUILD_CATEGORY
+                        { name: 'category', description: 'Category to place it in', type: 7, channel_types: [4], required: false }
                     ]
                 },
                 {
@@ -59,7 +62,8 @@ export default class ChannelManager extends Command {
                     description: 'Deletes and recreates the channel',
                     type: 1,
                     options: [
-                        { name: 'channel', description: 'Channel to nuke (defaults to current)', type: 7, required: false }
+                        { name: 'channel', description: 'Channel to nuke (defaults to current)', type: 7, required: false },
+                        { name: 'force', description: 'Skip interactive confirmation', type: 5, required: false }
                     ]
                 },
                 {
@@ -124,6 +128,8 @@ export default class ChannelManager extends Command {
             sub = args[0]?.toLowerCase() || null;
         }
 
+        const allowedMentions = { parse: [], roles: [], users: [ctx.author.id], repliedUser: false };
+
         if (!sub) {
             return ctx.replyV2({
                 title: 'Channel Management Commands',
@@ -138,7 +144,9 @@ export default class ChannelManager extends Command {
                     ' `unlock [channel]` - Unlocks channel for @everyone\n' +
                     ' `hide [channel]` - Hides channel from @everyone\n' +
                     ' `unhide [channel]` - Unhides channel for @everyone',
-                color: client.color.main
+                borderless: true,
+                color: null,
+                allowedMentions
             });
         }
 
@@ -158,7 +166,14 @@ export default class ChannelManager extends Command {
         if (sub === 'create') {
             const name = ctx.isInteraction ? ctx.options.getString('name') : args[1];
             if (!name) {
-                return ctx.replyV2({ title: 'Error', description: 'Please provide a channel name. Usage: `,ch create <name>`', color: client.color.red });
+                return ctx.replyV2({
+                    title: 'Error',
+                    description: 'Please provide a channel name. Usage: `,ch create <name>`',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    allowedMentions
+                });
             }
 
             let category: CategoryChannel | null = null;
@@ -199,7 +214,9 @@ export default class ChannelManager extends Command {
             return ctx.replyV2({
                 title: `${client.emoji.success} Channel Created`,
                 description: `Successfully created ${newChannel}.`,
-                color: client.color.main
+                borderless: true,
+                color: null,
+                allowedMentions
             });
         }
 
@@ -213,7 +230,14 @@ export default class ChannelManager extends Command {
             }
 
             if (!category) {
-                return ctx.replyV2({ title: 'Error', description: 'Please specify a category. Usage: `,ch move <category-id> [#channel]`', color: client.color.red });
+                return ctx.replyV2({
+                    title: 'Error',
+                    description: 'Please specify a category. Usage: `,ch move <category-id> [#channel]`',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    allowedMentions
+                });
             }
 
             const targetChannel = resolveTargetChannel(2);
@@ -224,7 +248,9 @@ export default class ChannelManager extends Command {
             return ctx.replyV2({
                 title: `${client.emoji.success} Channel Moved`,
                 description: `Successfully moved ${targetChannel} to **${category.name}**.`,
-                color: client.color.main
+                borderless: true,
+                color: null,
+                allowedMentions
             });
         }
 
@@ -234,16 +260,20 @@ export default class ChannelManager extends Command {
 
             const cloned = await targetChannel.clone();
 
-            await cloned.send({ embeds: [
-                new EmbedBuilder()
-                    .setDescription(`This channel was cloned by ${ctx.author}.`)
-                    .setColor(client.color.main)
-            ] });
+            const clonePayload = V2Helper.createLayout({
+                description: `This channel was cloned by <@${ctx.author.id}>.`,
+                borderless: true,
+                color: null,
+                allowedMentions
+            });
+            await cloned.send(clonePayload).catch(() => {});
 
             return ctx.replyV2({
                 title: `${client.emoji.success} Channel Cloned`,
                 description: `Successfully duplicated to ${cloned}.`,
-                color: client.color.main
+                borderless: true,
+                color: null,
+                allowedMentions
             });
         }
 
@@ -253,6 +283,21 @@ export default class ChannelManager extends Command {
 
             const name = targetChannel.name;
             const isCurrentChannel = targetChannel.id === ctx.channel.id;
+            const force = (ctx.isInteraction ? ctx.options.getBoolean('force') : false) || args.includes('--force') || args.includes('-f');
+
+            const confirmed = await ModConfirmation.ask({
+                client,
+                ctx,
+                actionName: 'Nuke Channel',
+                targetName: `#${name} (${targetChannel.id})`,
+                dangerLevel: 'danger',
+                details: 'This will delete the channel and recreate it cleanly. All message history will be permanently lost!',
+                confirmLabel: 'Confirm Nuke',
+                confirmEmoji: '💥',
+                force
+            });
+
+            if (!confirmed) return;
             
             // Recreate
             const cloned = await targetChannel.clone({
@@ -262,13 +307,16 @@ export default class ChannelManager extends Command {
 
             await targetChannel.delete(`Nuked by ${ctx.author.tag}`).catch(() => {});
 
-            const nukeEmbed = new EmbedBuilder()
-                .setTitle(' Channel Nuked')
-                .setImage('https://i.imgur.com/BnjHPh5.gif')
-                .setColor(client.color.red)
-                .setDescription(`This channel has been nuked by ${ctx.author}.`);
+            const nukePayload = V2Helper.createLayout({
+                title: '💥 Channel Nuked',
+                description: `This channel has been nuked by <@${ctx.author.id}>.`,
+                image: 'https://i.imgur.com/BnjHPh5.gif',
+                borderless: true,
+                color: null,
+                allowedMentions
+            });
 
-            await cloned.send({ embeds: [nukeEmbed] }).catch(() => {});
+            await cloned.send(nukePayload).catch(() => {});
 
             if (isCurrentChannel) {
                 return;
@@ -276,7 +324,9 @@ export default class ChannelManager extends Command {
                 return ctx.replyV2({
                     title: `${client.emoji.success} Channel Nuked`,
                     description: `Successfully nuked **#${name}**.`,
-                    color: client.color.main
+                    borderless: true,
+                    color: null,
+                    allowedMentions
                 });
             }
         }
@@ -284,7 +334,14 @@ export default class ChannelManager extends Command {
         if (sub === 'rename') {
             const newName = ctx.isInteraction ? ctx.options.getString('name')! : args[1];
             if (!newName) {
-                return ctx.replyV2({ title: 'Error', description: 'Please specify a new channel name. Usage: `,ch rename <new-name> [#channel]`', color: client.color.red });
+                return ctx.replyV2({
+                    title: 'Error',
+                    description: 'Please specify a new channel name. Usage: `,ch rename <new-name> [#channel]`',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    allowedMentions
+                });
             }
 
             const targetChannel = ctx.isInteraction ? resolveTargetChannel(1) : (args[2] ? resolveTargetChannel(2) : (ctx.channel as TextChannel | VoiceChannel));
@@ -307,7 +364,9 @@ export default class ChannelManager extends Command {
             return ctx.replyV2({
                 title: `${client.emoji.success} Channel Renamed`,
                 description: `Successfully renamed ${targetChannel} to **${newName}**.`,
-                color: client.color.main
+                borderless: true,
+                color: null,
+                allowedMentions
             });
         }
 
@@ -334,7 +393,9 @@ export default class ChannelManager extends Command {
             return ctx.replyV2({
                 title: `${client.emoji.success} Channel ${isLock ? 'Locked' : 'Unlocked'}`,
                 description: `Successfully ${isLock ? 'locked' : 'unlocked'} ${targetChannel} for everyone.`,
-                color: isLock ? client.color.red : client.color.main
+                borderless: true,
+                color: null,
+                allowedMentions
             });
         }
 
@@ -361,7 +422,9 @@ export default class ChannelManager extends Command {
             return ctx.replyV2({
                 title: `${client.emoji.success} Channel ${isHide ? 'Hidden' : 'Unhidden'}`,
                 description: `Successfully ${isHide ? 'hidden' : 'unhidden'} ${targetChannel} from everyone.`,
-                color: isHide ? client.color.red : client.color.main
+                borderless: true,
+                color: null,
+                allowedMentions
             });
         }
 
@@ -374,7 +437,10 @@ export default class ChannelManager extends Command {
                 return ctx.replyV2({
                     title: 'Error',
                     description: 'Invalid channel or cannot be executed in DMs.',
-                    color: client.color.red
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    allowedMentions
                 });
             }
 
@@ -382,7 +448,10 @@ export default class ChannelManager extends Command {
                 return ctx.replyV2({
                     title: 'Error',
                     description: 'This channel type does not support Age-Restricted (NSFW) settings.',
-                    color: client.color.red
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    allowedMentions
                 });
             }
 
@@ -417,7 +486,9 @@ export default class ChannelManager extends Command {
             return ctx.replyV2({
                 title: `${client.emoji.success} Channel Updated`,
                 description: `Successfully ${newState ? 'marked' : 'unmarked'} ${targetChannel} as **Age-Restricted (NSFW)**.`,
-                color: newState ? 0xef4444 : client.color.main
+                borderless: true,
+                color: null,
+                allowedMentions
             });
         }
     }

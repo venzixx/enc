@@ -1,19 +1,12 @@
 import {
     ApplicationCommandOptionType,
     PermissionFlagsBits,
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    TextChannel,
-    VoiceChannel,
-    StageChannel,
-    ComponentType,
-    PermissionsBitField
+    EmbedBuilder
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { isDev } from '../../utils/devCheck';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 const DANGEROUS_PERMISSIONS = [
     PermissionFlagsBits.Administrator,
@@ -129,6 +122,7 @@ export default class LockdownCommand extends Command {
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
         if (!ctx.guild) return;
 
+        const allowedMentions = { parse: [], roles: [], users: [ctx.author.id], repliedUser: false };
         const isGuildOwner = ctx.guild.ownerId === ctx.author.id;
         const isBotDev = await isDev(client, ctx.author.id);
 
@@ -155,28 +149,27 @@ export default class LockdownCommand extends Command {
 
         // 1. If no subcommand provided, show Overview Hub
         if (!sub) {
-            const embed = new EmbedBuilder()
-                .setTitle(`${client.emoji.antinuke_siren} Emergency Lockdown Protocol Interface`)
-                .setColor(0xef4444)
-                .setDescription(
+            return await ctx.replyV2({
+                title: `${client.emoji.antinuke_siren} Emergency Lockdown Protocol Interface`,
+                description:
                     `The **Lockdown Protocol** provides rapid containment tools during raids, token breaches, or server emergencies.\n\n` +
                     `### ${client.emoji.mod_lock} Available Lockdown Modules\n` +
-                    `• ${client.emoji.folder_module} \`e!lockdown channel\` — Locks all text/voice channels for @everyone.\n` +
+                    `• ${client.emoji.folder_module} \`,lockdown channel\` — Locks all text/voice channels for @everyone.\n` +
                     `> *Access: Trusted Admins, Extra Owners, Server Owner*\n\n` +
-                    `• ${client.emoji.mod_kick} \`e!lockdown kick\` — Kicks all accounts that joined in the last 24h with a lockdown DM.\n` +
+                    `• ${client.emoji.mod_kick} \`,lockdown kick\` — Kicks all accounts that joined in the last 24h with a lockdown DM.\n` +
                     `> *Access: Trusted Admins, Extra Owners, Server Owner*\n\n` +
-                    `• ${client.emoji.mod_ban} \`e!lockdown ban\` — Bans all accounts that joined in the last 24h with a lockdown DM.\n` +
+                    `• ${client.emoji.mod_ban} \`,lockdown ban\` — Bans all accounts that joined in the last 24h with a lockdown DM.\n` +
                     `> *Access: **Extra Owners & Server Owner ONLY***\n\n` +
-                    `• ${client.emoji.shield} \`e!lockdown roles\` — Strips administrative & dangerous permissions from all roles.\n` +
+                    `• ${client.emoji.shield} \`,lockdown roles\` — Strips administrative & dangerous permissions from all roles.\n` +
                     `> *Access: **Extra Owners & Server Owner ONLY***\n\n` +
-                    `• ${client.emoji.antinuke_siren} \`e!lockdown server\` — Full emergency containment (Channels + Kick + Roles).\n` +
+                    `• ${client.emoji.antinuke_siren} \`,lockdown server\` — Full emergency containment (Channels + Kick + Roles).\n` +
                     `> *Access: Extra Owners (all 3) / Trusted Admins (Channels + Kick)*\n\n` +
-                    `*💡 Tip: Append \`--force\` to bypass the confirmation dialog.*`
-                )
-                .setFooter({ text: `To restore normalcy, use e!unlockdown <module>` })
-                .setTimestamp();
-
-            return await ctx.sendMessage({ embeds: [embed] });
+                    `*💡 Tip: Append \`--force\` to bypass the confirmation dialog.*`,
+                borderless: true,
+                color: null,
+                footer: 'To restore normalcy, use ,unlockdown <module>',
+                allowedMentions
+            });
         }
 
         // ─── PERMISSION VALIDATION ─────────────────────────────────
@@ -184,101 +177,52 @@ export default class LockdownCommand extends Command {
             if (!isExtraOwner) {
                 return await ctx.replyV2({
                     description: `${client.emoji.cross || '❌'} **Access Denied**: Only **Extra Owners** and the **Server Owner** can execute \`lockdown ${sub}\`.`,
-                    color: client.color.red,
-                    isAlert: true
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    allowedMentions
                 });
             }
         } else if (['channel', 'kick', 'server'].includes(sub)) {
             if (!isTrusted) {
                 return await ctx.replyV2({
                     description: `${client.emoji.cross || '❌'} **Access Denied**: You must be a **Trusted Admin** or **Extra Owner** to initiate lockdown protocols.`,
-                    color: client.color.red,
-                    isAlert: true
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    allowedMentions
                 });
             }
         } else {
             return await ctx.replyV2({
-                description: `${client.emoji.cross || '❌'} Unknown lockdown module \`${sub}\`. Use \`e!lockdown\` to view available modules.`,
-                color: client.color.red,
-                isAlert: true
+                description: `${client.emoji.cross || '❌'} Unknown lockdown module \`${sub}\`. Use \`,lockdown\` to view available modules.`,
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
 
         // ─── INTERACTIVE CONFIRMATION ─────────────────────────────
-        if (!force) {
-            const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`lockdown_confirm_${ctx.author.id}`)
-                    .setLabel(`Confirm Lockdown: ${sub.toUpperCase()}`)
-                    .setStyle(ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId(`lockdown_cancel_${ctx.author.id}`)
-                    .setLabel('Cancel')
-                    .setStyle(ButtonStyle.Secondary)
-            );
+        const confirmed = await ModConfirmation.ask({
+            client,
+            ctx,
+            actionName: `Lockdown (${sub.toUpperCase()})`,
+            targetName: ctx.guild.name,
+            dangerLevel: ['ban', 'roles', 'server'].includes(sub) ? 'danger' : 'warning',
+            details: sub === 'channel' ? 'Locks all text and voice channels for @everyone.'
+                   : sub === 'kick' ? 'Kicks all accounts that joined in the last 24 hours with a containment DM.'
+                   : sub === 'ban' ? 'Bans all accounts that joined in the last 24 hours with a containment DM.'
+                   : sub === 'roles' ? 'Strips administrative and dangerous permissions from all server roles.'
+                   : 'Full emergency containment: locks channels, kicks recent joins, and strips dangerous role perms.',
+            confirmLabel: `Confirm Lockdown: ${sub.toUpperCase()}`,
+            confirmEmoji: '🚨',
+            force
+        });
 
-            const confirmEmbed = new EmbedBuilder()
-                .setTitle(`⚠️ Emergency Lockdown Confirmation`)
-                .setColor(0xf97316)
-                .setDescription(
-                    `Are you sure you want to activate **Lockdown (${sub.toUpperCase()})** for **${ctx.guild.name}**?\n\n` +
-                    `• **Initiator:** <@${ctx.author.id}>\n` +
-                    `• **Module:** \`${sub}\`\n` +
-                    `• **Impact:** Immediate server-wide containment.\n\n` +
-                    `*Click **Confirm** below to proceed or **Cancel** to abort. (Auto-cancels in 30 seconds)*`
-                );
+        if (!confirmed) return;
 
-            const promptMsg: any = await ctx.sendMessage({ embeds: [confirmEmbed], components: [confirmRow] });
-
-            // Create collector
-            const messageObj = promptMsg?.fetch ? await promptMsg.fetch().catch(() => null) : promptMsg;
-            const filter = (i: any) => i.user.id === ctx.author.id && i.customId.startsWith('lockdown_');
-            
-            let collector: any = null;
-            if (messageObj && typeof messageObj.createMessageComponentCollector === 'function') {
-                collector = messageObj.createMessageComponentCollector({ filter, time: 30000, max: 1 });
-            } else if (ctx.channel) {
-                collector = (ctx.channel as any).createMessageComponentCollector({ filter, time: 30000, max: 1 });
-            }
-
-            if (collector) {
-                collector.on('collect', async (i: any) => {
-                    if (i.customId === `lockdown_confirm_${ctx.author.id}`) {
-                        await i.deferUpdate().catch(() => {});
-                        await this.executeLockdown(client, ctx, sub, isExtraOwner);
-                    } else {
-                        await i.update({
-                            embeds: [
-                                new EmbedBuilder()
-                                    .setTitle(`❌ Lockdown Aborted`)
-                                    .setDescription(`Emergency lockdown protocol was cancelled by <@${ctx.author.id}>.`)
-                                    .setColor(client.color.red || 0xef4444)
-                            ],
-                            components: []
-                        }).catch(() => {});
-                    }
-                });
-
-                collector.on('end', async (collected: any, reason: string) => {
-                    if (reason === 'time' && collected.size === 0) {
-                        if (promptMsg && typeof promptMsg.edit === 'function') {
-                            await promptMsg.edit({
-                                embeds: [
-                                    new EmbedBuilder()
-                                        .setTitle(`⏱️ Lockdown Confirmation Timed Out`)
-                                        .setDescription(`Lockdown request expired without confirmation.`)
-                                        .setColor(client.color.red || 0xef4444)
-                                ],
-                                components: []
-                            }).catch(() => {});
-                        }
-                    }
-                });
-                return;
-            }
-        }
-
-        // Force execution
+        // Force / Confirmed execution
         await this.executeLockdown(client, ctx, sub, isExtraOwner);
     }
 
@@ -290,6 +234,7 @@ export default class LockdownCommand extends Command {
         if (!guild) return;
 
         const results: string[] = [];
+        const allowedMentions = { parse: [], roles: [], users: [ctx.author.id], repliedUser: false };
 
         // 1. CHANNEL LOCKDOWN
         if (sub === 'channel' || sub === 'server') {
@@ -421,16 +366,15 @@ export default class LockdownCommand extends Command {
             results.push(`${client.emoji.cross} *Role permissions strip skipped (Requires Extra Owner status).*`);
         }
 
-        const successEmbed = new EmbedBuilder()
-            .setTitle(`${client.emoji.antinuke_siren} Emergency Lockdown Protocol Executed`)
-            .setColor(0xef4444)
-            .setDescription(
+        await ctx.replyV2({
+            title: `${client.emoji.antinuke_siren} Emergency Lockdown Protocol Executed`,
+            description:
                 `Lockdown module **${sub.toUpperCase()}** has been deployed successfully by <@${ctx.author.id}>.\n\n` +
-                results.join('\n\n')
-            )
-            .setFooter({ text: `Use e!unlockdown <module> to reverse when safe.` })
-            .setTimestamp();
-
-        await ctx.sendMessage({ embeds: [successEmbed], components: [] });
+                results.join('\n\n'),
+            borderless: true,
+            color: null,
+            footer: 'Use ,unlockdown <module> to reverse when safe.',
+            allowedMentions
+        });
     }
 }

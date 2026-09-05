@@ -34,7 +34,13 @@ export default class DeleteChannel extends Command {
         let targetChannel = targetId ? await ctx.guild.channels.fetch(targetId).catch(() => null) : ctx.channel;
 
         if (!targetChannel || targetChannel.isDMBased()) {
-            return ctx.replyV2({ description: 'Invalid channel specified.', color: client.color.red, isAlert: true });
+            return ctx.replyV2({
+                description: 'Invalid channel specified.',
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+            });
         }
 
         const channelName = (targetChannel as any).name;
@@ -56,7 +62,13 @@ export default class DeleteChannel extends Command {
 
         await (targetChannel as any).delete(`Deleted by ${ctx.author.tag}`).catch((err: any) => {
             console.error(err);
-            return ctx.replyV2({ description: 'Failed to delete channel. Check my permissions.', color: client.color.red, isAlert: true });
+            return ctx.replyV2({
+                description: 'Failed to delete channel. Check my permissions.',
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+            });
         });
 
         await AuditLogger.log(client, ctx.guild, {
@@ -75,7 +87,9 @@ export default class DeleteChannel extends Command {
             return ctx.replyV2({
                 title: `${client.emoji.success} Channel Deleted`,
                 description: `Successfully deleted **#${channelName}**.`,
-                color: client.color.main
+                borderless: true,
+                color: null,
+                allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
             });
         }
     }
