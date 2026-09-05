@@ -253,6 +253,30 @@ export class PersistentComponentRouter {
                 return true;
             }
 
+            // ─── 5. TRUTH OR DARE (Cascading game replies without editing old message) ──
+            if (customId.startsWith('tord_')) {
+                // Format: tord_<action> or tord_<action>_<rating>
+                const parts = customId.split('_');
+                const action = (parts[1] || 'random') as 'truth' | 'dare' | 'random';
+                const rating = parts[2]; // optional: pg, pg13, r
+
+                const isNsfwChannel = !interaction.guildId || (interaction.channel as any)?.nsfw || (interaction.channel as any)?.type === 1;
+                if (rating?.toLowerCase() === 'r' && !isNsfwChannel) {
+                    await interaction.reply({
+                        content: 'Rating **R** prompts can only be used in NSFW channels or DMs.',
+                        flags: MessageFlags.Ephemeral
+                    });
+                    return true;
+                }
+
+                await interaction.deferReply();
+                const { TordHelper } = await import('./TordHelper');
+                const prompt = await TordHelper.fetchPrompt(action, rating);
+                const layout = TordHelper.createLayout(prompt, interaction.user.id, rating);
+                await interaction.editReply(layout as any);
+                return true;
+            }
+
             return false;
         } catch (error: any) {
             if (error.code === 10062) return true; // Interaction already expired, ignored
