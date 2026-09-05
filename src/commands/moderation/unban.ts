@@ -1,11 +1,9 @@
 import { 
     PermissionFlagsBits, 
-    EmbedBuilder, 
     ApplicationCommandOptionType 
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
-import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
 import { CaseManager } from '../../utils/CaseManager';
 import { ModConfirmation } from '../../utils/ModConfirmation';
@@ -15,7 +13,7 @@ export default class Unban extends Command {
 		super(client, {
 			name: 'unban',
 			description: {
-				content: 'Unban a member from the server.',
+				content: 'Unban a user from the server.',
 				usage: 'unban <user_id> [reason]',
 				examples: ['unban 123456789012345678 Misunderstanding']
 			},
@@ -24,7 +22,7 @@ export default class Unban extends Command {
 			slashCommand: true,
 			permissions: {
 				user: [PermissionFlagsBits.BanMembers],
-				client: [PermissionFlagsBits.BanMembers, PermissionFlagsBits.EmbedLinks]
+				client: [PermissionFlagsBits.BanMembers]
 			},
 			options: [
 				{
@@ -50,13 +48,25 @@ export default class Unban extends Command {
 		const reason = ctx.options.getString('reason') || args.slice(1).join(' ') || 'No reason provided';
 
 		if (!user) {
-			return await ctx.reply({ content: `${client.emoji.cross} Please provide a valid user ID or mention.`, flags: [64] });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Invalid User`,
+				description: 'Please provide a valid user ID or mention to unban.', 
+				borderless: true,
+				color: null,
+				isAlert: true 
+			});
 		}
 
 		try {
 			const ban = await ctx.guild.bans.fetch(user.id).catch(() => null);
 			if (!ban) {
-				return await ctx.reply({ content: `${client.emoji.cross} This user is not banned from this server.`, flags: [64] });
+				return await ctx.replyV2({ 
+					title: `${client.emoji.cross} Not Banned`,
+					description: `**${user.tag}** (\`${user.id}\`) is not currently banned from this server.`, 
+					borderless: true,
+					color: null,
+					isAlert: true 
+				});
 			}
 
 			const force = args.includes('--force') || args.includes('-f');
@@ -86,20 +96,26 @@ export default class Unban extends Command {
                 reason
             });
 
-			const embed = new EmbedBuilder()
-				.setTitle(`${client.emoji.volmore} Member Unbanned`)
-				.setDescription(`**${user.tag}** (\`${user.id}\`) has been unbanned.`)
-				.addFields(
-                    { name: 'Case', value: `\`#${newCase.caseNumber}\``, inline: true },
-                    { name: `${client.emoji.mic} Reason`, value: reason }
-                )
-				.setColor(client.color.main)
-                .setFooter({ text: `Case #${newCase.caseNumber}` })
-				.setTimestamp();
-
-			await ctx.reply({ embeds: [embed] });
+			return await ctx.replyV2({
+				title: `${client.emoji.volmore} Member Unbanned`,
+				description: 
+					`**${user.tag}** (\`${user.id}\`) has been unbanned.\n\n` +
+					`• **Moderator:** <@${ctx.author.id}>\n` +
+					`• **Target:** <@${user.id}> (\`${user.id}\`)\n` +
+					`• **Case:** \`#${newCase.caseNumber}\`\n` +
+					`• **Reason:** ${reason}`,
+				borderless: true,
+				color: null,
+				allowedMentions: { parse: [], roles: [], users: [user.id, ctx.author.id], repliedUser: false }
+			});
 		} catch (error: any) {
-			await ctx.reply({ content: `${client.emoji.cross} Failed to unban: ${error.message}`, flags: [64] });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Execution Error`,
+				description: `Failed to unban user: ${error.message}`, 
+				borderless: true,
+				color: null,
+				isAlert: true 
+			});
 		}
 	}
 }

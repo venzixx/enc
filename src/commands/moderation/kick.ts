@@ -1,12 +1,10 @@
 import { 
     PermissionFlagsBits, 
-    EmbedBuilder, 
     GuildMember, 
     ApplicationCommandOptionType 
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
-import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
 import { Appeals } from '../../utils/Appeals';
 import { CaseManager } from '../../utils/CaseManager';
@@ -26,7 +24,7 @@ export default class Kick extends Command {
 			slashCommand: true,
 			permissions: {
 				user: [PermissionFlagsBits.KickMembers],
-				client: [PermissionFlagsBits.KickMembers, PermissionFlagsBits.EmbedLinks]
+				client: [PermissionFlagsBits.KickMembers]
 			},
 			options: [
 				{
@@ -52,21 +50,45 @@ export default class Kick extends Command {
 		const reason = ctx.options.getString('reason') || args.slice(1).join(' ') || 'No reason provided';
 
 		if (!target) {
-			return await ctx.replyV2({ description: 'Could not find that member in this server.', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Member Not Found`,
+				description: 'Could not find that member in this server.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 
 		if (target.id === ctx.author.id) {
-			return await ctx.replyV2({ description: 'You cannot kick yourself.', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Invalid Action`,
+				description: 'You cannot kick yourself from the server.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 
 		const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
 		const isBotOwner = BOT_OWNERS.has(ctx.author.id);
 		if (ctx.author.id !== ctx.guild.ownerId && !isBotOwner && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
-			return await ctx.replyV2({ description: 'Hierarchy Violation: You cannot kick someone with a higher or equal role.', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Hierarchy Violation`,
+				description: 'You cannot kick someone with a higher or equal role to you.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 
 		if (!target.kickable) {
-			return await ctx.replyV2({ description: 'Hierarchy Block: My role position is below this user. Move me higher to enable moderation.', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Bot Hierarchy Error`,
+				description: 'My role position is below this user. Move my role higher to enable moderation.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 
 		const force = args.includes('--force') || args.includes('-f');
@@ -100,20 +122,26 @@ export default class Kick extends Command {
                 reason
             });
 
-			const embed = new EmbedBuilder()
-				.setTitle(`${client.emoji.mod_kick} Member Kicked`)
-				.setDescription(`**${target.user.tag}** has been kicked from the server.`)
-				.addFields(
-                    { name: 'Case', value: `\`#${newCase.caseNumber}\``, inline: true },
-                    { name: `${client.emoji.mic} Reason`, value: reason }
-                )
-				.setColor(client.color.main)
-                .setFooter({ text: `Case #${newCase.caseNumber}` })
-				.setTimestamp();
-
-			await ctx.reply({ embeds: [embed] });
+			return await ctx.replyV2({
+				title: `${client.emoji.mod_kick} Member Kicked`,
+				description: 
+					`**${target.user.tag}** has been kicked from the server.\n\n` +
+					`• **Moderator:** <@${ctx.author.id}>\n` +
+					`• **Target:** <@${target.id}> (\`${target.id}\`)\n` +
+					`• **Case:** \`#${newCase.caseNumber}\`\n` +
+					`• **Reason:** ${reason}`,
+				borderless: true,
+				color: null,
+				allowedMentions: { parse: [], roles: [], users: [target.id, ctx.author.id], repliedUser: false }
+			});
 		} catch (error: any) {
-			await ctx.replyV2({ title: 'Execution Error', description: `Failed to execute kick: ${error.message}`, color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Execution Error`, 
+				description: `Failed to execute kick: ${error.message}`, 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 	}
 }

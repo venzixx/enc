@@ -1,12 +1,10 @@
 import { 
     PermissionFlagsBits, 
-    EmbedBuilder, 
     GuildMember, 
     ApplicationCommandOptionType 
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
-import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
 import { CaseManager } from '../../utils/CaseManager';
 import { ModConfirmation } from '../../utils/ModConfirmation';
@@ -25,7 +23,7 @@ export default class Unmute extends Command {
 			slashCommand: true,
 			permissions: {
 				user: [PermissionFlagsBits.ModerateMembers],
-				client: [PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.EmbedLinks]
+				client: [PermissionFlagsBits.ModerateMembers]
 			},
 			options: [
 				{
@@ -51,13 +49,25 @@ export default class Unmute extends Command {
 		const reason = ctx.options.getString('reason') || args.slice(1).join(' ') || 'No reason provided';
 
 		if (!target) {
-			return await ctx.reply({ content: `${client.emoji.cross} Could not find that member.`, flags: [64] });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Member Not Found`,
+				description: 'Could not find that member in this server.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 
 		const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
 		const isBotOwner = BOT_OWNERS.has(ctx.author.id);
 		if (ctx.author.id !== ctx.guild.ownerId && !isBotOwner && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
-			return await ctx.reply({ content: `${client.emoji.cross} You cannot unmute someone with a higher or equal role.`, flags: [64] });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Hierarchy Violation`,
+				description: 'You cannot unmute someone with a higher or equal role to you.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 
 		const hasTimeout = Boolean(target.communicationDisabledUntilTimestamp);
@@ -88,7 +98,13 @@ export default class Unmute extends Command {
             const restoredRoles = await CaseManager.restoreMutedRoles(client, ctx.guild!, target.id);
 
             if (!hasTimeout && restoredRoles.length === 0) {
-                return await ctx.reply({ content: `${client.emoji.cross} This user is not timed out and has no pending roles to restore.`, flags: [64] });
+                return await ctx.replyV2({ 
+					title: `${client.emoji.cross} No Active Mute`,
+					description: 'This user is not timed out and has no pending roles to restore.', 
+					borderless: true, 
+					color: null, 
+					isAlert: true 
+				});
             }
 
             // 3. Create moderation case
@@ -101,23 +117,29 @@ export default class Unmute extends Command {
             });
 
             const restoredText = restoredRoles.length > 0
-                ? `\n**Restored Role(s):** ${restoredRoles.map(r => `\`${r}\``).join(', ')}`
+                ? `\n• **Restored Role(s):** ${restoredRoles.map(r => `\`${r}\``).join(', ')}`
                 : '';
 
-			const embed = new EmbedBuilder()
-				.setTitle(`${client.emoji.volmore} Member Unmuted`)
-				.setDescription(`**${target.user.tag}** has been unmuted.${restoredText}`)
-				.addFields(
-                    { name: 'Case', value: `\`#${newCase.caseNumber}\``, inline: true },
-                    { name: `${client.emoji.mic} Reason`, value: reason }
-                )
-				.setColor(client.color.main)
-                .setFooter({ text: `Case #${newCase.caseNumber}` })
-				.setTimestamp();
-
-			await ctx.reply({ embeds: [embed] });
+			return await ctx.replyV2({
+				title: `${client.emoji.volmore} Member Unmuted`,
+				description: 
+					`**${target.user.tag}** has been unmuted.${restoredText}\n\n` +
+					`• **Moderator:** <@${ctx.author.id}>\n` +
+					`• **Target:** <@${target.id}> (\`${target.id}\`)\n` +
+					`• **Case:** \`#${newCase.caseNumber}\`\n` +
+					`• **Reason:** ${reason}`,
+				borderless: true,
+				color: null,
+				allowedMentions: { parse: [], roles: [], users: [target.id, ctx.author.id], repliedUser: false }
+			});
 		} catch (error: any) {
-			await ctx.reply({ content: `${client.emoji.cross} Failed to unmute: ${error.message}`, flags: [64] });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Execution Error`,
+				description: `Failed to unmute: ${error.message}`, 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 	}
 }

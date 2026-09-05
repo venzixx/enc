@@ -1,12 +1,10 @@
 import { 
     PermissionFlagsBits, 
-    EmbedBuilder, 
     GuildMember, 
     ApplicationCommandOptionType 
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
-import { logModerationAction } from '../../utils/Logger';
 import { Resolver } from '../../utils/Resolver';
 import { Appeals } from '../../utils/Appeals';
 import { CaseManager } from '../../utils/CaseManager';
@@ -18,15 +16,15 @@ export default class Ban extends Command {
 			name: 'ban',
 			description: {
 				content: 'Ban a member from the server.',
-				usage: 'ban <user> [reason]',
-				examples: ['ban @User Breaking rules']
+				usage: 'ban <user> [reason] [days]',
+				examples: ['ban @User Breaking rules', 'ban @User Spam 1']
 			},
 			category: 'moderation',
 			cooldown: 3,
 			slashCommand: true,
 			permissions: {
 				user: [PermissionFlagsBits.BanMembers],
-				client: [PermissionFlagsBits.BanMembers, PermissionFlagsBits.EmbedLinks]
+				client: [PermissionFlagsBits.BanMembers]
 			},
 			options: [
 				{
@@ -40,6 +38,14 @@ export default class Ban extends Command {
 					description: 'Reason for the ban',
 					type: ApplicationCommandOptionType.String,
 					required: false
+				},
+				{
+					name: 'days',
+					description: 'Days of message history to delete (0-7)',
+					type: ApplicationCommandOptionType.Integer,
+					required: false,
+					min_value: 0,
+					max_value: 7
 				}
 			]
 		});
@@ -49,24 +55,49 @@ export default class Ban extends Command {
         await ctx.deferReply();
 
         const target = await Resolver.resolveMember(ctx);
-		const reason = ctx.options.getString('reason') || args.slice(1).join(' ') || 'No reason provided';
+		const reason = ctx.options.getString('reason') || args.slice(1).filter(a => !/^[0-7]$/.test(a)).join(' ') || 'No reason provided';
+		const days = ctx.options.getInteger('days') || (args[args.length - 1] && /^[0-7]$/.test(args[args.length - 1]) ? parseInt(args[args.length - 1]) : 0);
 
 		if (!target) {
-			return await ctx.replyV2({ description: 'Could not find that member in this server.', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Member Not Found`,
+				description: 'Could not find that member in this server.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 
 		if (target.id === ctx.author.id) {
-			return await ctx.replyV2({ description: 'You cannot ban yourself.', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Invalid Action`,
+				description: 'You cannot ban yourself from the server.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 
 		const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
 		const isBotOwner = BOT_OWNERS.has(ctx.author.id);
 		if (ctx.author.id !== ctx.guild.ownerId && !isBotOwner && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
-			return await ctx.replyV2({ description: 'Hierarchy Violation: You cannot ban someone with a higher or equal role.', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Hierarchy Violation`,
+				description: 'You cannot ban someone with a higher or equal role to you.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 
 		if (!target.bannable) {
-			return await ctx.replyV2({ description: 'Hierarchy Block: My role position is below this user. Move me higher to enable moderation.', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Bot Hierarchy Error`,
+				description: 'My role position is below this user. Move my role higher to enable moderation.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 
 		const force = args.includes('--force') || args.includes('-f');
@@ -89,7 +120,10 @@ export default class Ban extends Command {
             // Send DM before banning so we have access to the member
             await Appeals.sendAppealDM(client, target.user, ctx.guild!, 'BAN', reason);
             
-			await target.ban({ reason: `Banned by ${ctx.author.tag}: ${reason}` });
+			await target.ban({ 
+				reason: `Banned by ${ctx.author.tag}: ${reason}`,
+				deleteMessageSeconds: days * 86400
+			});
 			
             // Create moderation case
             const newCase = await CaseManager.createCase(client, {
@@ -100,20 +134,27 @@ export default class Ban extends Command {
                 reason
             });
 
-			const embed = new EmbedBuilder()
-				.setTitle(`${client.emoji.hammer} Member Banned`)
-				.setDescription(`**${target.user.tag}** has been banned from the server.`)
-				.addFields(
-                    { name: 'Case', value: `\`#${newCase.caseNumber}\``, inline: true },
-                    { name: `${client.emoji.mic} Reason`, value: reason }
-                )
-				.setColor(client.color.main)
-                .setFooter({ text: `Case #${newCase.caseNumber}` })
-				.setTimestamp();
-
-			await ctx.reply({ embeds: [embed] });
+			return await ctx.replyV2({
+				title: `${client.emoji.hammer} Member Banned`,
+				description: 
+					`**${target.user.tag}** has been banned from the server.\n\n` +
+					`• **Moderator:** <@${ctx.author.id}>\n` +
+					`• **Target:** <@${target.id}> (\`${target.id}\`)\n` +
+					`• **Case:** \`#${newCase.caseNumber}\`\n` +
+					(days > 0 ? `• **Messages Deleted:** Last ${days} day(s)\n` : '') +
+					`• **Reason:** ${reason}`,
+				borderless: true,
+				color: null,
+				allowedMentions: { parse: [], roles: [], users: [target.id, ctx.author.id], repliedUser: false }
+			});
 		} catch (error: any) {
-			await ctx.replyV2({ title: 'Execution Error', description: `Failed to execute ban: ${error.message}`, color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Execution Error`, 
+				description: `Failed to execute ban: ${error.message}`, 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 	}
 }

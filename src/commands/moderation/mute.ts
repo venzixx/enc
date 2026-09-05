@@ -130,23 +130,30 @@ export default class Mute extends Command {
                 duration: durationStr
             });
 
-			const embed = new EmbedBuilder()
-				.setTitle(`${client.emoji.mod_mute} Member Muted`)
-				.setDescription(`**${target.user.tag}** has been timed out for **${durationStr}**.`)
-				.addFields(
-                    { name: 'Case', value: `\`#${newCase.caseNumber}\``, inline: true },
-                    { name: `${client.emoji.mic} Reason`, value: reason }
-                )
-				.setColor(client.color.main)
-                .setFooter({ text: `Case #${newCase.caseNumber}` })
-				.setTimestamp();
-
-			await ctx.reply({ embeds: [embed] });
+			return await ctx.replyV2({
+				title: `${client.emoji.mod_mute} Member Muted`,
+				description: 
+					`**${target.user.tag}** has been timed out for **${durationStr}**.\n\n` +
+					`• **Moderator:** <@${ctx.author.id}>\n` +
+					`• **Target:** <@${target.id}> (\`${target.id}\`)\n` +
+					`• **Duration:** \`${durationStr}\`\n` +
+					`• **Case:** \`#${newCase.caseNumber}\`\n` +
+					`• **Reason:** ${reason}`,
+				borderless: true,
+				color: null,
+				allowedMentions: { parse: [], roles: [], users: [target.id, ctx.author.id], repliedUser: false }
+			});
 		} catch (error: any) {
             if (isGuildOwner && (error.message.includes('Permissions') || error.code === 50013)) {
                 return await this.askForceMute(client, ctx, target, time, reason, durationStr);
             }
-			await ctx.replyV2({ title: 'Execution Error', description: `Failed to execute mute: ${error.message}`, color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Execution Error`, 
+				description: `Failed to execute mute: ${error.message}`, 
+				borderless: true, 
+				color: null, 
+				isAlert: true 
+			});
 		}
 	}
 
