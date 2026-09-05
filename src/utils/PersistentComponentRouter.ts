@@ -300,6 +300,68 @@ export class PersistentComponentRouter {
                 return true;
             }
 
+            // ─── 7. ABANDON FAMILY CONFIRMATIONS ──────────────────────────────────
+            if (customId.startsWith('abandon_confirm_') || customId.startsWith('abandon_cancel_')) {
+                const isConfirm = customId.startsWith('abandon_confirm_');
+                const parts = customId.split('_');
+                const initiatorId = parts[2];
+
+                if (interaction.user.id !== initiatorId) {
+                    await interaction.reply({
+                        content: 'Only the user initiating the abandonment can decide.',
+                        flags: MessageFlags.Ephemeral
+                    });
+                    return true;
+                }
+
+                await interaction.deferUpdate();
+
+                if (!isConfirm) {
+                    const cancelLayout = V2Helper.createLayout({
+                        title: '🏠 Decision Cancelled',
+                        description: 'You had second thoughts and decided to stay with your family!',
+                        borderless: true,
+                        color: null,
+                        buttons: []
+                    });
+                    await interaction.editReply(cancelLayout as any);
+                    return true;
+                }
+
+                const parents = await client.prisma.familyRelation.findMany({
+                    where: { childId: initiatorId }
+                });
+
+                if (parents.length === 0) {
+                    const noParentsLayout = V2Helper.createLayout({
+                        title: '👪 No Parents Found',
+                        description: 'You do not have any registered parents to abandon.',
+                        isAlert: true,
+                        borderless: true,
+                        color: null,
+                        buttons: []
+                    });
+                    await interaction.editReply(noParentsLayout as any);
+                    return true;
+                }
+
+                const parentMentions = parents.map(p => `<@${p.parentId}>`).join(' & ');
+
+                await client.prisma.familyRelation.deleteMany({
+                    where: { childId: initiatorId }
+                });
+
+                const confirmLayout = V2Helper.createLayout({
+                    title: '🏃 Family Abandoned',
+                    description: `You have packed your bags, left home, and abandoned your parents: ${parentMentions}.\nYou are no longer listed as their child.`,
+                    borderless: true,
+                    color: null,
+                    buttons: []
+                });
+                await interaction.editReply(confirmLayout as any);
+                return true;
+            }
+
             return false;
         } catch (error: any) {
             if (error.code === 10062) return true; // Interaction already expired, ignored

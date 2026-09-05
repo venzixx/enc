@@ -8,11 +8,13 @@ export default class Abandon extends Command {
         super(client, {
             name: 'abandon',
             description: {
-                content: 'Abandon your parents.',
-                usage: 'abandon'
+                content: 'Abandon your parents and leave your family tree.',
+                usage: 'abandon',
+                examples: ['abandon']
             },
+            aliases: ['runaway', 'leavefamily'],
             category: 'marriage',
-            cooldown: 3,
+            cooldown: 5,
             slashCommand: true,
             integration_types: [ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall],
             contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],

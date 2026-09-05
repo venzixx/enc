@@ -444,20 +444,35 @@ export const marriageHelper = {
         });
 
         if (parents.length === 0) {
-            return ctx.replyV2({ description: 'You do not have any parents in the system.', isAlert: true });
+            return ctx.replyV2({
+                title: '👪 No Parents Found',
+                description: 'You do not have any registered parents in the family tree system.',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
-        await client.prisma.familyRelation.deleteMany({
-            where: { childId: ctx.author.id }
-        });
+        const parentMentions = parents.map(p => `<@${p.parentId}>`).join(' & ');
 
-        return ctx.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle('👪 Family Update')
-                    .setDescription('You have abandoned your parents.')
-                    .setColor(client.color.red)
-            ]
+        const confirmBtn = new ButtonBuilder()
+            .setCustomId(`abandon_confirm_${ctx.author.id}`)
+            .setLabel('Abandon Parents')
+            .setEmoji('🏃')
+            .setStyle(ButtonStyle.Danger);
+
+        const cancelBtn = new ButtonBuilder()
+            .setCustomId(`abandon_cancel_${ctx.author.id}`)
+            .setLabel('Cancel')
+            .setEmoji('✖️')
+            .setStyle(ButtonStyle.Secondary);
+
+        return ctx.replyV2({
+            title: '🏃 Family Abandonment',
+            description: `Are you sure you want to run away and abandon your parents: ${parentMentions}?\n\n⚠️ **Warning:** This will permanently remove you as their child from the family tree system.`,
+            borderless: true,
+            color: null,
+            buttons: [confirmBtn, cancelBtn]
         });
     },
 
