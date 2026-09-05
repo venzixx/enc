@@ -11,6 +11,7 @@ model Guild {
   id                    String            @id
   confessionChannel     String?
   confessPingRoleId     String?
+  pollPingRoleId        String?
   countingChannel       String?
   countingCurrent       Int               @default(0)
   countingLastUser      String?
