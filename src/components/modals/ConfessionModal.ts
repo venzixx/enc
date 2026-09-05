@@ -72,11 +72,17 @@ export default class ConfessionModal extends Component {
 			}
 
 			// Build the anonymous V2 layout
+			const roleMention = guildData.confessPingRoleId ? `<@&${guildData.confessPingRoleId}>` : null;
+
 			const layout = V2Helper.createLayout({
 				title: ` Anonymous Confession #${confessionNumber}`,
-				description: confession,
-				color: this.client.color.main,
+				description: roleMention ? `${roleMention}\n\n${confession}` : confession,
+				borderless: true,
+				color: null,
 				footer: 'Click the button below to send your own confession!',
+				allowedMentions: guildData.confessPingRoleId
+					? { roles: [guildData.confessPingRoleId], parse: [], users: [] }
+					: { parse: [], roles: [], users: [] },
 				buttons: [
 					new ButtonBuilder()
 						.setCustomId('confess_create')
@@ -92,8 +98,8 @@ export default class ConfessionModal extends Component {
                 ...V2Helper.createLayout({
                     title: `${this.client.emoji.success} Confession Sent`,
                     description: `Your confession **#${confessionNumber}** has been sent anonymously!`,
-                    isAlert: true,
-                    color: this.client.color.main,
+                    borderless: true,
+                    color: null,
                     ephemeral: true
                 }) as any
             });

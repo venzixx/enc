@@ -88,7 +88,10 @@ export default class Config extends Command {
                     name: 'confess',
                     description: 'Setup the anonymous confession module.',
                     type: ApplicationCommandOptionType.Subcommand,
-                    options: [{ name: 'channel', description: 'Confession channel', type: ApplicationCommandOptionType.Channel, channel_types: [ChannelType.GuildText], required: true }]
+                    options: [
+                        { name: 'channel', description: 'Confession channel', type: ApplicationCommandOptionType.Channel, channel_types: [ChannelType.GuildText], required: true },
+                        { name: 'ping_role', description: 'Role to ping when a confession is posted', type: ApplicationCommandOptionType.Role, required: false }
+                    ]
                 },
                 {
                     name: 'counting',
@@ -366,15 +369,33 @@ export default class Config extends Command {
                 }
                 case 'confess': {
                     const channel = ctx.options.getChannel('channel', true);
-                    await client.prisma.guild.upsert({ where: { id: ctx.guild.id }, update: { confessionChannel: channel.id }, create: { id: ctx.guild.id, confessionChannel: channel.id } });
+                    const pingRole = ctx.options.getRole('ping_role');
+                    await client.prisma.guild.upsert({ 
+                        where: { id: ctx.guild.id }, 
+                        update: { 
+                            confessionChannel: channel.id,
+                            ...(pingRole !== null && pingRole !== undefined ? { confessPingRoleId: pingRole.id } : {})
+                        }, 
+                        create: { 
+                            id: ctx.guild.id, 
+                            confessionChannel: channel.id,
+                            confessPingRoleId: pingRole?.id || null 
+                        } 
+                    });
                     await (channel as TextChannel).send(V2Helper.createLayout({
                         title: ' Anonymous Confessions',
                         description: 'Share your deepest secrets anonymously! Click the button below to send a confession.',
-                        color: client.color.main,
+                        borderless: true,
+                        color: null,
                         footer: 'Your identity will remain completely hidden.',
                         buttons: [ new ButtonBuilder().setCustomId('confess_create').setLabel('Send Confession').setEmoji('1494693086843109527').setStyle(ButtonStyle.Primary) ]
                     }) as any).catch(() => {});
-                    return ctx.replyV2({ title: 'Confession Configured', description: `Anonymous confessions posted in ${channel}.`, color: client.color.main });
+                    return ctx.replyV2({ 
+                        title: 'Confession Configured', 
+                        description: `Anonymous confessions posted in ${channel}${pingRole ? ` pinging ${pingRole}` : ''}.`, 
+                        borderless: true,
+                        color: null 
+                    });
                 }
                 case 'counting': {
                     const channel = ctx.options.getChannel('channel', true);
