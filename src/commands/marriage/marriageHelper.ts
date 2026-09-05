@@ -923,7 +923,12 @@ export const marriageHelper = {
         }
 
         if (allUsers.size === 0) {
-            return ctx.replyV2({ description: 'No marriage or family relationships have been registered yet.', isAlert: true });
+            return ctx.replyV2({
+                title: '🌳 Global Family Tree',
+                description: 'No marriage or family relationships have been registered yet.\nBe the first to propose using `/marry` or adopt a child using `/adopt`!',
+                borderless: true,
+                color: null
+            });
         }
 
         // Find connected components using BFS

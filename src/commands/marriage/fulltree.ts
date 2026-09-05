@@ -8,9 +8,11 @@ export default class Fulltree extends Command {
         super(client, {
             name: 'fulltree',
             description: {
-                content: 'View the global marriage and relationship tree.',
-                usage: 'fulltree [page] [font=FontName]'
+                content: 'View the global marriage and family relationship tree.',
+                usage: 'fulltree [page] [font=FontName]',
+                examples: ['fulltree', 'fulltree 2', 'fulltree font=Roboto', 'fulltree 2 font=Caveat']
             },
+            aliases: ['globaltree', 'worldtree', 'alltrees'],
             category: 'marriage',
             cooldown: 5,
             slashCommand: true,
@@ -51,6 +53,8 @@ export default class Fulltree extends Command {
             const pageArg = args.find(arg => !isNaN(parseInt(arg, 10)) && !arg.includes('='));
             if (pageArg) {
                 page = parseInt(pageArg, 10);
+            } else if (args[0] && isNaN(parseInt(args[0], 10)) && !args[0].includes('=')) {
+                font = args[0].trim();
             }
         }
 
