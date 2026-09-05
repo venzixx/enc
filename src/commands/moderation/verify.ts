@@ -3,6 +3,7 @@ import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
 import { isDev } from '../../utils/devCheck';
 import { V2Helper } from '../../utils/V2Helper';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class Verify extends Command {
     constructor(client: ExtendedClient) {
@@ -24,6 +25,8 @@ export default class Verify extends Command {
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
         if (!ctx.guild) return;
 
+        const allowedMentions = { parse: [], roles: [], users: [ctx.author.id], repliedUser: false };
+
         // 1. Authorization: Only Server Owner, Bot Developers, and Extra Owners
         const isGuildOwner = ctx.guild.ownerId === ctx.author.id;
         const isBotDev = await isDev(client, ctx.author.id);
@@ -33,7 +36,10 @@ export default class Verify extends Command {
         if (!isExtraOwner) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} **Access Denied**: Only the **Server Owner** and **Extra Owners** can manually verify members.`, 
-                borderless: true
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
 
@@ -42,7 +48,10 @@ export default class Verify extends Command {
         if (!targetStr) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} Please specify a user to verify.\n\n**Usage:** \`${ctx.prefix || ','}verify <@user|userId>\``, 
-                borderless: true
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
 
@@ -50,7 +59,10 @@ export default class Verify extends Command {
         if (!member) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} Could not find that member in this server.`, 
-                borderless: true
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
 
@@ -59,7 +71,10 @@ export default class Verify extends Command {
         if (!guildData || !guildData.verificationRoleId) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} Verification is not configured for this server. Please set a verified role first via \`,config verify <#channel> <@role>\` or on the dashboard.`, 
-                borderless: true
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
 
@@ -67,19 +82,41 @@ export default class Verify extends Command {
         if (!role) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} The configured verification role (\`${guildData.verificationRoleId}\`) was not found in this server.`, 
-                borderless: true
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
 
         // 4. Check If Already Verified
         if (member.roles.cache.has(role.id)) {
             return await ctx.replyV2({ 
-                description: `${client.emoji.info || 'ℹ️'} **${member.user.tag}** is already verified!`, 
-                borderless: true
+                description: `${client.emoji.info || 'ℹ️'} **${member.user.tag}** (<@${member.id}>) is already verified!`, 
+                borderless: true,
+                color: null,
+                allowedMentions: { parse: [], roles: [], users: [member.id, ctx.author.id], repliedUser: false }
             });
         }
 
-        // 5. Execute Verification
+        // 5. Interactive Confirmation
+        const force = args.includes('--force') || args.includes('-f');
+        const confirmed = await ModConfirmation.ask({
+            client,
+            ctx,
+            actionName: 'Manual Verify',
+            targetName: `${member.user.tag} (${member.id})`,
+            targetAvatar: member.user.displayAvatarURL(),
+            dangerLevel: 'primary',
+            details: `Assign verification role @${role.name} to member.`,
+            confirmLabel: 'Confirm Verify',
+            confirmEmoji: '✅',
+            force
+        });
+
+        if (!confirmed) return;
+
+        // 6. Execute Verification
         try {
             await member.roles.add(role.id, `Manual verification by ${ctx.author.tag}`);
 
@@ -99,7 +136,8 @@ export default class Verify extends Command {
                         description: `**Member:** **${member.user.tag}** (\`${member.id}\`)\n**Status:** Manually Verified\n**Verified By:** **${ctx.author.tag}** (\`${ctx.author.id}\`)\n**Role Given:** \`@${role.name}\` (\`${role.id}\`)`,
                         footer: "Encl Security Engine",
                         timestamp: true,
-                        borderless: true
+                        borderless: true,
+                        color: null
                     });
                     await (logChannel as any).send({
                         ...layout,
@@ -123,19 +161,20 @@ export default class Verify extends Command {
                 }
             }).catch(() => {});
 
-            const replyLayout = V2Helper.createLayout({
-                description: `${client.emoji.success || '✅'} Successfully verified **${member.user.tag}** (\`${member.id}\`) and assigned \`@${role.name}\`!`,
-                borderless: true
+            return await ctx.replyV2({
+                title: `${client.emoji.success || '✅'} Member Verified`,
+                description: `Successfully verified **${member.user.tag}** (<@${member.id}>) and assigned \`@${role.name}\`!`,
+                borderless: true,
+                color: null,
+                allowedMentions: { parse: [], roles: [], users: [member.id, ctx.author.id], repliedUser: false }
             });
-
-            return await ctx.reply({
-                ...replyLayout,
-                allowedMentions: { parse: [], roles: [], users: [] }
-            } as any);
         } catch (err: any) {
             return await ctx.replyV2({
                 description: `${client.emoji.cross || '❌'} Failed to assign verification role: ${err.message}`,
-                borderless: true
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
     }

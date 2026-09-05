@@ -1,7 +1,8 @@
-import { EmbedBuilder, PermissionFlagsBits, GuildMember } from 'discord.js';
+import { PermissionFlagsBits, GuildMember } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class NicknameCommand extends Command {
     constructor(client: ExtendedClient) {
@@ -10,8 +11,8 @@ export default class NicknameCommand extends Command {
             aliases: ['nick'],
             description: {
                 content: 'Check or force a member\'s nickname.',
-                usage: 'nickname <user> [force <on/off>]',
-                examples: ['nickname @Member', 'nickname @Member force on']
+                usage: 'nickname <user> [nickname] [force <on/off>]',
+                examples: ['nickname @Member', 'nickname @Member cool-name', 'nickname @Member force on']
             },
             category: 'moderation',
             cooldown: 3,
@@ -52,7 +53,13 @@ export default class NicknameCommand extends Command {
 
         const target = await Resolver.resolveMember(ctx, args[0]);
         if (!target) {
-            return await ctx.reply({ content: 'Please provide a valid member.' });
+            return await ctx.replyV2({
+                description: 'Please provide a valid member.',
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+            });
         }
 
         let forceArg: string | null = null;
@@ -75,15 +82,54 @@ export default class NicknameCommand extends Command {
             }
         }
 
+        // Clean empty string
+        if (newNickname === '') newNickname = null;
+
+        // Interactive confirmation if making changes
+        if (newNickname || forceArg) {
+            const force = args.includes('--force') || args.includes('-f');
+            const actionName = forceArg ? `Force Nickname (${forceArg.toUpperCase()})` : 'Change Nickname';
+            const details = newNickname 
+                ? `Set nickname to "${newNickname}"${forceArg ? ` (Force: ${forceArg})` : ''}` 
+                : `Set force nickname status to "${forceArg}"`;
+
+            const confirmed = await ModConfirmation.ask({
+                client,
+                ctx,
+                actionName,
+                targetName: `${target.user.tag} (${target.id})`,
+                targetAvatar: target.user.displayAvatarURL(),
+                dangerLevel: 'warning',
+                details,
+                confirmLabel: 'Confirm Nickname',
+                confirmEmoji: '✏️',
+                force
+            });
+
+            if (!confirmed) return;
+        }
+
         // 1. Handle Nickname Change if provided
         if (newNickname) {
             try {
                 if (target.roles.highest.position >= (ctx.guild.members.me as GuildMember).roles.highest.position && ctx.guild.ownerId !== ctx.author.id) {
-                    return await ctx.reply({ content: 'I cannot change the nickname of someone with a higher or equal role than me.' });
+                    return await ctx.replyV2({
+                        description: 'I cannot change the nickname of someone with a higher or equal role than me.',
+                        borderless: true,
+                        color: null,
+                        isAlert: true,
+                        allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+                    });
                 }
                 await target.setNickname(newNickname, `Requested by ${ctx.author.tag}`);
             } catch (err: any) {
-                return await ctx.reply({ content: `Failed to change nickname: ${err.message}` });
+                return await ctx.replyV2({
+                    description: `Failed to change nickname: ${err.message}`,
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+                });
             }
         }
 
@@ -98,23 +144,25 @@ export default class NicknameCommand extends Command {
                 create: { guildId: ctx.guild.id, userId: target.id, nickname: finalNick }
             });
 
-            const embed = new EmbedBuilder()
-                .setTitle(`${client.emoji.success} Nickname Forced`)
-                .setDescription(`Successfully ${newNickname ? 'updated and ' : ''}forced **${target.user.tag}**'s nickname to \`${finalNick}\`.`)
-                .setColor(client.color.main);
-            
-            return await ctx.reply({ embeds: [embed] });
+            return await ctx.replyV2({
+                title: `${client.emoji.success} Nickname Forced`,
+                description: `Successfully ${newNickname ? 'updated and ' : ''}forced **${target.user.tag}** (<@${target.id}>)'s nickname to \`${finalNick}\`.`,
+                borderless: true,
+                color: null,
+                allowedMentions: { parse: [], roles: [], users: [target.id, ctx.author.id], repliedUser: false }
+            });
         } else if (forceArg === 'off') {
             await client.prisma.forcedNickname.deleteMany({
                 where: { guildId: ctx.guild.id, userId: target.id }
             });
 
-            const embed = new EmbedBuilder()
-                .setTitle(`${client.emoji.success} Force Removed`)
-                .setDescription(`Successfully ${newNickname ? 'updated nickname and ' : ''}removed force for **${target.user.tag}**.`)
-                .setColor(client.color.main);
-            
-            return await ctx.reply({ embeds: [embed] });
+            return await ctx.replyV2({
+                title: `${client.emoji.success} Force Removed`,
+                description: `Successfully ${newNickname ? 'updated nickname and ' : ''}removed force for **${target.user.tag}** (<@${target.id}>).`,
+                borderless: true,
+                color: null,
+                allowedMentions: { parse: [], roles: [], users: [target.id, ctx.author.id], repliedUser: false }
+            });
         }
 
         // 3. If no force arg and no nickname change, just show info
@@ -123,18 +171,25 @@ export default class NicknameCommand extends Command {
                 where: { guildId_userId: { guildId: ctx.guild.id, userId: target.id } }
             });
 
-            const embed = new EmbedBuilder()
-                .setTitle(`Nickname Info: ${target.user.tag}`)
-                .addFields(
+            return await ctx.replyV2({
+                title: `Nickname Info: ${target.user.tag}`,
+                fields: [
                     { name: 'Current Nickname', value: target.nickname || 'None', inline: true },
                     { name: 'Force Status', value: isForced ? `${client.emoji.success} Forced (\`${isForced.nickname}\`)` : `${client.emoji.cross} Not Forced`, inline: true }
-                )
-                .setColor(client.color.main)
-                .setThumbnail(target.user.displayAvatarURL());
-
-            return await ctx.reply({ embeds: [embed] });
+                ],
+                borderless: true,
+                color: null,
+                thumbnail: target.user.displayAvatarURL(),
+                allowedMentions: { parse: [], roles: [], users: [target.id, ctx.author.id], repliedUser: false }
+            });
         } else if (newNickname && !forceArg) {
-            return await ctx.reply({ content: `${client.emoji.success} Successfully changed nickname for **${target.user.tag}** to \`${newNickname}\`.` });
+            return await ctx.replyV2({
+                title: `${client.emoji.success} Nickname Updated`,
+                description: `Successfully changed nickname for **${target.user.tag}** (<@${target.id}>) to \`${newNickname}\`.`,
+                borderless: true,
+                color: null,
+                allowedMentions: { parse: [], roles: [], users: [target.id, ctx.author.id], repliedUser: false }
+            });
         }
     }
 }

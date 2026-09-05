@@ -3,6 +3,7 @@ import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
 import { isDev } from '../../utils/devCheck';
 import { V2Helper } from '../../utils/V2Helper';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class Unverify extends Command {
     constructor(client: ExtendedClient) {
@@ -24,6 +25,8 @@ export default class Unverify extends Command {
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
         if (!ctx.guild) return;
 
+        const allowedMentions = { parse: [], roles: [], users: [ctx.author.id], repliedUser: false };
+
         // 1. Authorization: Only Server Owner, Bot Developers, and Extra Owners
         const isGuildOwner = ctx.guild.ownerId === ctx.author.id;
         const isBotDev = await isDev(client, ctx.author.id);
@@ -33,7 +36,10 @@ export default class Unverify extends Command {
         if (!isExtraOwner) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} **Access Denied**: Only the **Server Owner** and **Extra Owners** can unverify members.`, 
-                borderless: true
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
 
@@ -42,7 +48,10 @@ export default class Unverify extends Command {
         if (!targetStr) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} Please specify a user to unverify.\n\n**Usage:** \`${ctx.prefix || ','}unverify <@user|userId> [reason]\``, 
-                borderless: true
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
 
@@ -50,24 +59,47 @@ export default class Unverify extends Command {
         if (!member) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} Could not find that member in this server.`, 
-                borderless: true
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
 
-        const reason = args.slice(1).join(' ') || 'No reason provided';
+        const reason = args.slice(1).filter(a => a !== '--force' && a !== '-f').join(' ') || 'No reason provided';
 
         // 3. Guild Verification Configuration Check
         const guildData = await client.prisma.guild.findUnique({ where: { id: ctx.guild.id } });
         if (!guildData || !guildData.verificationRoleId) {
             return await ctx.replyV2({ 
                 description: `${client.emoji.cross || '❌'} Verification is not configured for this server.`, 
-                borderless: true
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
 
         const role = ctx.guild.roles.cache.get(guildData.verificationRoleId);
 
-        // 4. Execute Unverification
+        // 4. Interactive Confirmation
+        const force = args.includes('--force') || args.includes('-f');
+        const confirmed = await ModConfirmation.ask({
+            client,
+            ctx,
+            actionName: 'Manual Unverify',
+            targetName: `${member.user.tag} (${member.id})`,
+            targetAvatar: member.user.displayAvatarURL(),
+            dangerLevel: 'danger',
+            details: `Strip verification roles and reset verification status. Reason: ${reason}`,
+            confirmLabel: 'Confirm Unverify',
+            confirmEmoji: '🚫',
+            force
+        });
+
+        if (!confirmed) return;
+
+        // 5. Execute Unverification
         try {
             if (role && member.roles.cache.has(role.id)) {
                 await member.roles.remove(role.id, `Unverified by ${ctx.author.tag}: ${reason}`).catch(() => {});
@@ -98,7 +130,8 @@ export default class Unverify extends Command {
                         description: `**Member:** **${member.user.tag}** (\`${member.id}\`)\n**Status:** Unverified & Access Revoked\n**Unverified By:** **${ctx.author.tag}** (\`${ctx.author.id}\`)\n**Reason:** ${reason}\n**Role Removed:** ${role ? `\`@${role.name}\` (\`${role.id}\`)` : 'None'}`,
                         footer: "Encl Security Engine",
                         timestamp: true,
-                        borderless: true
+                        borderless: true,
+                        color: null
                     });
                     await (logChannel as any).send({
                         ...layout,
@@ -122,19 +155,20 @@ export default class Unverify extends Command {
                 }
             }).catch(() => {});
 
-            const replyLayout = V2Helper.createLayout({
-                description: `${client.emoji.success || '✅'} Successfully unverified **${member.user.tag}** (\`${member.id}\`) and reset their verification roles.\n**Reason:** ${reason}`,
-                borderless: true
+            return await ctx.replyV2({
+                title: `${client.emoji.success || '✅'} Member Unverified`,
+                description: `Successfully unverified **${member.user.tag}** (<@${member.id}>) and reset their verification roles.\n**Reason:** ${reason}`,
+                borderless: true,
+                color: null,
+                allowedMentions: { parse: [], roles: [], users: [member.id, ctx.author.id], repliedUser: false }
             });
-
-            return await ctx.reply({
-                ...replyLayout,
-                allowedMentions: { parse: [], roles: [], users: [] }
-            } as any);
         } catch (err: any) {
             return await ctx.replyV2({
                 description: `${client.emoji.cross || '❌'} Failed to unverify member: ${err.message}`,
-                borderless: true
+                borderless: true,
+                color: null,
+                isAlert: true,
+                allowedMentions
             });
         }
     }
