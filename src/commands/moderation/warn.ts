@@ -1,6 +1,5 @@
 import { 
     PermissionFlagsBits, 
-    EmbedBuilder, 
     GuildMember, 
     ApplicationCommandOptionType 
 } from 'discord.js';
@@ -8,6 +7,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
 import { CaseManager } from '../../utils/CaseManager';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class Warn extends Command {
     constructor(client: ExtendedClient) {
@@ -24,7 +24,7 @@ export default class Warn extends Command {
             slashCommand: true,
             permissions: {
                 user: [PermissionFlagsBits.ModerateMembers],
-                client: [PermissionFlagsBits.EmbedLinks]
+                client: []
             },
             options: [
                 {
@@ -47,7 +47,13 @@ export default class Warn extends Command {
         await ctx.deferReply();
 
         if (!ctx.guild) {
-            return await ctx.replyV2({ description: 'This command can only be used in a server.', color: client.color.red, isAlert: true });
+            return await ctx.replyV2({ 
+                title: `${client.emoji.cross} Server Only`,
+                description: 'This command can only be used in a server.', 
+                borderless: true, 
+                color: null, 
+                isAlert: true 
+            });
         }
 
         const target = await Resolver.resolveMember(ctx);
@@ -60,27 +66,73 @@ export default class Warn extends Command {
         }
 
         if (!target) {
-            return await ctx.replyV2({ description: 'Could not find that member in this server.', color: client.color.red, isAlert: true });
+            return await ctx.replyV2({ 
+                title: `${client.emoji.cross} Member Not Found`,
+                description: 'Could not find that member in this server.', 
+                borderless: true, 
+                color: null, 
+                isAlert: true 
+            });
         }
 
         if (!reason) {
-            return await ctx.replyV2({ description: 'Please provide a valid reason for the warning.\n**Usage:** `.warn <@user> <reason>`', color: client.color.red, isAlert: true });
+            return await ctx.replyV2({ 
+                title: `${client.emoji.cross} Missing Reason`,
+                description: 'Please provide a valid reason for the warning.\n**Usage:** `.warn <@user> <reason>`', 
+                borderless: true, 
+                color: null, 
+                isAlert: true 
+            });
         }
 
         if (target.id === ctx.author.id) {
-            return await ctx.replyV2({ description: 'You cannot warn yourself.', color: client.color.red, isAlert: true });
+            return await ctx.replyV2({ 
+                title: `${client.emoji.cross} Invalid Action`,
+                description: 'You cannot warn yourself.', 
+                borderless: true, 
+                color: null, 
+                isAlert: true 
+            });
         }
 
         if (target.user.bot) {
-            return await ctx.replyV2({ description: 'You cannot warn bots.', color: client.color.red, isAlert: true });
+            return await ctx.replyV2({ 
+                title: `${client.emoji.cross} Invalid Action`,
+                description: 'You cannot warn bots.', 
+                borderless: true, 
+                color: null, 
+                isAlert: true 
+            });
         }
 
         const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
         const isBotOwner = BOT_OWNERS.has(ctx.author.id);
 
         if (ctx.author.id !== ctx.guild.ownerId && !isBotOwner && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
-            return await ctx.replyV2({ description: 'Hierarchy Violation: You cannot warn someone with a higher or equal role.', color: client.color.red, isAlert: true });
+            return await ctx.replyV2({ 
+                title: `${client.emoji.cross} Hierarchy Violation`,
+                description: 'You cannot warn someone with a higher or equal role to you.', 
+                borderless: true, 
+                color: null, 
+                isAlert: true 
+            });
         }
+
+        const force = args.includes('--force') || args.includes('-f');
+        const confirmed = await ModConfirmation.ask({
+            client,
+            ctx,
+            actionName: 'Warn Member',
+            targetName: `${target.user.tag} (${target.id})`,
+            targetAvatar: target.user.displayAvatarURL(),
+            dangerLevel: 'warning',
+            reason,
+            confirmLabel: 'Confirm Warn',
+            confirmEmoji: client.emoji?.mod_warn || '⚠️',
+            force
+        });
+
+        if (!confirmed) return;
 
         try {
             // Create the case record
@@ -97,40 +149,34 @@ export default class Warn extends Command {
 
             // Try to DM the warned member
             try {
-                const dmEmbed = new EmbedBuilder()
-                    .setTitle(`${client.emoji.mod_warn} Warning from ${ctx.guild.name}`)
-                    .setDescription(`You have received a warning in **${ctx.guild.name}**.`)
-                    .addFields(
-                        { name: 'Case ID', value: `\`#${newCase.caseNumber}\``, inline: true },
-                        { name: 'Moderator', value: `${ctx.author.tag}`, inline: true },
-                        { name: 'Total Warnings', value: `\`${totalWarns}\``, inline: true },
-                        { name: 'Reason', value: reason }
-                    )
-                    .setColor(client.color.main)
-                    .setTimestamp();
-
-                await target.user.send({ embeds: [dmEmbed] }).catch(() => null);
+                await target.user.send({
+                    content: `⚠️ You have received a warning in **${ctx.guild.name}** for: **${reason}** (Case #${newCase.caseNumber}).`
+                }).catch(() => null);
             } catch {
                 // Ignore DM failure if user has DMs closed
             }
 
-            // Reply with Wick-style clean confirmation embed
-            const embed = new EmbedBuilder()
-                .setAuthor({ name: `Member Warned • Case #${newCase.caseNumber}`, iconURL: target.user.displayAvatarURL() })
-                .setDescription(`**${target.user.tag}** has been warned.`)
-                .addFields(
-                    { name: `${client.emoji.user} User`, value: `${target.user.tag} (\`${target.id}\`)`, inline: true },
-                    { name: `${client.emoji.shield} Moderator`, value: `${ctx.author.tag} (\`${ctx.author.id}\`)`, inline: true },
-                    { name: `${client.emoji.mod_warn} Total Warns`, value: `\`${totalWarns}\``, inline: true },
-                    { name: `${client.emoji.mic} Reason`, value: reason }
-                )
-                .setColor(client.color.main)
-                .setFooter({ text: `Case #${newCase.caseNumber} • Use .case ${newCase.caseNumber} to view details` })
-                .setTimestamp();
-
-            return await ctx.reply({ embeds: [embed] });
+            return await ctx.replyV2({
+                title: `${client.emoji.mod_warn} Member Warned`,
+                description: 
+                    `**${target.user.tag}** has received a formal warning.\n\n` +
+                    `• **Moderator:** <@${ctx.author.id}>\n` +
+                    `• **Target:** <@${target.id}> (\`${target.id}\`)\n` +
+                    `• **Case:** \`#${newCase.caseNumber}\`\n` +
+                    `• **Total Warnings:** \`${totalWarns}\`\n` +
+                    `• **Reason:** ${reason}`,
+                borderless: true,
+                color: null,
+                allowedMentions: { parse: [], roles: [], users: [target.id, ctx.author.id], repliedUser: false }
+            });
         } catch (error: any) {
-            return await ctx.replyV2({ title: 'Execution Error', description: `Failed to issue warning: ${error.message}`, color: client.color.red, isAlert: true });
+            return await ctx.replyV2({ 
+                title: `${client.emoji.cross} Execution Error`, 
+                description: `Failed to issue warning: ${error.message}`, 
+                borderless: true, 
+                color: null, 
+                isAlert: true 
+            });
         }
     }
 }

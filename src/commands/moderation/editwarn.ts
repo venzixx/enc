@@ -1,11 +1,11 @@
 import { 
     PermissionFlagsBits, 
-    EmbedBuilder, 
     ApplicationCommandOptionType 
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { CaseManager } from '../../utils/CaseManager';
+import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class EditWarn extends Command {
     constructor(client: ExtendedClient) {
@@ -22,7 +22,7 @@ export default class EditWarn extends Command {
             slashCommand: true,
             permissions: {
                 user: [PermissionFlagsBits.ModerateMembers],
-                client: [PermissionFlagsBits.EmbedLinks]
+                client: []
             },
             options: [
                 {
@@ -45,7 +45,13 @@ export default class EditWarn extends Command {
         await ctx.deferReply();
 
         if (!ctx.guild) {
-            return await ctx.replyV2({ description: 'This command can only be used in a server.', color: client.color.red, isAlert: true });
+            return await ctx.replyV2({ 
+                title: `${client.emoji.cross} Server Only`,
+                description: 'This command can only be used in a server.', 
+                borderless: true, 
+                color: null, 
+                isAlert: true 
+            });
         }
 
         let caseNumber = 0;
@@ -56,7 +62,13 @@ export default class EditWarn extends Command {
             newReason = ctx.options.getString('reason', true);
         } else {
             if (!args[0] || isNaN(parseInt(args[0], 10))) {
-                return await ctx.replyV2({ description: 'Please provide a valid case number.\n**Usage:** `.editwarn <case_number> <new_reason>`', color: client.color.red, isAlert: true });
+                return await ctx.replyV2({ 
+                    title: `${client.emoji.cross} Missing Case Number`,
+                    description: 'Please provide a valid case number.\n**Usage:** `.editwarn <case_number> <new_reason>`', 
+                    borderless: true, 
+                    color: null, 
+                    isAlert: true 
+                });
             }
 
             caseNumber = parseInt(args[0], 10);
@@ -64,35 +76,69 @@ export default class EditWarn extends Command {
         }
 
         if (!newReason) {
-            return await ctx.replyV2({ description: 'Please provide a new reason.\n**Usage:** `.editwarn <case_number> <new_reason>`', color: client.color.red, isAlert: true });
+            return await ctx.replyV2({ 
+                title: `${client.emoji.cross} Missing Reason`,
+                description: 'Please provide a new reason.\n**Usage:** `.editwarn <case_number> <new_reason>`', 
+                borderless: true, 
+                color: null, 
+                isAlert: true 
+            });
         }
+
+        const existing = await client.prisma.case.findFirst({
+            where: { guildId: ctx.guild.id, caseNumber }
+        });
+
+        if (!existing) {
+            return await ctx.replyV2({
+                title: `${client.emoji.cross} Case Not Found`,
+                description: `Case **#${caseNumber}** was not found in this server.`,
+                borderless: true,
+                color: null,
+                isAlert: true
+            });
+        }
+
+        const force = args.includes('--force') || args.includes('-f');
+        const confirmed = await ModConfirmation.ask({
+            client,
+            ctx,
+            actionName: 'Edit Case Reason',
+            targetName: `Case #${caseNumber} (${existing.type})`,
+            dangerLevel: 'primary',
+            details: `Target: ${existing.targetTag || 'Unknown'} (${existing.targetId})\nOld Reason: ${existing.reason}\nNew Reason: ${newReason}`,
+            confirmLabel: 'Confirm Update',
+            confirmEmoji: '✏️',
+            force
+        });
+
+        if (!confirmed) return;
 
         const result = await CaseManager.editCase(client, ctx.guild.id, caseNumber, newReason);
 
         if (!result) {
             return await ctx.replyV2({
-                description: `Case **#${caseNumber}** was not found in this server.`,
-                color: client.color.red,
+                title: `${client.emoji.cross} Update Failed`,
+                description: `Failed to update case **#${caseNumber}**.`,
+                borderless: true,
+                color: null,
                 isAlert: true
             });
         }
 
         const { previous, updated } = result;
-        const emoji = CaseManager.getActionEmoji(updated.type);
 
-        const embed = new EmbedBuilder()
-            .setAuthor({ name: `Case #${caseNumber} Updated`, iconURL: ctx.guild.iconURL() || undefined })
-            .setDescription(`${emoji} Moderation **${updated.type}** case reason has been updated.`)
-            .addFields(
-                { name: '👤 Target', value: `${updated.targetTag || 'Unknown'} (\`${updated.targetId}\`)`, inline: true },
-                { name: '🛡️ Editor', value: `${ctx.author.tag} (\`${ctx.author.id}\`)`, inline: true },
-                { name: '📝 Previous Reason', value: previous.reason },
-                { name: '✨ New Reason', value: updated.reason }
-            )
-            .setColor(client.color.main)
-            .setFooter({ text: `Case #${caseNumber} • Originally logged by ${updated.moderatorTag || 'Unknown'}` })
-            .setTimestamp();
-
-        return await ctx.reply({ embeds: [embed] });
+        return await ctx.replyV2({
+            title: `✏️ Case #${caseNumber} Reason Updated`,
+            description: 
+                `Updated **${updated.type}** case **#${caseNumber}**.\n\n` +
+                `• **Target:** <@${updated.targetId}> (\`${updated.targetId}\`)\n` +
+                `• **Editor:** <@${ctx.author.id}>\n` +
+                `• **Previous Reason:** ${previous.reason}\n` +
+                `• **New Reason:** ${updated.reason}`,
+            borderless: true,
+            color: null,
+            allowedMentions: { parse: [], roles: [], users: [updated.targetId, ctx.author.id], repliedUser: false }
+        });
     }
 }

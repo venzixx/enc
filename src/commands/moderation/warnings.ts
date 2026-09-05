@@ -1,8 +1,6 @@
 import { 
     PermissionFlagsBits, 
-    EmbedBuilder, 
     ApplicationCommandOptionType,
-    ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
     ComponentType
@@ -11,6 +9,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
 import { CaseManager } from '../../utils/CaseManager';
+import { V2Helper } from '../../utils/V2Helper';
 
 export default class Warnings extends Command {
     constructor(client: ExtendedClient) {
@@ -27,7 +26,7 @@ export default class Warnings extends Command {
             slashCommand: true,
             permissions: {
                 user: [],
-                client: [PermissionFlagsBits.EmbedLinks]
+                client: []
             },
             options: [
                 {
@@ -44,7 +43,13 @@ export default class Warnings extends Command {
         await ctx.deferReply();
 
         if (!ctx.guild) {
-            return await ctx.replyV2({ description: 'This command can only be used in a server.', color: client.color.red, isAlert: true });
+            return await ctx.replyV2({ 
+                title: `${client.emoji.cross} Server Only`,
+                description: 'This command can only be used in a server.', 
+                borderless: true, 
+                color: null, 
+                isAlert: true 
+            });
         }
 
         let targetUser = await Resolver.resolveUser(ctx);
@@ -55,7 +60,7 @@ export default class Warnings extends Command {
         const pageSize = 5;
         let currentPage = 1;
 
-        const result = await CaseManager.getCases(client, ctx.guild.id, {
+        let result = await CaseManager.getCases(client, ctx.guild.id, {
             type: 'WARN',
             targetId: targetUser.id,
             activeOnly: true,
@@ -65,30 +70,21 @@ export default class Warnings extends Command {
 
         if (result.total === 0) {
             return await ctx.replyV2({
-                title: '🛡️ Clean Record',
+                title: `${client.emoji.shield || '🛡️'} Clean Record`,
                 description: `**${targetUser.tag}** has no active warnings in this server.`,
-                color: client.color.main
+                thumbnail: targetUser.displayAvatarURL(),
+                borderless: true,
+                color: null
             });
         }
 
-        const renderEmbed = (page: number, data: any) => {
-            const embed = new EmbedBuilder()
-                .setAuthor({ name: `Warnings for ${targetUser!.tag} (${data.total} total)`, iconURL: targetUser!.displayAvatarURL() })
-                .setColor(client.color.main)
-                .setFooter({ text: `Page ${page} of ${data.totalPages} • Total Warnings: ${data.total}` })
-                .setTimestamp();
-
+        const renderLayout = (page: number, data: any, withButtons = true) => {
             const lines = data.cases.map((c: any) => {
                 const time = `<t:${Math.floor(new Date(c.createdAt).getTime() / 1000)}:R>`;
-                return `**Case #${c.caseNumber}** (${time})\n**Mod:** ${c.moderatorTag || 'Unknown'}\n**Reason:** ${c.reason}\n`;
+                return `**Case #${c.caseNumber}** (${time})\n• **Moderator:** ${c.moderatorTag || 'Unknown'}\n• **Reason:** ${c.reason}\n`;
             });
 
-            embed.setDescription(lines.join('\n'));
-            return embed;
-        };
-
-        const renderButtons = (page: number, totalPages: number) => {
-            return new ActionRowBuilder<ButtonBuilder>().addComponents(
+            const buttons = (withButtons && data.totalPages > 1) ? [
                 new ButtonBuilder()
                     .setCustomId('warns_prev')
                     .setEmoji('◀️')
@@ -98,23 +94,31 @@ export default class Warnings extends Command {
                     .setCustomId('warns_next')
                     .setEmoji('▶️')
                     .setStyle(ButtonStyle.Secondary)
-                    .setDisabled(page >= totalPages)
-            );
+                    .setDisabled(page >= data.totalPages)
+            ] : undefined;
+
+            return V2Helper.createLayout({
+                title: `⚠️ Warnings for ${targetUser!.tag}`,
+                description: lines.join('\n'),
+                footer: `Page ${page} of ${data.totalPages} • Total Active Warnings: ${data.total}`,
+                thumbnail: targetUser!.displayAvatarURL(),
+                borderless: true,
+                color: null,
+                buttons
+            });
         };
 
-        const embed = renderEmbed(currentPage, result);
+        const layout = renderLayout(currentPage, result, result.totalPages > 1);
+        const msg = await ctx.replyV2(layout as any);
 
-        if (result.totalPages <= 1) {
-            return await ctx.reply({ embeds: [embed] });
-        }
+        if (result.totalPages <= 1) return;
 
-        const row = renderButtons(currentPage, result.totalPages);
-        const msg = await ctx.reply({ embeds: [embed], components: [row] });
-
-        const collector = (msg as any).createMessageComponentCollector({
+        const collector = (msg as any)?.createMessageComponentCollector({
             componentType: ComponentType.Button,
             time: 60000
         });
+
+        if (!collector) return;
 
         collector.on('collect', async (i: any) => {
             if (i.user.id !== ctx.author.id) {
@@ -127,7 +131,7 @@ export default class Warnings extends Command {
                 currentPage++;
             }
 
-            const newResult = await CaseManager.getCases(client, ctx.guild!.id, {
+            result = await CaseManager.getCases(client, ctx.guild!.id, {
                 type: 'WARN',
                 targetId: targetUser!.id,
                 activeOnly: true,
@@ -135,17 +139,18 @@ export default class Warnings extends Command {
                 limit: pageSize
             });
 
-            await i.update({
-                embeds: [renderEmbed(currentPage, newResult)],
-                components: [renderButtons(currentPage, newResult.totalPages)]
-            });
+            await i.update(renderLayout(currentPage, result, true) as any);
         });
 
         collector.on('end', async () => {
             try {
-                await (msg as any).edit({ components: [] });
+                if (ctx.isInteraction && ctx.interaction) {
+                    await ctx.interaction.editReply(renderLayout(currentPage, result, false) as any);
+                } else if ((msg as any)?.editable) {
+                    await (msg as any).edit(renderLayout(currentPage, result, false) as any);
+                }
             } catch {
-                // Ignore edit error if message deleted
+                // Ignore if message deleted
             }
         });
     }

@@ -11,6 +11,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
 import { CaseManager } from '../../utils/CaseManager';
+import { V2Helper } from '../../utils/V2Helper';
 
 export default class Cases extends Command {
     constructor(client: ExtendedClient) {
@@ -110,7 +111,7 @@ export default class Cases extends Command {
         const pageSize = 6;
         let currentPage = Math.max(1, page);
 
-        const result = await CaseManager.getCases(client, ctx.guild.id, {
+        let result = await CaseManager.getCases(client, ctx.guild.id, {
             type: filterType,
             targetId: targetUser?.id,
             page: currentPage,
@@ -124,22 +125,17 @@ export default class Cases extends Command {
             ].filter(Boolean).join(' ');
 
             return await ctx.replyV2({
-                title: '🛡️ No Cases Found',
+                title: `${client.emoji.shield || '🛡️'} No Cases Found`,
                 description: `No moderation cases found ${filterDesc ? `${filterDesc} ` : ''}in this server.`,
-                color: client.color.main
+                borderless: true,
+                color: null
             });
         }
 
-        const renderEmbed = (p: number, data: any) => {
+        const renderLayout = (p: number, data: any, withButtons = true) => {
             const titleParts = ['Moderation Cases'];
             if (filterType) titleParts.push(`[${filterType.toUpperCase()}]`);
             if (targetUser) titleParts.push(`• ${targetUser.tag}`);
-
-            const embed = new EmbedBuilder()
-                .setTitle(`🛡️ ${titleParts.join(' ')} (${data.total} total)`)
-                .setColor(client.color.main)
-                .setFooter({ text: `Page ${p} of ${data.totalPages} • Total Cases: ${data.total} • Use .case <id> for details` })
-                .setTimestamp();
 
             const descriptionLines = data.cases.map((c: any) => {
                 const emoji = CaseManager.getActionEmoji(c.type);
@@ -148,12 +144,7 @@ export default class Cases extends Command {
                        `└ **Mod:** ${c.moderatorTag || 'Unknown'} • **Reason:** ${c.reason.length > 60 ? `${c.reason.substring(0, 57)}...` : c.reason} • ${time}`;
             });
 
-            embed.setDescription(descriptionLines.join('\n\n'));
-            return embed;
-        };
-
-        const renderButtons = (p: number, totalPages: number) => {
-            return new ActionRowBuilder<ButtonBuilder>().addComponents(
+            const buttons = (withButtons && data.totalPages > 1) ? [
                 new ButtonBuilder()
                     .setCustomId('cases_first')
                     .setEmoji('⏮️')
@@ -168,28 +159,35 @@ export default class Cases extends Command {
                     .setCustomId('cases_next')
                     .setEmoji('▶️')
                     .setStyle(ButtonStyle.Secondary)
-                    .setDisabled(p >= totalPages),
+                    .setDisabled(p >= data.totalPages),
                 new ButtonBuilder()
                     .setCustomId('cases_last')
                     .setEmoji('⏭️')
                     .setStyle(ButtonStyle.Secondary)
-                    .setDisabled(p >= totalPages)
-            );
+                    .setDisabled(p >= data.totalPages)
+            ] : undefined;
+
+            return V2Helper.createLayout({
+                title: `🛡️ ${titleParts.join(' ')}`,
+                description: descriptionLines.join('\n\n'),
+                footer: `Page ${p} of ${data.totalPages} • Total Cases: ${data.total} • Use /case <id> for details`,
+                borderless: true,
+                color: null,
+                buttons
+            });
         };
 
-        const embed = renderEmbed(currentPage, result);
+        const layout = renderLayout(currentPage, result, result.totalPages > 1);
+        const msg = await ctx.replyV2(layout as any);
 
-        if (result.totalPages <= 1) {
-            return await ctx.reply({ embeds: [embed] });
-        }
+        if (result.totalPages <= 1) return;
 
-        const row = renderButtons(currentPage, result.totalPages);
-        const msg = await ctx.reply({ embeds: [embed], components: [row] });
-
-        const collector = (msg as any).createMessageComponentCollector({
+        const collector = (msg as any)?.createMessageComponentCollector({
             componentType: ComponentType.Button,
             time: 60000
         });
+
+        if (!collector) return;
 
         collector.on('collect', async (i: any) => {
             if (i.user.id !== ctx.author.id) {
@@ -206,24 +204,25 @@ export default class Cases extends Command {
                 currentPage = result.totalPages;
             }
 
-            const newResult = await CaseManager.getCases(client, ctx.guild!.id, {
+            result = await CaseManager.getCases(client, ctx.guild!.id, {
                 type: filterType,
                 targetId: targetUser?.id,
                 page: currentPage,
                 limit: pageSize
             });
 
-            await i.update({
-                embeds: [renderEmbed(currentPage, newResult)],
-                components: [renderButtons(currentPage, newResult.totalPages)]
-            });
+            await i.update(renderLayout(currentPage, result, true) as any);
         });
 
         collector.on('end', async () => {
             try {
-                await (msg as any).edit({ components: [] });
+                if (ctx.isInteraction && ctx.interaction) {
+                    await ctx.interaction.editReply(renderLayout(currentPage, result, false) as any);
+                } else if ((msg as any)?.editable) {
+                    await (msg as any).edit(renderLayout(currentPage, result, false) as any);
+                }
             } catch {
-                // Ignore edit error if message deleted
+                // Ignore if message was deleted
             }
         });
     }

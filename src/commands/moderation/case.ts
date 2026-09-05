@@ -1,6 +1,5 @@
 import { 
     PermissionFlagsBits, 
-    EmbedBuilder, 
     ApplicationCommandOptionType 
 } from 'discord.js';
 import { Command, Context } from '../../structures';
@@ -22,7 +21,7 @@ export default class CaseCommand extends Command {
             slashCommand: true,
             permissions: {
                 user: [PermissionFlagsBits.ModerateMembers],
-                client: [PermissionFlagsBits.EmbedLinks]
+                client: []
             },
             options: [
                 {
@@ -46,7 +45,13 @@ export default class CaseCommand extends Command {
         await ctx.deferReply();
 
         if (!ctx.guild) {
-            return await ctx.replyV2({ description: 'This command can only be used in a server.', color: client.color.red, isAlert: true });
+            return await ctx.replyV2({ 
+                title: `${client.emoji.cross} Server Only`,
+                description: 'This command can only be used in a server.', 
+                borderless: true, 
+                color: null, 
+                isAlert: true 
+            });
         }
 
         let caseNumber = 0;
@@ -58,8 +63,10 @@ export default class CaseCommand extends Command {
             const numStr = args.find(a => /^\d+$/.test(a));
             if (!numStr) {
                 return await ctx.replyV2({
+                    title: `${client.emoji.cross} Missing Case Number`,
                     description: 'Please provide a valid case number.\n**Usage:** `.case show <number>` or `.case <number>`',
-                    color: client.color.red,
+                    borderless: true,
+                    color: null,
                     isAlert: true
                 });
             }
@@ -70,9 +77,10 @@ export default class CaseCommand extends Command {
 
         if (!caseData) {
             return await ctx.replyV2({
-                title: '🛡️ Case Not Found',
+                title: `${client.emoji.shield || '🛡️'} Case Not Found`,
                 description: `Case **#${caseNumber}** does not exist in this server.`,
-                color: client.color.red,
+                borderless: true,
+                color: null,
                 isAlert: true
             });
         }
@@ -81,31 +89,31 @@ export default class CaseCommand extends Command {
         const createdTimestamp = Math.floor(new Date(caseData.createdAt).getTime() / 1000);
         const isEdited = new Date(caseData.updatedAt).getTime() > new Date(caseData.createdAt).getTime() + 1000;
 
-        const embed = new EmbedBuilder()
-            .setAuthor({ name: `Moderation Case #${caseData.caseNumber}`, iconURL: ctx.guild.iconURL() || undefined })
-            .setTitle(`${emoji} ${caseData.type} — Case #${caseData.caseNumber}`)
-            .setDescription(`Detailed information for moderation case **#${caseData.caseNumber}**.`)
-            .addFields(
-                { name: `${client.emoji.user} Target Member`, value: `${caseData.targetTag || 'Unknown'}\n\`${caseData.targetId}\` (<@${caseData.targetId}>)`, inline: true },
-                { name: `${client.emoji.shield} Responsible Moderator`, value: `${caseData.moderatorTag || 'Unknown'}\n\`${caseData.moderatorId}\` (<@${caseData.moderatorId}>)`, inline: true },
-                { name: `${client.emoji.mod_case} Action Type`, value: `\`${caseData.type}\``, inline: true },
-                { name: `${client.emoji.mic} Reason`, value: caseData.reason },
-                { name: `${client.emoji.clock_time} Date Issued`, value: `<t:${createdTimestamp}:F> (<t:${createdTimestamp}:R>)`, inline: true },
-                { name: `${client.emoji.status_dot_green} Status`, value: caseData.active ? `${client.emoji.status_dot_green} Active` : `${client.emoji.mod_stop} Inactive / Deleted`, inline: true }
-            )
-            .setColor(client.color.main)
-            .setFooter({ text: `Server: ${ctx.guild.name} • Case ID: ${caseData.id}` })
-            .setTimestamp();
+        const descLines = [
+            `Detailed information for moderation case **#${caseData.caseNumber}**.\n`,
+            `• **Target:** <@${caseData.targetId}> (\`${caseData.targetId}\`)`,
+            `• **Moderator:** <@${caseData.moderatorId}> (\`${caseData.moderatorId}\`)`,
+            `• **Action Type:** \`${caseData.type}\``,
+            `• **Reason:** ${caseData.reason}`,
+            `• **Date Issued:** <t:${createdTimestamp}:F> (<t:${createdTimestamp}:R>)`,
+            `• **Status:** ${caseData.active ? '🟢 Active' : '🔴 Inactive / Cleared'}`
+        ];
 
         if (caseData.duration) {
-            embed.addFields({ name: `${client.emoji.clock_time} Duration`, value: `\`${caseData.duration}\``, inline: true });
+            descLines.push(`• **Duration:** \`${caseData.duration}\``);
         }
 
         if (isEdited) {
             const updatedTimestamp = Math.floor(new Date(caseData.updatedAt).getTime() / 1000);
-            embed.addFields({ name: `${client.emoji.edit} Last Modified`, value: `<t:${updatedTimestamp}:R>`, inline: true });
+            descLines.push(`• **Last Modified:** <t:${updatedTimestamp}:R>`);
         }
 
-        return await ctx.reply({ embeds: [embed] });
+        return await ctx.replyV2({
+            title: `${emoji} ${caseData.type} — Case #${caseData.caseNumber}`,
+            description: descLines.join('\n'),
+            footer: `Server: ${ctx.guild.name} • Case ID: ${caseData.id}`,
+            borderless: true,
+            color: null
+        });
     }
 }

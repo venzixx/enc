@@ -1,6 +1,5 @@
 import { 
     PermissionFlagsBits, 
-    EmbedBuilder, 
     ApplicationCommandOptionType 
 } from 'discord.js';
 import { Command, Context } from '../../structures';
@@ -23,7 +22,7 @@ export default class DelWarn extends Command {
             slashCommand: true,
             permissions: {
                 user: [PermissionFlagsBits.ModerateMembers],
-                client: [PermissionFlagsBits.EmbedLinks]
+                client: []
             },
             options: [
                 {
@@ -40,7 +39,13 @@ export default class DelWarn extends Command {
         await ctx.deferReply();
 
         if (!ctx.guild) {
-            return await ctx.replyV2({ description: 'This command can only be used in a server.', color: client.color.red, isAlert: true });
+            return await ctx.replyV2({ 
+                title: `${client.emoji.cross} Server Only`,
+                description: 'This command can only be used in a server.', 
+                borderless: true, 
+                color: null, 
+                isAlert: true 
+            });
         }
 
         let caseNumber = 0;
@@ -49,7 +54,13 @@ export default class DelWarn extends Command {
             caseNumber = ctx.options.getInteger('case', true);
         } else {
             if (!args[0] || isNaN(parseInt(args[0], 10))) {
-                return await ctx.replyV2({ description: 'Please provide a valid case number to delete.\n**Usage:** `.delwarn <case_number>`', color: client.color.red, isAlert: true });
+                return await ctx.replyV2({ 
+                    title: `${client.emoji.cross} Missing Case Number`,
+                    description: 'Please provide a valid case number to delete.\n**Usage:** `.delwarn <case_number>`', 
+                    borderless: true, 
+                    color: null, 
+                    isAlert: true 
+                });
             }
 
             caseNumber = parseInt(args[0], 10);
@@ -61,8 +72,10 @@ export default class DelWarn extends Command {
 
         if (!targetCase) {
             return await ctx.replyV2({
+                title: `${client.emoji.cross} Case Not Found`,
                 description: `Case **#${caseNumber}** was not found in this server.`,
-                color: client.color.red,
+                borderless: true,
+                color: null,
                 isAlert: true
             });
         }
@@ -86,25 +99,24 @@ export default class DelWarn extends Command {
 
         if (!deletedCase) {
             return await ctx.replyV2({
+                title: `${client.emoji.cross} Action Failed`,
                 description: `Case **#${caseNumber}** could not be deleted.`,
-                color: client.color.red,
+                borderless: true,
+                color: null,
                 isAlert: true
             });
         }
 
-        const emoji = CaseManager.getActionEmoji(deletedCase.type);
-
-        const embed = new EmbedBuilder()
-            .setAuthor({ name: `Case #${caseNumber} Deleted`, iconURL: ctx.guild.iconURL() || undefined })
-            .setDescription(`${emoji} Deleted **${deletedCase.type}** case **#${caseNumber}** for **${deletedCase.targetTag || 'Unknown'}**.`)
-            .addFields(
-                { name: '👤 Target', value: `${deletedCase.targetTag || 'Unknown'} (\`${deletedCase.targetId}\`)`, inline: true },
-                { name: '🛡️ Deleted By', value: `${ctx.author.tag} (\`${ctx.author.id}\`)`, inline: true },
-                { name: '📝 Original Reason', value: deletedCase.reason }
-            )
-            .setColor(client.color.main)
-            .setTimestamp();
-
-        return await ctx.reply({ embeds: [embed] });
+        return await ctx.replyV2({
+            title: `🗑️ Case #${caseNumber} Deleted`,
+            description: 
+                `Deleted **${deletedCase.type}** case **#${caseNumber}**.\n\n` +
+                `• **Target:** <@${deletedCase.targetId}> (\`${deletedCase.targetId}\`)\n` +
+                `• **Deleted By:** <@${ctx.author.id}>\n` +
+                `• **Original Reason:** ${deletedCase.reason}`,
+            borderless: true,
+            color: null,
+            allowedMentions: { parse: [], roles: [], users: [deletedCase.targetId, ctx.author.id], repliedUser: false }
+        });
     }
 }
