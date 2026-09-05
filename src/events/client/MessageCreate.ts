@@ -39,9 +39,20 @@ export default class MessageCreate extends Event {
 
 		// --- DIRECT MESSAGE (DM) COMMAND HANDLING ---
 		if (!message.guild) {
-			const prefix = ','; // default bot prefix
-			if (!message.content.startsWith(prefix)) return;
-			const args = message.content.slice(prefix.length).trim().split(/\s+/);
+			const supportedPrefixes = ['e!', ',', '.', '!'];
+			const matchedPrefix = supportedPrefixes.find(p => message.content.startsWith(p));
+			let rawContent = '';
+			let prefixUsed = 'e!';
+			if (matchedPrefix) {
+				rawContent = message.content.slice(matchedPrefix.length).trim();
+				prefixUsed = matchedPrefix;
+			} else {
+				// Allow running commands directly in DM without prefix (e.g. "tord", "truth", "dare")
+				rawContent = message.content.trim();
+				prefixUsed = '';
+			}
+
+			const args = rawContent.split(/\s+/);
 			const cmd = args.shift()?.toLowerCase();
 			if (!cmd) return;
 
@@ -50,7 +61,7 @@ export default class MessageCreate extends Event {
 
 			(message as any).args = args;
 			const ctx = new Context(this.client, message);
-			ctx.prefix = prefix;
+			ctx.prefix = prefixUsed || 'e!';
 			ctx.command = command;
 			(ctx as any).args = args;
 			try {

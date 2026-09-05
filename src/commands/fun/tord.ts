@@ -1,5 +1,7 @@
 import { 
 	ApplicationCommandOptionType, 
+	ApplicationIntegrationType,
+	InteractionContextType,
 	ButtonBuilder, 
 	ButtonStyle, 
 	ComponentType 
@@ -159,6 +161,15 @@ export default class Tord extends Command {
 			category: 'fun',
 			cooldown: 3,
 			slashCommand: true,
+			integration_types: [
+				ApplicationIntegrationType.GuildInstall,
+				ApplicationIntegrationType.UserInstall
+			],
+			contexts: [
+				InteractionContextType.Guild,
+				InteractionContextType.BotDM,
+				InteractionContextType.PrivateChannel
+			],
 			options: [
 				{
 					name: 'type',
