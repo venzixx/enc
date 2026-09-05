@@ -8,6 +8,7 @@ import {
 } from 'discord.js';
 import { ExtendedClient } from '../client';
 import SocialUtils from './SocialUtils';
+import { V2Helper } from './V2Helper';
 import logger from '../structures/Logger';
 
 export class PersistentComponentRouter {
@@ -55,15 +56,16 @@ export class PersistentComponentRouter {
                     create: { userId: initiatorId, fromId: interaction.user.id, action, count: 1 }
                 });
 
-                await interaction.followUp({
-                    content: `<@${initiatorId}>`,
-                    embeds: [
-                        client.embed()
-                            .setDescription(`💞 **${interaction.user.username}** ${action}ed **<@${initiatorId}>** back!\n\n*They've ${action}ed you **${pairBack.count}** times now!*`)
-                            .setImage(gifUrlBack || 'https://i.imgur.com/ud3EWNh.jpg')
-                            .setColor(client.color.main)
-                    ]
+                const pastAction = action.endsWith('e') ? `${action}d` : `${action}ed`;
+                const layoutBack = V2Helper.createLayout({
+                    description: `💞 <@${interaction.user.id}> ${pastAction} <@${initiatorId}> back!\n\n*They've ${pastAction} you **${pairBack.count}** times now!*`,
+                    image: gifUrlBack || 'https://i.imgur.com/ud3EWNh.jpg',
+                    borderless: true,
+                    color: null,
+                    allowedMentions: { users: [initiatorId], parse: [], roles: [] }
                 });
+
+                await interaction.followUp(layoutBack as any);
                 return true;
             }
 

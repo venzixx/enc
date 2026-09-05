@@ -5,6 +5,7 @@ import {
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import SocialUtils from '../../utils/SocialUtils';
+import { V2Helper } from '../../utils/V2Helper';
 
 export default class KillContext extends Command {
     constructor(client: ExtendedClient) {
@@ -50,15 +51,15 @@ export default class KillContext extends Command {
 
             const countText = `\n\n*That's **${pair.count}** times you've killed them! (${total._sum.count || 0} total)*`;
 
-            await ctx.sendMessage({
-                content: `${targetUser}`,
-                embeds: [
-                    client.embed()
-                        .setDescription(`${client.emoji.duel_swords} **${ctx.author.username}** killed **${targetUser.username}**!${countText}`)
-                        .setImage(gifUrl)
-                        .setColor(client.color.main)
-                ]
+            const layout = V2Helper.createLayout({
+                description: `${client.emoji.duel_swords} <@${ctx.author.id}> killed <@${targetUser.id}>!${countText}`,
+                image: gifUrl,
+                borderless: true,
+                color: null,
+                allowedMentions: { users: [targetUser.id], parse: [], roles: [] }
             });
+
+            await ctx.sendMessage(layout as any);
         } catch (error) {
             console.error('[KillContext] Error running command:', error);
             return ctx.replyV2({ description: `Failed to kill user. Try again!`, isAlert: true });

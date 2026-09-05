@@ -183,7 +183,8 @@ export class NsfwGuard {
         const promptMsg = await ctx.sendMessage({
             content: `<@${targetUser.id}>`,
             embeds: [embed],
-            components: [row]
+            components: [row],
+            allowedMentions: { users: [targetUser.id], parse: [], roles: [] }
         });
 
         let targetMsg: any = promptMsg;

@@ -2,12 +2,34 @@ import {
     ApplicationCommandOptionType,
     ButtonBuilder,
     ButtonStyle,
-    ActionRowBuilder,
     ComponentType,
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import SocialUtils from '../../utils/SocialUtils';
+import { V2Helper } from '../../utils/V2Helper';
+import { Resolver } from '../../utils/Resolver';
+
+function formatAction(action: string): string {
+    switch (action) {
+        case 'hug': return 'hugged';
+        case 'slap': return 'slapped';
+        case 'pat': return 'patted';
+        case 'bite': return 'bit';
+        case 'kiss': return 'kissed';
+        case 'poke': return 'poked';
+        case 'punch': return 'punched';
+        case 'lick': return 'licked';
+        case 'tickle': return 'tickled';
+        case 'cuddle': return 'cuddled';
+        case 'feed': return 'fed';
+        case 'nom': return 'nommed';
+        case 'pinch': return 'pinched';
+        case 'smack': return 'smacked';
+        case 'kill': return 'killed';
+        default: return action.endsWith('e') ? `${action}d` : `${action}ed`;
+    }
+}
 
 const TARGETED_REACTIONS = [
     'airkiss', 'baka', 'bite', 'bonk', 'brofist', 'cuddle', 'feed', 'handhold', 'highfive', 'hug', 'kick', 'kill', 'kiss', 'lick', 
@@ -78,10 +100,10 @@ export default class Do extends Command {
             if (!ALL_REACTIONS.includes(action)) {
                 if (action === 'do') {
                     action = args[0]?.toLowerCase();
-                    targetUser = ctx.message!.mentions.users.first();
+                    targetUser = ctx.message!.mentions.users.first() || (args[1] ? await Resolver.resolveUser(ctx, args[1]) : null);
                 } else return;
             } else {
-                targetUser = ctx.message!.mentions.users.first();
+                targetUser = ctx.message!.mentions.users.first() || (args[0] ? await Resolver.resolveUser(ctx, args[0]) : null);
             }
         }
 
@@ -89,20 +111,18 @@ export default class Do extends Command {
 
         // Validation
         if (isTargeted && !targetUser) {
-            return ctx.replyV2({ description: `You need to mention a user to **${action}**!`, isAlert: true });
+            return ctx.replyV2({ description: `You need to mention a user to **${action}**!`, isAlert: true, borderless: true, color: null });
         }
 
         if (targetUser?.id === ctx.author.id && isTargeted) {
-            return ctx.replyV2({ description: `You can't ${action} yourself!`, isAlert: true });
+            return ctx.replyV2({ description: `You can't ${action} yourself!`, isAlert: true, borderless: true, color: null });
         }
-
-        await ctx.deferReply();
 
         try {
             // 2. Fetch GIF
             const gifUrl = await SocialUtils.fetchGif(client, action);
             if (!gifUrl) {
-                return ctx.replyV2({ description: `Could not find a GIF for **${action}**.`, isAlert: true });
+                return ctx.replyV2({ description: `Could not find a GIF for **${action}**.`, isAlert: true, borderless: true, color: null });
             }
 
             // 3. Database Tracking
@@ -122,14 +142,15 @@ export default class Do extends Command {
                 countText = `\n\n*That's **${pair.count}** times you've ${action}ed them! (${total._sum.count || 0} total)*`;
             }
 
-            // 4. Send Response
-            const description = isTargeted 
-                ? `🤗 **${ctx.author.username}** ${action}ed **${targetUser!.username}**!${countText}`
-                : `✨ **${ctx.author.username}** is **${action}ing**!`;
+            // 4. Send Response via V2 borderless card
+            const pastAction = formatAction(action);
+            const description = isTargeted && targetUser 
+                ? `🤗 <@${ctx.author.id}> ${pastAction} <@${targetUser.id}>!${countText}`
+                : `✨ <@${ctx.author.id}> is **${action}ing**!`;
 
-            const row = new ActionRowBuilder<ButtonBuilder>();
+            const buttons: ButtonBuilder[] = [];
             if (isTargeted && targetUser) {
-                row.addComponents(
+                buttons.push(
                     new ButtonBuilder()
                         .setCustomId(`social_${action}_${ctx.author.id}_${targetUser.id}`)
                         .setLabel(`${action.charAt(0).toUpperCase() + action.slice(1)} Back!`)
@@ -137,57 +158,61 @@ export default class Do extends Command {
                 );
             }
 
-            const response = await ctx.sendMessage({
-                content: isTargeted ? `${targetUser}` : undefined,
-                embeds: [
-                    client.embed()
-                        .setDescription(description)
-                        .setImage(gifUrl)
-                        .setColor(client.color.main)
-                ],
-                components: isTargeted && targetUser ? [row] : []
+            const layout = V2Helper.createLayout({
+                description,
+                image: gifUrl,
+                borderless: true,
+                color: null,
+                buttons,
+                allowedMentions: (isTargeted && targetUser)
+                    ? { users: [targetUser.id], parse: [], roles: [] }
+                    : { parse: [], roles: [], users: [] }
             });
+
+            const response = await ctx.sendMessage(layout as any);
 
             // 5. Button Collector
             if (isTargeted && targetUser) {
-                const msg = ctx.interaction ? await ctx.interaction.fetchReply() : response as any;
-                const collector = msg.createMessageComponentCollector({
-                    componentType: ComponentType.Button,
-                    time: 60000
-                });
-
-                collector.on('collect', async (i: any) => {
-                    if (i.user.id !== targetUser!.id) {
-                        return i.reply({ content: `Only ${targetUser!.username} can react back!`, ephemeral: true });
-                    }
-
-                    await i.deferUpdate();
-                    
-                    const gifUrlBack = await SocialUtils.fetchGif(client, action);
-                    if (!gifUrlBack) return; // Should rarely happen if it worked once
-                    
-                    const pairBack = await (client.prisma as any).socialAction.upsert({
-                        where: { userId_fromId_action: { userId: ctx.author.id, fromId: targetUser!.id, action } },
-                        update: { count: { increment: 1 } },
-                        create: { userId: ctx.author.id, fromId: targetUser!.id, action, count: 1 }
+                const msg = ctx.interaction ? await ctx.interaction.fetchReply().catch(() => null) : response as any;
+                if (msg && typeof msg.createMessageComponentCollector === 'function') {
+                    const collector = msg.createMessageComponentCollector({
+                        componentType: ComponentType.Button,
+                        time: 60000
                     });
 
-                    await i.followUp({
-                        content: `${ctx.author}`,
-                        embeds: [
-                            client.embed()
-                                .setDescription(`💞 **${targetUser!.username}** ${action}ed **${ctx.author.username}** back!\n\n*They've ${action}ed you **${pairBack.count}** times now!*`)
-                                .setImage(gifUrlBack)
-                                .setColor(client.color.main)
-                        ]
+                    collector.on('collect', async (i: any) => {
+                        if (i.user.id !== targetUser!.id) {
+                            return i.reply({ content: `Only <@${targetUser!.id}> can react back!`, ephemeral: true });
+                        }
+
+                        await i.deferUpdate();
+                        
+                        const gifUrlBack = await SocialUtils.fetchGif(client, action);
+                        if (!gifUrlBack) return;
+                        
+                        const pairBack = await (client.prisma as any).socialAction.upsert({
+                            where: { userId_fromId_action: { userId: ctx.author.id, fromId: targetUser!.id, action } },
+                            update: { count: { increment: 1 } },
+                            create: { userId: ctx.author.id, fromId: targetUser!.id, action, count: 1 }
+                        });
+
+                        const layoutBack = V2Helper.createLayout({
+                            description: `💞 <@${targetUser!.id}> ${pastAction} <@${ctx.author.id}> back!\n\n*They've ${pastAction} you **${pairBack.count}** times now!*`,
+                            image: gifUrlBack,
+                            borderless: true,
+                            color: null,
+                            allowedMentions: { users: [ctx.author.id], parse: [], roles: [] }
+                        });
+
+                        await i.followUp(layoutBack as any);
+                        collector.stop();
                     });
-                    collector.stop();
-                });
+                }
             }
 
         } catch (error) {
             console.error('Interact Command Error:', error);
-            return ctx.replyV2({ description: `Failed to perform that interaction.`, isAlert: true });
+            return ctx.replyV2({ description: `Failed to perform that interaction.`, isAlert: true, borderless: true, color: null });
         }
     }
 }

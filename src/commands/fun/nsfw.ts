@@ -1,13 +1,13 @@
 import { 
     ApplicationCommandOptionType, 
     ApplicationIntegrationType, 
-    InteractionContextType, 
-    EmbedBuilder 
+    InteractionContextType
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { NsfwGuard } from '../../utils/NsfwGuard';
 import { Resolver } from '../../utils/Resolver';
+import { V2Helper } from '../../utils/V2Helper';
 
 interface ActionConfig {
     name: string;
@@ -246,15 +246,18 @@ export default class Nsfw extends Command {
             ? actionConfig.targetText.replace('{author}', authorMention).replace('{target}', targetMention)
             : actionConfig.soloText.replace('{author}', authorMention);
 
-        const embed = new EmbedBuilder()
-            .setDescription(description)
-            .setImage(gifUrl)
-            .setColor(client.color.main || 0xe3d7d2)
-            .setFooter({ 
-                text: `Requested by ${ctx.author.tag || ctx.author.username} • 18+ Content`,
-                iconURL: ctx.author.displayAvatarURL()
-            });
+        const layout = V2Helper.createLayout({
+            description: description,
+            image: gifUrl,
+            borderless: true,
+            color: null,
+            footer: `Requested by ${ctx.author.tag || ctx.author.username} • 18+ Content`,
+            footerIcon: ctx.author.displayAvatarURL(),
+            allowedMentions: targetUser && targetUser.id !== ctx.author.id
+                ? { users: [targetUser.id], parse: [], roles: [] }
+                : { parse: [], roles: [], users: [] }
+        });
 
-        return await ctx.sendMessage({ embeds: [embed] });
+        return await ctx.sendMessage(layout as any);
     }
 }
