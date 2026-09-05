@@ -160,75 +160,43 @@ export const marriageHelper = {
         });
 
         if (!marriage) {
-            return ctx.replyV2({ description: 'You are not currently married to anyone.', isAlert: true });
+            return ctx.replyV2({
+                title: '💔 Not Married',
+                description: 'You are not currently married to anyone.',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         const spouseId = marriage.user1Id === ctx.author.id ? marriage.user2Id : marriage.user1Id;
+        const spouse = await client.users.fetch(spouseId).catch(() => null);
+        const marriedTime = Math.floor(new Date(marriage.marriedAt).getTime() / 1000);
 
         const confirmBtn = new ButtonBuilder()
             .setCustomId(`divorce_confirm_${ctx.author.id}_${spouseId}`)
-            .setLabel('Confirm')
+            .setLabel('Confirm Divorce')
+            .setEmoji('💔')
             .setStyle(ButtonStyle.Danger);
 
         const cancelBtn = new ButtonBuilder()
             .setCustomId(`divorce_cancel_${ctx.author.id}_${spouseId}`)
-            .setLabel('Cancel')
+            .setLabel('Stay Married')
+            .setEmoji('💍')
             .setStyle(ButtonStyle.Secondary);
 
-        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(confirmBtn, cancelBtn);
+        let desc = `Are you sure you want to divorce <@${spouseId}>?\n\n`;
+        desc += `💍 **Married Since:** <t:${marriedTime}:D> (<t:${marriedTime}:R>)\n`;
+        if (marriage.ring) desc += `💎 **Marriage Ring:** ${marriage.ring}\n`;
+        desc += `\n⚠️ **Warning:** This will permanently dissolve your marriage and reset your shared marriage status.`;
 
-        const response = await ctx.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle('💔 Divorce Confirmation')
-                    .setDescription(`Are you sure you want to divorce <@${spouseId}>?\nThis will end your marriage globally.`)
-                    .setColor(client.color.red)
-                    .setTimestamp()
-            ],
-            components: [row]
-        }) as any;
-
-        const collector = response.createMessageComponentCollector({
-            componentType: ComponentType.Button,
-            time: 30000
-        });
-
-        collector.on('collect', async (i: ButtonInteraction) => {
-            if (i.user.id !== ctx.author.id) {
-                return i.reply({ content: 'Only the user initiating the divorce can confirm.', ephemeral: true });
-            }
-
-            await i.deferUpdate();
-
-            if (i.customId.startsWith('divorce_cancel')) {
-                await i.editReply({
-                    embeds: [
-                        new EmbedBuilder()
-                            .setTitle('💍 Divorce Aborted')
-                            .setDescription(`Divorce request cancelled. You remain married to <@${spouseId}>.`)
-                            .setColor(client.color.main)
-                    ],
-                    components: []
-                });
-                return collector.stop();
-            }
-
-            // Execute divorce
-            await client.prisma.marriage.delete({
-                where: { id: marriage.id }
-            });
-
-            await i.editReply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setTitle('💔 Marriage Ended')
-                        .setDescription(`You and <@${spouseId}> are now divorced.`)
-                        .setColor(client.color.red)
-                ],
-                components: []
-            });
-
-            collector.stop();
+        return ctx.replyV2({
+            title: '💔 Divorce Confirmation',
+            description: desc,
+            thumbnail: spouse?.displayAvatarURL({ forceStatic: false }) || undefined,
+            borderless: true,
+            color: null,
+            buttons: [confirmBtn, cancelBtn]
         });
     },
 

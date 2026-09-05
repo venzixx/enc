@@ -8,11 +8,13 @@ export default class Divorce extends Command {
         super(client, {
             name: 'divorce',
             description: {
-                content: 'Divorce your current spouse.',
-                usage: 'divorce'
+                content: 'Divorce your current spouse and dissolve your marriage.',
+                usage: 'divorce',
+                examples: ['divorce']
             },
+            aliases: ['breakup', 'split'],
             category: 'marriage',
-            cooldown: 3,
+            cooldown: 5,
             slashCommand: true,
             integration_types: [ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall],
             contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],

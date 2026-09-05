@@ -153,7 +153,7 @@ export class PersistentComponentRouter {
 
                 if (interaction.user.id !== initiatorId) {
                     await interaction.reply({
-                        content: 'Only the user initiating the divorce can confirm.',
+                        content: 'Only the spouse who initiated the divorce can confirm or cancel.',
                         flags: MessageFlags.Ephemeral
                     });
                     return true;
@@ -162,15 +162,14 @@ export class PersistentComponentRouter {
                 await interaction.deferUpdate();
 
                 if (!isConfirm) {
-                    await interaction.editReply({
-                        embeds: [
-                            new EmbedBuilder()
-                                .setTitle('💍 Divorce Aborted')
-                                .setDescription(`Divorce request cancelled. You remain married to <@${spouseId}>.`)
-                                .setColor(client.color.main)
-                        ],
-                        components: []
+                    const cancelLayout = V2Helper.createLayout({
+                        title: '💍 Divorce Cancelled',
+                        description: `You had second thoughts and decided to stay married to <@${spouseId}>!`,
+                        borderless: true,
+                        color: null,
+                        buttons: []
                     });
+                    await interaction.editReply(cancelLayout as any);
                     return true;
                 }
 
@@ -183,21 +182,33 @@ export class PersistentComponentRouter {
                     }
                 });
 
-                if (marriage) {
-                    await client.prisma.marriage.delete({
-                        where: { id: marriage.id }
+                if (!marriage) {
+                    const notMarriedLayout = V2Helper.createLayout({
+                        title: '💔 Not Married',
+                        description: 'This marriage record no longer exists.',
+                        isAlert: true,
+                        borderless: true,
+                        color: null,
+                        buttons: []
                     });
+                    await interaction.editReply(notMarriedLayout as any);
+                    return true;
                 }
 
-                await interaction.editReply({
-                    embeds: [
-                        new EmbedBuilder()
-                            .setTitle('💔 Marriage Ended')
-                            .setDescription(`You and <@${spouseId}> are now divorced.`)
-                            .setColor(client.color.red)
-                    ],
-                    components: []
+                const marriedTime = Math.floor(new Date(marriage.marriedAt).getTime() / 1000);
+
+                await client.prisma.marriage.delete({
+                    where: { id: marriage.id }
                 });
+
+                const confirmLayout = V2Helper.createLayout({
+                    title: '💔 Marriage Ended',
+                    description: `<@${initiatorId}> and <@${spouseId}> are now officially divorced.\nThey were married since <t:${marriedTime}:D> (<t:${marriedTime}:R>).`,
+                    borderless: true,
+                    color: null,
+                    buttons: []
+                });
+                await interaction.editReply(confirmLayout as any);
                 return true;
             }
 
