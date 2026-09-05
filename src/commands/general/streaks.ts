@@ -1,18 +1,20 @@
-import { ApplicationCommandOptionType, EmbedBuilder, GuildMember } from 'discord.js';
+import { ApplicationCommandOptionType, User } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
+import { StreakHelper } from '../../utils/StreakHelper';
 
 export default class StreaksCommand extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'streaks',
+            aliases: ['streak', 'stk', 'mystreak'],
             description: {
-                content: 'View your message streaks.',
-                usage: 'streaks [user]',
-                examples: ['streaks', 'streaks @user']
+                content: 'View your message streaks and server streak leaderboard.',
+                usage: 'streaks [user | top]',
+                examples: ['streaks', 'streaks @user', 'streaks top']
             },
             category: 'general',
-            cooldown: 5,
+            cooldown: 3,
             slashCommand: true,
             options: [
                 {
@@ -20,65 +22,55 @@ export default class StreaksCommand extends Command {
                     description: 'The user to view streaks for',
                     type: ApplicationCommandOptionType.User,
                     required: false
+                },
+                {
+                    name: 'leaderboard',
+                    description: 'View the server streak leaderboard instead',
+                    type: ApplicationCommandOptionType.Boolean,
+                    required: false
                 }
             ]
         });
     }
 
-    public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<void> {
-        const target = ctx.options.getUser('user') || ctx.author;
-
-        // Fetch streaks
-        const streaks = await client.prisma.userStreak.findMany({
-            where: {
-                guildId: ctx.guild!.id,
-                userId: target.id
-            },
-            include: {
-                tier: true
-            }
-        });
-
-        if (streaks.length === 0) {
-            await ctx.reply({ content: `**${target.username}** does not have any active or recorded streaks in this server. Chat to build up streaks!` });
-            return;
+    public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
+        if (!ctx.guild) {
+            return ctx.replyV2({
+                title: `${client.emoji.cross} Server Only`,
+                description: 'Streak tracking is server-specific. Please run this command inside a server!',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
-        const embed = new EmbedBuilder()
-            .setTitle(`${client.emoji.streak_fire} ${target.username}'s Streaks`)
-            .setColor(client.color.main)
-            .setThumbnail(target.displayAvatarURL({ forceStatic: false }))
-            .setTimestamp();
+        const showLeaderboard = ctx.isInteraction
+            ? ctx.options.getBoolean('leaderboard')
+            : (args[0]?.toLowerCase() === 'top' || args[0]?.toLowerCase() === 'lb' || args[0]?.toLowerCase() === 'leaderboard');
 
-        let description = '';
-        const today = new Date().toISOString().split('T')[0];
-        const yesterdayDate = new Date(Date.now() - 86400000);
-        const yesterday = yesterdayDate.toISOString().split('T')[0];
-
-        // Sort streaks by threshold (hardest first)
-        streaks.sort((a, b) => b.tier.threshold - a.tier.threshold);
-
-        for (const streak of streaks) {
-            // Lazy evaluation logic to display properly even if they haven't chatted today yet
-            let current = streak.currentStreak;
-            let status = '';
-
-            if (streak.lastActiveDate === today) {
-                status = '✅ (Completed today)';
-            } else if (streak.lastActiveDate === yesterday) {
-                status = '⏳ (Pending for today)';
-            } else {
-                current = 0; // Broken
-                status = '❌ (Streak broken)';
-            }
-
-            description += `**${streak.tier.name}** (${streak.tier.threshold} msgs/day)\n`;
-            description += `Current: **${current} days** ${status}\n`;
-            description += `Longest: **${streak.longestStreak} days**\n\n`;
+        if (showLeaderboard) {
+            const lbLayout = await StreakHelper.buildLeaderboardLayout(client, ctx.guild.id, ctx.author.id);
+            return ctx.replyV2(lbLayout as any);
         }
 
-        embed.setDescription(description || 'No streaks found.');
+        let target: User = ctx.author;
+        if (ctx.isInteraction) {
+            target = ctx.options.getUser('user') || ctx.author;
+        } else {
+            if (args[0]) {
+                const cleaned = args[0].replace(/[<@!>]/g, '');
+                let found = client.users.cache.get(cleaned);
+                if (!found && /^\d{17,20}$/.test(cleaned)) {
+                    try {
+                        found = await client.users.fetch(cleaned);
+                    } catch {}
+                }
+                if (found) target = found;
+            }
+        }
 
-        await ctx.reply({ embeds: [embed] });
+        const layout = await StreakHelper.buildUserStreaksLayout(client, ctx.guild.id, target, ctx.author.id);
+        return ctx.replyV2(layout as any);
     }
 }
+

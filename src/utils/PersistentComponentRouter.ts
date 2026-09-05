@@ -277,6 +277,29 @@ export class PersistentComponentRouter {
                 return true;
             }
 
+            // ─── 6. STREAKS & LEADERBOARD ───────────────────────────────────────
+            if (customId.startsWith('streaks_lb_')) {
+                const guildId = customId.replace('streaks_lb_', '');
+                await interaction.deferUpdate();
+                const { StreakHelper } = await import('./StreakHelper');
+                const layout = await StreakHelper.buildLeaderboardLayout(client, guildId, interaction.user.id);
+                await interaction.editReply(layout as any);
+                return true;
+            }
+
+            if (customId.startsWith('streaks_user_')) {
+                // Format: streaks_user_<guildId>_<userId>
+                const parts = customId.split('_');
+                const guildId = parts[2];
+                const userId = parts[3];
+                await interaction.deferUpdate();
+                const targetUser = await client.users.fetch(userId).catch(() => interaction.user);
+                const { StreakHelper } = await import('./StreakHelper');
+                const layout = await StreakHelper.buildUserStreaksLayout(client, guildId, targetUser, interaction.user.id);
+                await interaction.editReply(layout as any);
+                return true;
+            }
+
             return false;
         } catch (error: any) {
             if (error.code === 10062) return true; // Interaction already expired, ignored
