@@ -45,6 +45,13 @@ export class V2Helper {
      * This bypasses @discordjs/builders validation.
      */
     public static createLayout(options: V2Options) {
+        if (!options) return { components: [], flags: [MessageFlags.IsComponentsV2] };
+        // Guard against double wrapping if options is already a generated V2 layout
+        const raw = options as any;
+        if (Array.isArray(raw.components) && (raw.flags || raw.components.some((c: any) => c.type === 17))) {
+            return raw;
+        }
+
         const { title, description, fields, buttons, selectMenu, isAlert, color, footer, image, thumbnail, media, authorName, authorIcon, authorUrl, timestamp, borderless } = options;
         const banner = image || media;
 

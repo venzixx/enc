@@ -79,10 +79,11 @@ async function fetchTordPrompt(type: 'truth' | 'dare' | 'random', rating?: strin
 
 		if (res.ok) {
 			const data: any = await res.json();
-			if (data && data.question) {
+			const englishQuestion = data?.question || data?.translations?.en || '';
+			if (englishQuestion) {
 				return {
 					type: (data.type || selectedType).toUpperCase() as 'TRUTH' | 'DARE',
-					question: data.question,
+					question: englishQuestion.trim(),
 					id: data.id || Math.random().toString(36).substring(2, 8),
 					rating: data.rating || (rating ? rating.toUpperCase() : 'PG')
 				};

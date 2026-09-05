@@ -293,27 +293,31 @@ export default class Context {
     /**
      * Sends a Discord Components V2 message.
      */
-    public async sendV2(options: V2Options) {
-        const layout = V2Helper.createLayout(options);
+    public async sendV2(options: V2Options | any) {
+        const layout = (options && Array.isArray(options.components) && (options.flags || options.components.some((c: any) => c.type === 17)))
+            ? options
+            : V2Helper.createLayout(options);
         if (options.ephemeral && this.interaction) {
             (layout as any).ephemeral = true;
         }
         return this.sendMessage(layout as any);
     }
 
-    public async replyV2(options: V2Options) {
+    public async replyV2(options: V2Options | any) {
         return this.sendV2(options);
     }
 
     /**
      * Edits a Discord Components V2 message.
      */
-    public async editMessageV2(options: V2Options) {
-        const layout = V2Helper.createLayout(options);
+    public async editMessageV2(options: V2Options | any) {
+        const layout = (options && Array.isArray(options.components) && (options.flags || options.components.some((c: any) => c.type === 17)))
+            ? options
+            : V2Helper.createLayout(options);
         return this.editMessage(layout as any);
     }
 
-    public async editReplyV2(options: V2Options) {
+    public async editReplyV2(options: V2Options | any) {
         return this.editMessageV2(options);
     }
 
