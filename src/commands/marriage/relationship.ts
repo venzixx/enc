@@ -9,9 +9,11 @@ export default class Relationship extends Command {
         super(client, {
             name: 'relationship',
             description: {
-                content: 'View your relationship status or inspect another user.',
-                usage: 'relationship [@user]'
+                content: 'View your kinship relationship connection with another user.',
+                usage: 'relationship <@user>',
+                examples: ['relationship @user', 'rel @user', 'relationship 123456789012345678']
             },
+            aliases: ['rel', 'path', 'kinship'],
             category: 'marriage',
             cooldown: 3,
             slashCommand: true,
@@ -20,9 +22,9 @@ export default class Relationship extends Command {
             options: [
                 {
                     name: 'user',
-                    description: 'The user to inspect',
+                    description: 'The user to inspect relationship connection with',
                     type: 6, // USER
-                    required: false
+                    required: true
                 }
             ]
         });

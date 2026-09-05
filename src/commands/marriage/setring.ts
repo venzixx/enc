@@ -8,9 +8,11 @@ export default class Setring extends Command {
         super(client, {
             name: 'setring',
             description: {
-                content: 'Set a custom marriage ring string/emoji.',
-                usage: 'setring <ring>'
+                content: 'Set a custom marriage ring string or emoji.',
+                usage: 'setring <ring>',
+                examples: ['setring 💎', 'setring 💍', 'setring 👑', 'setring 🌹']
             },
+            aliases: ['ring', 'customring', 'wedring'],
             category: 'marriage',
             cooldown: 3,
             slashCommand: true,
@@ -19,7 +21,7 @@ export default class Setring extends Command {
             options: [
                 {
                     name: 'ring',
-                    description: 'Custom ring string or emoji',
+                    description: 'Custom ring string or emoji (max 32 chars)',
                     type: 3, // STRING
                     required: true
                 }
@@ -28,7 +30,7 @@ export default class Setring extends Command {
     }
 
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-        const ring = ctx.options.getString('ring') || args.join(' ');
+        const ring = ctx.options.getString('ring') || args.join(' ').trim();
         return await marriageHelper.setring(client, ctx, ring);
     }
 }

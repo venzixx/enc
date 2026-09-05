@@ -184,31 +184,56 @@ export const marriageHelper = {
         });
 
         if (!marriage) {
-            return ctx.replyV2({ description: `${user.id === ctx.author.id ? 'You are' : `${user.username} is`} not married.`, isAlert: true });
+            return ctx.replyV2({
+                title: '💔 Not Married',
+                description: `${user.id === ctx.author.id ? 'You are' : `**${user.username}** is`} not currently married to anyone.`,
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         const spouseId = marriage.user1Id === user.id ? marriage.user2Id : marriage.user1Id;
         const spouse = await client.users.fetch(spouseId).catch(() => null);
-        const spouseTag = spouse ? spouse.tag : 'Unknown';
+        const spouseName = spouse ? spouse.username : 'Unknown User';
+        const marriedTimestamp = Math.floor(marriage.marriedAt.getTime() / 1000);
+        const ring = marriage.ring || '💍';
 
-        const embed = new EmbedBuilder()
-            .setTitle('💍 Marriage Status')
-            .setDescription(`**${user.username}** is globally married to **${spouseTag}**!`)
-            .addFields(
-                { name: ' Spouse', value: `<@${spouseId}>` },
-                { name: ' Married At', value: `<t:${Math.floor(marriage.marriedAt.getTime() / 1000)}:D> (<t:${Math.floor(marriage.marriedAt.getTime() / 1000)}:R>)` },
-                { name: ' Ring', value: marriage.ring || 'None' }
-            )
-            .setColor(0xec4899)
-            .setTimestamp();
-
-        return ctx.reply({ embeds: [embed] });
+        return ctx.replyV2({
+            title: '💍 Marriage Status',
+            description: `**${user.username}** is happily married to **${spouseName}**!`,
+            thumbnail: spouse?.displayAvatarURL({ forceStatic: false }) || user.displayAvatarURL({ forceStatic: false }),
+            fields: [
+                { name: '💍 Spouse', value: `<@${spouseId}> (\`${spouseName}\`)`, inline: true },
+                { name: '💎 Ring', value: `${ring}`, inline: true },
+                { name: '📅 Married On', value: `<t:${marriedTimestamp}:D> (<t:${marriedTimestamp}:R>)`, inline: false }
+            ],
+            borderless: true,
+            color: null
+        });
     },
 
     // 4. SET RING
     async setring(client: ExtendedClient, ctx: Context, ring: string | null): Promise<any> {
-        if (!ring) {
-            return ctx.replyV2({ description: 'Please specify the ring symbol/emoji.\n**Usage:** `.setring <ring>` or `/marriage setring <ring>`', isAlert: true });
+        if (!ring || !ring.trim()) {
+            return ctx.replyV2({
+                title: '💍 Set Marriage Ring',
+                description: 'Please specify the ring symbol or emoji.\n\n**Usage:** `.setring <ring>` or `/setring ring:<ring>`\n**Examples:** `.setring 💎`, `.setring 💍`',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
+        }
+
+        const trimmedRing = ring.trim();
+        if (trimmedRing.length > 32) {
+            return ctx.replyV2({
+                title: '❌ Ring Too Long',
+                description: 'The ring representation cannot exceed 32 characters.',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         const marriage = await client.prisma.marriage.findFirst({
@@ -216,21 +241,25 @@ export const marriageHelper = {
         });
 
         if (!marriage) {
-            return ctx.replyV2({ description: 'You must be married to set a ring!', isAlert: true });
+            return ctx.replyV2({
+                title: '💔 Not Married',
+                description: 'You must be married before you can set a marriage ring!',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         await client.prisma.marriage.update({
             where: { id: marriage.id },
-            data: { ring }
+            data: { ring: trimmedRing }
         });
 
-        return ctx.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle('💍 Ring Updated')
-                    .setDescription(`You successfully updated your marriage ring to: ${ring}`)
-                    .setColor(client.color.main)
-            ]
+        return ctx.replyV2({
+            title: '💎 Ring Updated',
+            description: `You successfully updated your marriage ring to: **${trimmedRing}**`,
+            borderless: true,
+            color: null
         });
     },
 
@@ -1288,11 +1317,23 @@ export const marriageHelper = {
         }
 
         if (!targetUser) {
-            return ctx.replyV2({ description: 'Please mention a user to check relationship.\n**Usage:** `.relationship <@user>` or `/marriage relationship <user>`', isAlert: true });
+            return ctx.replyV2({
+                title: '🔮 Relationship Checker',
+                description: 'Please mention or specify the ID of the user you want to check your relationship with.\n\n**Usage:** `.relationship <@user>` or `/relationship user:<@user>`',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         if (targetUser.id === ctx.author.id) {
-            return ctx.replyV2({ description: 'You cannot check the relationship with yourself!', isAlert: true });
+            return ctx.replyV2({
+                title: '❌ Self Check',
+                description: 'You cannot check the family tree relationship with yourself!',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         // Fetch marriages and family relations
@@ -1361,14 +1402,12 @@ export const marriageHelper = {
         }
 
         if (!foundPath) {
-            return ctx.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setTitle('🔮 Relationship Checker')
-                        .setDescription(`💔 You and <@${targetUser.id}> are unrelated.`)
-                        .setColor(client.color.red)
-                        .setTimestamp()
-                ]
+            return ctx.replyV2({
+                title: '🔮 Relationship Checker',
+                description: `💔 <@${ctx.author.id}> and <@${targetUser.id}> are not related in the family tree.`,
+                thumbnail: targetUser.displayAvatarURL({ forceStatic: false }),
+                borderless: true,
+                color: null
             });
         }
 
@@ -1453,18 +1492,18 @@ export const marriageHelper = {
             pathVisualization += ` ${relationSymbol} <@${node.userId}>`;
         }
 
-        const embed = new EmbedBuilder()
-            .setTitle('🔮 Relationship Checker')
-            .setDescription(`<@${ctx.author.id}>, your relationship with <@${targetUser.id}> is:`)
-            .addFields(
-                { name: '👤 Target', value: `<@${targetUser.id}>`, inline: true },
+        return ctx.replyV2({
+            title: '🔮 Family Relationship',
+            description: `Relationship connection between <@${ctx.author.id}> and <@${targetUser.id}>:`,
+            thumbnail: targetUser.displayAvatarURL({ forceStatic: false }),
+            fields: [
+                { name: '👤 Target', value: `<@${targetUser.id}> (\`${targetUser.username}\`)`, inline: true },
                 { name: '✨ Relationship', value: `**${term}**`, inline: true },
-                { name: '🔗 Path', value: pathVisualization }
-            )
-            .setColor(client.color.main)
-            .setTimestamp();
-
-        return ctx.reply({ embeds: [embed] });
+                { name: '🔗 Path Connection', value: pathVisualization, inline: false }
+            ],
+            borderless: true,
+            color: null
+        });
     }
 };
 

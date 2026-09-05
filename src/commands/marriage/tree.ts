@@ -10,8 +10,10 @@ export default class Tree extends Command {
             name: 'tree',
             description: {
                 content: 'View your family tree canvas or someone else\'s family tree.',
-                usage: 'tree [@user] [page] [font=FontName]'
+                usage: 'tree [@user] [page] [font=FontName]',
+                examples: ['tree', 'tree @user', 'tree 2', 'tree font=Caveat', 'tree @user 2 font=Roboto']
             },
+            aliases: ['familytree', 'mytree'],
             category: 'marriage',
             cooldown: 5,
             slashCommand: true,

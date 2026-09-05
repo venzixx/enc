@@ -9,9 +9,11 @@ export default class Partner extends Command {
         super(client, {
             name: 'partner',
             description: {
-                content: 'View your spouse or someone else\'s spouse status.',
-                usage: 'partner [@user]'
+                content: 'View your spouse or inspect someone else\'s marriage status.',
+                usage: 'partner [@user]',
+                examples: ['partner', 'partner @user', 'partner 123456789012345678']
             },
+            aliases: ['spouse', 'wife', 'husband'],
             category: 'marriage',
             cooldown: 3,
             slashCommand: true,
@@ -20,7 +22,7 @@ export default class Partner extends Command {
             options: [
                 {
                     name: 'user',
-                    description: 'The user to inspect',
+                    description: 'The user whose spouse status you want to inspect',
                     type: 6, // USER
                     required: false
                 }
