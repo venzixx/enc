@@ -87,16 +87,15 @@ export class PersistentComponentRouter {
                 await interaction.deferUpdate();
 
                 if (!isAccept) {
-                    await interaction.editReply({
-                        content: '',
-                        embeds: [
-                            new EmbedBuilder()
-                                .setTitle('💔 Proposal Declined')
-                                .setDescription(`<@${targetId}> declined <@${proposerId}>'s proposal.`)
-                                .setColor(client.color.red)
-                        ],
-                        components: []
+                    const layout = V2Helper.createLayout({
+                        title: '💔 Proposal Declined',
+                        description: `<@${targetId}> declined the marriage proposal from <@${proposerId}>.`,
+                        isAlert: true,
+                        borderless: true,
+                        color: null,
+                        buttons: []
                     });
+                    await interaction.editReply(layout as any);
                     return true;
                 }
 
@@ -109,16 +108,15 @@ export class PersistentComponentRouter {
                 });
 
                 if (check1 || check2) {
-                    await interaction.editReply({
-                        content: '',
-                        embeds: [
-                            new EmbedBuilder()
-                                .setTitle('💍 Marriage Error')
-                                .setDescription('One of the users has already married someone else.')
-                                .setColor(client.color.red)
-                        ],
-                        components: []
+                    const layout = V2Helper.createLayout({
+                        title: '💍 Marriage Error',
+                        description: 'One of the users has already married someone else in the meantime.',
+                        isAlert: true,
+                        borderless: true,
+                        color: null,
+                        buttons: []
                     });
+                    await interaction.editReply(layout as any);
                     return true;
                 }
 
@@ -130,17 +128,14 @@ export class PersistentComponentRouter {
                     }
                 });
 
-                await interaction.editReply({
-                    content: '',
-                    embeds: [
-                        new EmbedBuilder()
-                            .setTitle('💖 Just Married!')
-                            .setDescription(`Congratulations <@${proposerId}> and <@${targetId}>! You are now happily married.`)
-                            .setColor(client.color.main)
-                            .setTimestamp()
-                    ],
-                    components: []
+                const layout = V2Helper.createLayout({
+                    title: '💖 Just Married!',
+                    description: `🎉 Congratulations <@${proposerId}> and <@${targetId}>!\nYou are now officially married globally! 💍`,
+                    borderless: true,
+                    color: null,
+                    buttons: []
                 });
+                await interaction.editReply(layout as any);
                 return true;
             }
 

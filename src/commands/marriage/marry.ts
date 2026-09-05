@@ -9,11 +9,13 @@ export default class Marry extends Command {
         super(client, {
             name: 'marry',
             description: {
-                content: 'Marry a user globally.',
-                usage: 'marry <@user>'
+                content: 'Propose to and marry a user globally.',
+                usage: 'marry <@user>',
+                examples: ['marry @user', 'marry 123456789012345678']
             },
+            aliases: ['propose', 'proposal'],
             category: 'marriage',
-            cooldown: 3,
+            cooldown: 5,
             slashCommand: true,
             integration_types: [ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall],
             contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],

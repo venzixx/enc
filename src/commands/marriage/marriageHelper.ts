@@ -30,15 +30,33 @@ export const marriageHelper = {
     // 1. MARRY
     async marry(client: ExtendedClient, ctx: Context, targetUser: User | null): Promise<any> {
         if (!targetUser) {
-            return ctx.replyV2({ description: 'Please mention a user to marry.\n**Usage:** `.marry <@user>` or `/marriage marry <user>`', isAlert: true });
+            return ctx.replyV2({
+                title: '💍 Marry a User',
+                description: 'Please mention or provide the ID of the user you wish to propose to.\n\n**Usage:** `.marry <@user>` or `/marry user:<@user>`',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         if (targetUser.id === ctx.author.id) {
-            return ctx.replyV2({ description: 'You cannot marry yourself.', isAlert: true });
+            return ctx.replyV2({
+                title: '❌ Invalid Proposal',
+                description: 'You cannot marry yourself!',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         if (targetUser.bot) {
-            return ctx.replyV2({ description: 'Bots cannot marry!', isAlert: true });
+            return ctx.replyV2({
+                title: '🤖 Bots Cannot Marry',
+                description: 'Bots are not eligible for marriage.',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         // Check if sender is married
@@ -46,7 +64,13 @@ export const marriageHelper = {
             where: { OR: [{ user1Id: ctx.author.id }, { user2Id: ctx.author.id }] }
         });
         if (senderMarriage) {
-            return ctx.replyV2({ description: 'You are already married!', isAlert: true });
+            return ctx.replyV2({
+                title: '💍 Already Married',
+                description: 'You are already married to someone! You must `/divorce` before proposing to someone else.',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         // Check if target is married
@@ -54,102 +78,53 @@ export const marriageHelper = {
             where: { OR: [{ user1Id: targetUser.id }, { user2Id: targetUser.id }] }
         });
         if (targetMarriage) {
-            return ctx.replyV2({ description: `${targetUser.username} is already married!`, isAlert: true });
+            return ctx.replyV2({
+                title: '💍 Already Married',
+                description: `<@${targetUser.id}> is already married to someone else!`,
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
+        }
+
+        // Check family relations (cannot marry immediate parent/child)
+        const relationCheck = await client.prisma.familyRelation.findFirst({
+            where: {
+                OR: [
+                    { parentId: ctx.author.id, childId: targetUser.id },
+                    { parentId: targetUser.id, childId: ctx.author.id }
+                ]
+            }
+        });
+        if (relationCheck) {
+            return ctx.replyV2({
+                title: '🚫 Forbidden Proposal',
+                description: 'You cannot marry someone who is in your immediate family tree (parent/child)!',
+                isAlert: true,
+                borderless: true,
+                color: null
+            });
         }
 
         const acceptBtn = new ButtonBuilder()
             .setCustomId(`marry_accept_${ctx.author.id}_${targetUser.id}`)
-            .setLabel('Accept')
+            .setLabel('Accept Proposal')
+            .setEmoji('💍')
             .setStyle(ButtonStyle.Success);
 
         const denyBtn = new ButtonBuilder()
             .setCustomId(`marry_deny_${ctx.author.id}_${targetUser.id}`)
             .setLabel('Decline')
+            .setEmoji('✖️')
             .setStyle(ButtonStyle.Danger);
 
-        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(acceptBtn, denyBtn);
-
-        const response = await ctx.reply({
-            content: `<@${targetUser.id}>`,
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle('💍 Marriage Proposal')
-                    .setDescription(`<@${ctx.author.id}> has proposed to you, <@${targetUser.id}>!\n\nDo you accept their hand in marriage?`)
-                    .setColor(client.color.main)
-                    .setTimestamp()
-            ],
-            components: [row]
-        }) as any;
-
-        const collector = response.createMessageComponentCollector({
-            componentType: ComponentType.Button,
-            time: 60000
-        });
-
-        collector.on('collect', async (i: ButtonInteraction) => {
-            if (i.user.id !== targetUser.id) {
-                return i.reply({ content: 'Only the recipient of the proposal can answer.', ephemeral: true });
-            }
-
-            await i.deferUpdate();
-
-            if (i.customId.startsWith('marry_deny')) {
-                await i.editReply({
-                    content: '',
-                    embeds: [
-                        new EmbedBuilder()
-                            .setTitle('💔 Proposal Declined')
-                            .setDescription(`<@${targetUser.id}> declined <@${ctx.author.id}>'s proposal.`)
-                            .setColor(client.color.red)
-                    ],
-                    components: []
-                });
-                return collector.stop();
-            }
-
-            // Verify again in case status changed during proposal time
-            const check1 = await client.prisma.marriage.findFirst({
-                where: { OR: [{ user1Id: ctx.author.id }, { user2Id: ctx.author.id }] }
-            });
-            const check2 = await client.prisma.marriage.findFirst({
-                where: { OR: [{ user1Id: targetUser.id }, { user2Id: targetUser.id }] }
-            });
-
-            if (check1 || check2) {
-                await i.editReply({
-                    content: '',
-                    embeds: [
-                        new EmbedBuilder()
-                            .setTitle('💍 Marriage Error')
-                            .setDescription('One of the users has already married someone else in the meantime.')
-                            .setColor(client.color.red)
-                    ],
-                    components: []
-                });
-                return collector.stop();
-            }
-
-            // Create Marriage
-            await client.prisma.marriage.create({
-                data: {
-                    user1Id: ctx.author.id,
-                    user2Id: targetUser.id,
-                    proposerId: ctx.author.id
-                }
-            });
-
-            await i.editReply({
-                content: '',
-                embeds: [
-                    new EmbedBuilder()
-                        .setTitle('💖 Just Married!')
-                        .setDescription(`🎉 Congratulations! <@${ctx.author.id}> and <@${targetUser.id}> are now globally married!`)
-                        .setColor(0xec4899)
-                ],
-                components: []
-            });
-
-            collector.stop();
+        return ctx.replyV2({
+            title: '💍 Marriage Proposal',
+            description: `<@${targetUser.id}>, you have received a marriage proposal from <@${ctx.author.id}>!\n\nDo you accept their offer to be married globally?`,
+            thumbnail: targetUser.displayAvatarURL({ forceStatic: false }),
+            borderless: true,
+            color: null,
+            buttons: [acceptBtn, denyBtn]
         });
     },
 

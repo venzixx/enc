@@ -8,10 +8,10 @@ export default class Marriage extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'marriage',
-            aliases: ['marry'],
+            aliases: ['family', 'wed', 'wedding'],
             description: {
                 content: 'Global Marriage & Family system.',
-                usage: 'marriage <marry/divorce/partner/setring/adopt/disown/abandon/tree> [args]',
+                usage: 'marriage <marry/divorce/partner/setring/adopt/disown/abandon/tree/fulltree/relationship> [args]',
                 examples: [
                     'marriage marry @User',
                     'marriage divorce',
@@ -20,7 +20,9 @@ export default class Marriage extends Command {
                     'marriage adopt @User',
                     'marriage disown @User',
                     'marriage abandon',
-                    'marriage tree @User'
+                    'marriage tree @User',
+                    'marriage fulltree',
+                    'marriage relationship @User'
                 ]
             },
             category: 'marriage',
@@ -177,7 +179,26 @@ export default class Marriage extends Command {
         }
 
         if (!sub) {
-            return ctx.replyV2({ description: 'Please specify a subcommand. Options: `marry`, `divorce`, `partner`, `setring`, `adopt`, `disown`, `abandon`, `tree`.', isAlert: true });
+            return ctx.replyV2({
+                title: '💍 Marriage & Family Hub',
+                description: [
+                    'Please specify a valid marriage subcommand to execute.',
+                    '',
+                    '**Available Subcommands:**',
+                    '• `marry <@user>` — Propose and marry a user globally',
+                    '• `divorce` — Divorce your current spouse',
+                    '• `partner [@user]` — View your spouse or someone else\'s spouse',
+                    '• `setring <ring>` — Set custom marriage ring emoji or text',
+                    '• `adopt <@user>` — Adopt a user into your family',
+                    '• `disown <@user>` — Disown a child from your family',
+                    '• `abandon` — Run away and abandon your parents',
+                    '• `tree [@user]` — Render your interactive family tree',
+                    '• `fulltree [page]` — View the global relationships graph',
+                    '• `relationship <@user>` — Find relationship path between two users'
+                ].join('\n'),
+                borderless: true,
+                color: null
+            });
         }
 
         switch (sub) {
@@ -274,7 +295,13 @@ export default class Marriage extends Command {
                 return await marriageHelper.relationship(client, ctx, user);
             }
             default: {
-                return ctx.replyV2({ description: `Invalid subcommand: \`${sub}\`. Use: \`marry\`, \`divorce\`, \`partner\`, \`setring\`, \`adopt\`, \`disown\`, \`abandon\`, \`tree\`, \`fulltree\`, \`relationship\`.`, isAlert: true });
+                return ctx.replyV2({
+                    title: '💍 Unknown Subcommand',
+                    description: `Invalid subcommand: \`${sub}\`.\n\n**Valid Options:** \`marry\`, \`divorce\`, \`partner\`, \`setring\`, \`adopt\`, \`disown\`, \`abandon\`, \`tree\`, \`fulltree\`, \`relationship\`.`,
+                    isAlert: true,
+                    borderless: true,
+                    color: null
+                });
             }
         }
     }
