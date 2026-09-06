@@ -82,7 +82,7 @@ export default class DownloadContext extends Command {
         return null;
     }
 
-    private async downloadInstagram(url: string, tmpFile: string): Promise<{ files: string[]; type: 'video' | 'slides' } | null> {
+    private async downloadInstagram(url: string, tmpFile: string): Promise<{ files: string[]; type: 'video' | 'slides' | 'restricted'; error?: string } | null> {
         try {
             const candidatePaths = [
                 path.join(process.cwd(), 'src', 'utils', 'ig_downloader.py'),
@@ -98,6 +98,14 @@ export default class DownloadContext extends Command {
             const cmd = `${pyCmd} "${scriptPath}" "${url}"`;
             const { stdout } = await execAsync(cmd, { timeout: 45000 });
             const data = JSON.parse(stdout.trim());
+
+            if (data.is_age_restricted) {
+                return {
+                    files: [],
+                    type: 'restricted',
+                    error: 'This video is age-restricted or from a private account.'
+                };
+            }
 
             if (data.success && Array.isArray(data.media) && data.media.length > 0) {
                 const files: string[] = [];
@@ -199,25 +207,34 @@ export default class DownloadContext extends Command {
             const isInstagram = url.includes('instagram.com') || url.includes('instagr.am');
             if (isInstagram) {
                 const igResult = await this.downloadInstagram(url, tmpFile);
-                if (igResult && igResult.files.length > 0) {
-                    const attachments = igResult.files.map(filePath => {
-                        const baseName = path.basename(filePath);
-                        return new AttachmentBuilder(filePath, { name: baseName });
-                    });
-
-                    const titleText = igResult.type === 'slides'
-                        ? '✅ **Instagram Carousel / Photos downloaded!**'
-                        : '✅ **Instagram Media downloaded!**';
-
-                    await ctx.followUp({
-                        content: titleText,
-                        files: attachments
-                    });
-                    await ctx.deleteReply();
-                    for (const f of igResult.files) {
-                        if (fs.existsSync(f)) fs.unlinkSync(f);
+                if (igResult) {
+                    if (igResult.type === 'restricted') {
+                        return await ctx.editReplyV2({
+                            description: '❌ **Download failed:** This Instagram video is age-restricted or from a private account and cannot be downloaded without login.',
+                            isAlert: true,
+                            color: client.color.red,
+                        });
                     }
-                    return;
+                    if (igResult.files && igResult.files.length > 0) {
+                        const attachments = igResult.files.map(filePath => {
+                            const baseName = path.basename(filePath);
+                            return new AttachmentBuilder(filePath, { name: baseName });
+                        });
+
+                        const titleText = igResult.type === 'slides'
+                            ? '✅ **Instagram Carousel / Photos downloaded!**'
+                            : '✅ **Instagram Media downloaded!**';
+
+                        await ctx.followUp({
+                            content: titleText,
+                            files: attachments
+                        });
+                        await ctx.deleteReply();
+                        for (const f of igResult.files) {
+                            if (fs.existsSync(f)) fs.unlinkSync(f);
+                        }
+                        return;
+                    }
                 }
             }
 
@@ -247,7 +264,8 @@ export default class DownloadContext extends Command {
             }
 
             if (!success) {
-                let command = `${ytDlpPath} -o "${tmpFile}.%(ext)s" -f "bv[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best/b" --max-filesize 25M --js-runtimes node --no-warnings --no-playlist ${cookiesArg} "${url}"`;
+                const igCookieArg = isInstagram ? '' : cookiesArg;
+                let command = `${ytDlpPath} -o "${tmpFile}.%(ext)s" -f "bv[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best/b" --max-filesize 25M --js-runtimes node --no-warnings --no-playlist ${igCookieArg} "${url}"`;
                 try {
                     await execAsync(command);
                 } catch (err: any) {
@@ -255,7 +273,7 @@ export default class DownloadContext extends Command {
                         description: '🔄 **Retrying download with fallback flags...**',
                         color: client.color.yellow
                     });
-                    command = `${ytDlpPath} -o "${tmpFile}.%(ext)s" -f "b/bv+ba/best" --max-filesize 25M --js-runtimes node --no-warnings --no-playlist ${cookiesArg} "${url}"`;
+                    command = `${ytDlpPath} -o "${tmpFile}.%(ext)s" -f "b/bv+ba/best" --max-filesize 25M --js-runtimes node --no-warnings --no-playlist ${igCookieArg} "${url}"`;
                     await execAsync(command);
                 }
             }
@@ -266,20 +284,29 @@ export default class DownloadContext extends Command {
             if (!filePath || !fs.existsSync(filePath)) {
                 if (isInstagram) {
                     const fallbackIg = await this.downloadInstagram(url, tmpFile);
-                    if (fallbackIg && fallbackIg.files.length > 0) {
-                        const attachments = fallbackIg.files.map(filePath => {
-                            const baseName = path.basename(filePath);
-                            return new AttachmentBuilder(filePath, { name: baseName });
-                        });
-                        await ctx.followUp({
-                            content: '✅ **Instagram Media downloaded!**',
-                            files: attachments
-                        });
-                        await ctx.deleteReply();
-                        for (const f of fallbackIg.files) {
-                            if (fs.existsSync(f)) fs.unlinkSync(f);
+                    if (fallbackIg) {
+                        if (fallbackIg.type === 'restricted') {
+                            return await ctx.editReplyV2({
+                                description: '❌ **Download failed:** This Instagram video is age-restricted or from a private account and cannot be downloaded without login.',
+                                isAlert: true,
+                                color: client.color.red,
+                            });
                         }
-                        return;
+                        if (fallbackIg.files && fallbackIg.files.length > 0) {
+                            const attachments = fallbackIg.files.map(filePath => {
+                                const baseName = path.basename(filePath);
+                                return new AttachmentBuilder(filePath, { name: baseName });
+                            });
+                            await ctx.followUp({
+                                content: '✅ **Instagram Media downloaded!**',
+                                files: attachments
+                            });
+                            await ctx.deleteReply();
+                            for (const f of fallbackIg.files) {
+                                if (fs.existsSync(f)) fs.unlinkSync(f);
+                            }
+                            return;
+                        }
                     }
                 }
                 throw new Error('Download failed: File not found');
@@ -358,8 +385,22 @@ export default class DownloadContext extends Command {
 
             logger.error(`[DOWNLOAD_CONTEXT_ERROR] ${error}`);
             let failReason = error.message || 'Unknown error';
-            if (failReason.includes('empty media response') || failReason.includes('Check if this post is accessible in your browser without being logged-in')) {
-                failReason = 'This Instagram post/reel cannot be accessed without being logged in (it may be age-restricted, private, or restricted by Instagram).';
+            const isIg = url.includes('instagram.com') || url.includes('instagr.am');
+
+            if (isIg && (
+                failReason.includes('empty media response') ||
+                failReason.includes('Check if this post is accessible in your browser without being logged-in') ||
+                failReason.includes('login') ||
+                failReason.includes('Login') ||
+                failReason.includes('private') ||
+                failReason.includes('Private') ||
+                failReason.includes('age-restricted') ||
+                failReason.includes('restricted') ||
+                failReason.includes('BadResponseException') ||
+                failReason.includes('No video formats found') ||
+                failReason.includes('not found after execution')
+            )) {
+                failReason = 'This Instagram video is age-restricted or from a private account and cannot be downloaded without login.';
             } else if (failReason.includes('Sign in to confirm')) {
                 failReason = 'YouTube is requiring bot confirmation for this video on the server IP.';
             } else if (failReason.includes('Private video') || failReason.includes('This video is private')) {

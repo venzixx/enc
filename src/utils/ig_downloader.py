@@ -18,7 +18,8 @@ def extract_shortcode(url):
 def fetch_instagram_media(url_or_shortcode):
     shortcode = extract_shortcode(url_or_shortcode)
     
-    # 1. Try Instaloader
+    # 1. Try Instaloader (no cookies)
+    is_restricted = False
     try:
         L = instaloader.Instaloader(
             download_pictures=False,
@@ -29,26 +30,6 @@ def fetch_instagram_media(url_or_shortcode):
             save_metadata=False,
             compress_json=False
         )
-        
-        cookie_paths = [
-            '/home/ubuntu/Dimscord/instagram_cookies.txt',
-            '/home/ubuntu/Dimscord/cookies.txt',
-            os.path.join(os.getcwd(), 'instagram_cookies.txt'),
-            os.path.join(os.getcwd(), 'cookies.txt'),
-            os.path.join(os.path.dirname(__file__), '..', '..', 'instagram_cookies.txt'),
-            os.path.join(os.path.dirname(__file__), '..', '..', 'cookies.txt')
-        ]
-        
-        import http.cookiejar
-        for cp in cookie_paths:
-            if os.path.exists(cp):
-                try:
-                    cj = http.cookiejar.MozillaCookieJar(cp)
-                    cj.load(ignore_discard=True, ignore_expires=True)
-                    L.context._session.cookies = cj
-                    break
-                except Exception:
-                    pass
         
         post = instaloader.Post.from_shortcode(L.context, shortcode)
         
@@ -82,7 +63,10 @@ def fetch_instagram_media(url_or_shortcode):
                 'media': [{'type': 'image', 'url': post.url}]
             }
     except Exception as inst_err:
-        pass
+        err_str = str(inst_err)
+        err_type = type(inst_err).__name__
+        if any(keyword in err_type or keyword in err_str.lower() for keyword in ['login', 'private', '401', '403', 'badresponse', 'restricted']):
+            is_restricted = True
 
     # 2. Fallback: Query Instagram Embed / Public GraphQL Endpoint
     try:
@@ -117,7 +101,8 @@ def fetch_instagram_media(url_or_shortcode):
 
     return {
         'success': False,
-        'error': f'Unable to fetch Instagram post {shortcode}'
+        'is_age_restricted': is_restricted,
+        'error': 'This video is age-restricted or from a private account' if is_restricted else f'Unable to fetch Instagram post {shortcode}'
     }
 
 if __name__ == '__main__':
