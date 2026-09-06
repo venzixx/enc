@@ -5,7 +5,7 @@ import config from '../config';
 
 export interface CreateCaseOptions {
     guild: Guild;
-    type: 'WARN' | 'BAN' | 'KICK' | 'MUTE' | 'TIMEOUT' | 'UNBAN' | 'UNMUTE';
+    type: 'WARN' | 'BAN' | 'KICK' | 'MUTE' | 'TIMEOUT' | 'UNBAN' | 'UNMUTE' | 'SOFTBAN' | 'BACKROOM' | string;
     target: User;
     moderator: User;
     reason: string;
