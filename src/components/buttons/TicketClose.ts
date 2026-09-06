@@ -21,28 +21,36 @@ export default class TicketClose extends Component {
         if (!ticket) {
             return await interaction.reply({ 
                 ...V2Helper.createLayout({
-                    description: `${this.client.emoji.cross || '❌'} Ticket data not found. I can only close registered tickets.`,
+                    title: `${this.client.emoji.cross || '❌'} Invalid Channel`,
+                    description: 'Ticket data not found. I can only close registered tickets.',
+                    borderless: true,
+                    color: null,
                     isAlert: true,
-                    borderless: true
-                }) as any,
-                ephemeral: true 
+                    ephemeral: true
+                }) as any
             });
         }
 
         if (ticket.status === 'CLOSED') {
             return await interaction.reply({ 
-                content: `${this.client.emoji.cross || '❌'} This ticket is already in the process of closing.`, 
-                ephemeral: true 
+                ...V2Helper.createLayout({
+                    title: `${this.client.emoji.cross || '❌'} Already Closing`,
+                    description: 'This ticket is already in the process of closing.',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    ephemeral: true
+                }) as any
             });
         }
 
         // Send Persistent Borderless V2 Close Confirmation Layout
         const closePayload = V2Helper.createLayout({
             title: '🔒 Ticket Close Confirmation',
-            description: `Are you sure you want to close this ticket?\n\n**Note:** Transcripts will be archived, and this channel will be closed.\n\n<@${ticket.userId}> or Support Staff, please confirm below.`,
+            description: `Are you sure you want to close this ticket?\n\n**Note:** An HTML transcript will be archived, and this channel will be closed.\n\n<@${ticket.userId}> or Support Staff, please confirm below.`,
             isAlert: true,
-            color: 0xFFA500,
             borderless: true,
+            color: null,
             buttons: [
                 new ButtonBuilder()
                     .setCustomId('ticket_confirm_close')

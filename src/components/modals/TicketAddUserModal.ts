@@ -1,6 +1,7 @@
-import { type ModalSubmitInteraction, EmbedBuilder, PermissionFlagsBits } from "discord.js";
+import { type ModalSubmitInteraction, PermissionFlagsBits } from "discord.js";
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
+import { V2Helper } from "../../utils/V2Helper";
 
 export default class TicketAddUserModal extends Component {
 	constructor(client: ExtendedClient) {
@@ -24,14 +25,25 @@ export default class TicketAddUserModal extends Component {
                 AttachFiles: true
             });
 
-            const embed = new EmbedBuilder()
-                .setColor(this.client.color.main)
-                .setDescription(` ${targetUser} has been added to the ticket by ${interaction.user}`)
-                .setTimestamp();
-
-            await interaction.reply({ embeds: [embed] });
+            await interaction.reply({
+                ...V2Helper.createLayout({
+                    title: 'User Added to Ticket',
+                    description: `${targetUser} has been added to the ticket by ${interaction.user}.`,
+                    borderless: true,
+                    color: null
+                }) as any
+            });
         } catch (error) {
-            await interaction.reply({ content: `${this.client.emoji.cross} Invalid User ID or user not found in this server.`, ephemeral: true });
+            await interaction.reply({ 
+                ...V2Helper.createLayout({
+                    title: `${this.client.emoji.cross || '❌'} Error`,
+                    description: 'Invalid User ID or user not found in this server.',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    ephemeral: true
+                }) as any 
+            });
         }
 	}
 }

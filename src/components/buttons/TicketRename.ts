@@ -1,6 +1,7 @@
 import { type ButtonInteraction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, PermissionFlagsBits } from "discord.js";
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
+import { V2Helper } from "../../utils/V2Helper";
 
 export default class TicketRename extends Component {
 	constructor(client: ExtendedClient) {
@@ -24,7 +25,16 @@ export default class TicketRename extends Component {
         const isStaff = member.roles.cache.has(config?.supportRoleId) || member.permissions.has(PermissionFlagsBits.Administrator);
 
         if (!isStaff) {
-            return await interaction.reply({ content: `${this.client.emoji.cross} Only staff can rename tickets.`, ephemeral: true });
+            return await interaction.reply({ 
+                ...V2Helper.createLayout({
+                    title: `${this.client.emoji.cross || '❌'} Permission Denied`,
+                    description: 'Only server support staff can rename tickets.',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    ephemeral: true
+                }) as any 
+            });
         }
 
 		const modal = new ModalBuilder()

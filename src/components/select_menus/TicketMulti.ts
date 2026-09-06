@@ -80,6 +80,31 @@ export default class TicketMulti extends Component {
             }
         }
 
+        // Check Ticket Limit (0 or null = unlimited)
+        const maxOpenTickets = targetConfig.maxOpenTickets ?? config.maxOpenTickets ?? 0;
+        if (maxOpenTickets > 0) {
+            const openCount = await (this.client.prisma as any).ticket.count({
+                where: {
+                    guildId: interaction.guild.id,
+                    userId: interaction.user.id,
+                    status: 'OPEN'
+                }
+            });
+
+            if (openCount >= maxOpenTickets) {
+                return await interaction.reply({
+                    ...V2Helper.createLayout({
+                        title: `${this.client.emoji.cross || '❌'} Ticket Limit Reached`,
+                        description: `You already have **${openCount}** open ticket(s) in this server.\nThe maximum allowed is **${maxOpenTickets}**.\n\nPlease close your existing ticket before opening a new one.`,
+                        borderless: true,
+                        color: null,
+                        isAlert: true,
+                        ephemeral: true
+                    }) as any
+                });
+            }
+        }
+
         // Increment Ticket Count & Fetch Next ID
         const updatedConfig = await (this.client.prisma as any).ticketConfig.update({
             where: { id: config.id },
@@ -163,7 +188,6 @@ export default class TicketMulti extends Component {
                 { name: 'Claimed By', value: 'Unclaimed', inline: true },
                 ...customFields
             ],
-            color: targetConfig.welcomeColor || this.client.color.main,
             image: targetConfig.welcomeImage,
             thumbnail: targetConfig.welcomeThumbnail,
             footer: targetConfig.welcomeFooterText || 'Encl Ticket System',
@@ -172,6 +196,7 @@ export default class TicketMulti extends Component {
             authorUrl: targetConfig.welcomeAuthorUrl,
             timestamp: true,
             borderless: true,
+            color: null,
             buttons: [
                 new ButtonBuilder()
                     .setCustomId(`ticket_claim_${ticket.id}`)
@@ -193,20 +218,37 @@ export default class TicketMulti extends Component {
             ]
         });
 
-        const pingContent = (supportRoleId && supportRoleId !== 'MULTI') ? `${interaction.user} | <@&${supportRoleId}>` : `${interaction.user}`;
+        // Build roles to ping (support role + mentionOnOpen roles)
+        const rolesToPing = new Set<string>();
+        if (supportRoleId && supportRoleId !== 'MULTI') rolesToPing.add(supportRoleId);
+        if (targetConfig?.mentionOnOpen) {
+            targetConfig.mentionOnOpen.split(',').map((r: string) => r.trim()).filter(Boolean).forEach((r: string) => rolesToPing.add(r));
+        }
+        if (config?.mentionOnOpen) {
+            config.mentionOnOpen.split(',').map((r: string) => r.trim()).filter(Boolean).forEach((r: string) => rolesToPing.add(r));
+        }
 
+        const rolePings = Array.from(rolesToPing).map(r => `<@&${r}>`).join(' ');
+        const pingContent = rolePings ? `${interaction.user} | ${rolePings}` : `${interaction.user}`;
+
+        // Send mention ping with explicit allowedMentions so global restrictions don't block the alert
 		await ticketChannel.send({ 
-            content: pingContent, 
-            ...(ticketLayout as any)
+            content: pingContent,
+            allowedMentions: {
+                roles: Array.from(rolesToPing),
+                users: [interaction.user.id]
+            }
         });
+
+        // Send ticket dashboard
+        await ticketChannel.send(ticketLayout as any);
 
 		await interaction.reply({ 
             ...V2Helper.createLayout({
                 title: `${this.client.emoji.success || '✅'} Ticket Opened`,
                 description: `Your ticket has been opened in ${ticketChannel}!`,
-                isAlert: true,
-                color: this.client.color.main,
                 borderless: true,
+                color: null,
                 ephemeral: true
             }) as any
         });

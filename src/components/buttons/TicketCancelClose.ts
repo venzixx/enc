@@ -20,8 +20,14 @@ export default class TicketCancelClose extends Component {
 
         if (!ticket) {
             return await interaction.reply({ 
-                content: `${this.client.emoji.cross || '❌'} Ticket data not found.`, 
-                ephemeral: true 
+                ...V2Helper.createLayout({
+                    title: `${this.client.emoji.cross || '❌'} Not Found`,
+                    description: 'Ticket data not found.',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    ephemeral: true
+                }) as any 
             });
         }
 
@@ -50,16 +56,22 @@ export default class TicketCancelClose extends Component {
 
         if (!isCreator && !isAdmin && !isStaff) {
             return await interaction.reply({ 
-                content: `${this.client.emoji.cross || '❌'} Only the ticket creator or server support staff can cancel ticket closure.`, 
-                ephemeral: true 
+                ...V2Helper.createLayout({
+                    title: `${this.client.emoji.cross || '❌'} Permission Denied`,
+                    description: 'Only the ticket creator or server support staff can cancel ticket closure.',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    ephemeral: true
+                }) as any 
             });
         }
 
         const cancelLayout = V2Helper.createLayout({
-            title: '✅ Ticket Closure Cancelled',
+            title: `${this.client.emoji.success || '✅'} Ticket Closure Cancelled`,
             description: 'The ticket will remain open.',
-            color: 0x22c55e,
-            borderless: true
+            borderless: true,
+            color: null
         });
 
         await interaction.update(cancelLayout as any).catch(async () => {

@@ -1,7 +1,8 @@
-import { type ButtonInteraction, PermissionFlagsBits, AttachmentBuilder } from "discord.js";
+import { type ButtonInteraction, PermissionFlagsBits, AttachmentBuilder, TextChannel } from "discord.js";
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
 import { V2Helper } from "../../utils/V2Helper";
+import { TicketTranscript } from "../../utils/TicketTranscript";
 
 export default class TicketConfirmClose extends Component {
 	constructor(client: ExtendedClient) {
@@ -20,15 +21,27 @@ export default class TicketConfirmClose extends Component {
 
         if (!ticket) {
             return await interaction.reply({ 
-                content: `${this.client.emoji.cross || '❌'} Ticket data not found in database. This channel might not be a registered ticket.`,
-                ephemeral: true 
+                ...V2Helper.createLayout({
+                    title: `${this.client.emoji.cross || '❌'} Not Found`,
+                    description: 'Ticket data not found in database. This channel might not be a registered ticket.',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    ephemeral: true
+                }) as any
             });
         }
 
         if (ticket.status === 'CLOSED') {
             return await interaction.reply({ 
-                content: `${this.client.emoji.cross || '❌'} This ticket is already in the process of closing.`, 
-                ephemeral: true 
+                ...V2Helper.createLayout({
+                    title: `${this.client.emoji.cross || '❌'} Already Closing`,
+                    description: 'This ticket is already in the process of closing.',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    ephemeral: true
+                }) as any
             });
         }
 
@@ -57,8 +70,14 @@ export default class TicketConfirmClose extends Component {
 
         if (!isCreator && !isAdmin && !isStaff) {
             return await interaction.reply({ 
-                content: `${this.client.emoji.cross || '❌'} Only the ticket creator or server support staff can close this ticket.`, 
-                ephemeral: true 
+                ...V2Helper.createLayout({
+                    title: `${this.client.emoji.cross || '❌'} Permission Denied`,
+                    description: 'Only the ticket creator or server support staff can close this ticket.',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    ephemeral: true
+                }) as any
             });
         }
 
@@ -69,10 +88,10 @@ export default class TicketConfirmClose extends Component {
         // Immediately update interaction to Closing State (removes buttons automatically)
         const closingLayout = V2Helper.createLayout({
             title: '⏳ Closing Ticket',
-            description: 'Generating transcript and closing channel...',
+            description: 'Generating HTML transcript and closing channel...',
             isAlert: true,
-            color: 0xFFA500,
-            borderless: true
+            borderless: true,
+            color: null
         });
 
         await interaction.update(closingLayout as any).catch(async () => {
@@ -81,23 +100,18 @@ export default class TicketConfirmClose extends Component {
             }
         });
 
-        const channel = interaction.channel as any;
+        const channel = interaction.channel as TextChannel;
         if (!channel) return;
 
-        // Generate Transcript
+        // Generate Modern HTML Transcript
         let transcriptFile: AttachmentBuilder | null = null;
         if (transcriptEnabled) {
             try {
-                const messages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
-                if (messages) {
-                    const transcriptContent = Array.from(messages.values()).reverse().map((m: any) => 
-                        `[${m.createdAt.toLocaleString()}] ${m.author.tag}: ${m.content || (m.embeds?.length > 0 ? '[Embed]' : '[No Content]')}`
-                    ).join('\n');
-
-                    transcriptFile = new AttachmentBuilder(Buffer.from(transcriptContent), { name: `transcript-${channel.name}.txt` });
-                }
+                transcriptFile = await TicketTranscript.generate(channel, ticket, {
+                    closer: interaction.user
+                });
             } catch (err) {
-                console.error('Failed to generate transcript:', err);
+                console.error('Failed to generate HTML transcript:', err);
             }
         }
 
@@ -107,8 +121,14 @@ export default class TicketConfirmClose extends Component {
                 try {
                     const creator = await interaction.guild?.members.fetch(ticket.userId).catch(() => null);
                     if (creator) {
+                        const dmLayout = V2Helper.createLayout({
+                            title: `📁 Ticket Closed: #${channel.name}`,
+                            description: `Your ticket in **${interaction.guild?.name}** has been closed.\n\nA full HTML transcript of the conversation has been attached below for your records.`,
+                            borderless: true,
+                            color: null
+                        });
                         await creator.send({ 
-                            content: `Your ticket **#${channel.name}** in **${interaction.guild?.name}** has been closed. Here is your transcript:`,
+                            ...dmLayout,
                             files: [transcriptFile]
                         }).catch(() => {});
                     }
@@ -122,9 +142,20 @@ export default class TicketConfirmClose extends Component {
                 try {
                     const logChannel = await interaction.guild?.channels.fetch(transcriptChannelId).catch(() => null);
                     if (logChannel && logChannel.isTextBased()) {
+                        const logLayout = V2Helper.createLayout({
+                            title: '📁 Ticket Closed & Archived',
+                            description: 
+                                `Ticket **#${channel.name}** has been closed.\n\n` +
+                                `• **Creator:** <@${ticket.userId}> (\`${ticket.userId}\`)\n` +
+                                `• **Closed By:** <@${interaction.user.id}> (${interaction.user.tag})\n` +
+                                `• **Closed At:** <t:${Math.floor(Date.now() / 1000)}:F>`,
+                            borderless: true,
+                            color: null
+                        });
                         await (logChannel as any).send({
-                            content: `Transcript for closed ticket **#${channel.name}** (Opened by <@${ticket.userId}>, Closed by ${interaction.user}):`,
-                            files: [transcriptFile]
+                            ...logLayout,
+                            files: [transcriptFile],
+                            allowedMentions: { parse: [], roles: [], users: [] }
                         }).catch(() => {});
                     }
                 } catch (err) {

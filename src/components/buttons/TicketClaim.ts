@@ -21,12 +21,30 @@ export default class TicketClaim extends Component {
         });
 
         if (!ticket) {
-            return await interaction.reply({ content: `${this.client.emoji.cross} Ticket data not found in database.`, ephemeral: true });
+            return await interaction.reply({ 
+                ...V2Helper.createLayout({
+                    title: `${this.client.emoji.cross || '❌'} Not Found`,
+                    description: 'Ticket data not found in database.',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    ephemeral: true
+                }) as any 
+            });
         }
 
         // Check if already claimed
         if (ticket.claimantId) {
-            return await interaction.reply({ content: `${this.client.emoji.cross} This ticket is already claimed by <@${ticket.claimantId}>.`, ephemeral: true });
+            return await interaction.reply({ 
+                ...V2Helper.createLayout({
+                    title: `${this.client.emoji.cross || '❌'} Already Claimed`,
+                    description: `This ticket is already claimed by <@${ticket.claimantId}>.`,
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    ephemeral: true
+                }) as any 
+            });
         }
 
         // Check staff role
@@ -41,7 +59,16 @@ export default class TicketClaim extends Component {
         const isStaff = member.roles.cache.has(config?.supportRoleId) || member.permissions.has(PermissionFlagsBits.Administrator);
 
         if (!isStaff) {
-            return await interaction.reply({ content: `${this.client.emoji.cross} Only staff can claim tickets.`, ephemeral: true });
+            return await interaction.reply({ 
+                ...V2Helper.createLayout({
+                    title: `${this.client.emoji.cross || '❌'} Permission Denied`,
+                    description: 'Only server support staff can claim tickets.',
+                    borderless: true,
+                    color: null,
+                    isAlert: true,
+                    ephemeral: true
+                }) as any 
+            });
         }
 
         // Update DB
@@ -50,8 +77,14 @@ export default class TicketClaim extends Component {
             data: { claimantId: interaction.user.id }
         });
 
-        // Instead of trying to edit the V2 message (which is complex), 
-        // just acknowledge and send a follow-up
-        await interaction.reply({ content: `${this.client.emoji.success} Ticket claimed by ${interaction.user}!` });
+        await interaction.reply({ 
+            ...V2Helper.createLayout({
+                title: `${this.client.emoji.success || '✅'} Ticket Claimed`,
+                description: `This ticket has been claimed by ${interaction.user}!`,
+                borderless: true,
+                color: null,
+                allowedMentions: { parse: [], roles: [], users: [interaction.user.id], repliedUser: false }
+            }) as any
+        });
 	}
 }

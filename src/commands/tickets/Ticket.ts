@@ -5,21 +5,23 @@ import {
     ButtonStyle, 
     StringSelectMenuBuilder,
     ApplicationCommandOptionType,
+    TextChannel
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { V2Helper } from '../../utils/V2Helper';
 import { Resolver } from '../../utils/Resolver';
+import { TicketTranscript } from '../../utils/TicketTranscript';
 
 export default class Ticket extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'ticket',
-            aliases: ['t', 'tickets'],
+            aliases: ['t', 'tickets', 'ticketdelete'],
             description: {
                 content: 'Unified ticket management system.',
                 usage: 'ticket <subcommand>',
-                examples: ['ticket setup single', 'ticket close', 'ticket add @User']
+                examples: ['ticket setup single', 'ticket close', 'ticket delete', 'ticket add @User']
             },
             category: 'tickets',
             cooldown: 3,
@@ -79,6 +81,11 @@ export default class Ticket extends Command {
                     type: ApplicationCommandOptionType.Subcommand
                 },
                 {
+                    name: 'delete',
+                    description: 'Instantly delete the ticket channel and archive transcript',
+                    type: ApplicationCommandOptionType.Subcommand
+                },
+                {
                     name: 'add',
                     description: 'Add a user to the ticket',
                     type: ApplicationCommandOptionType.Subcommand,
@@ -115,6 +122,11 @@ export default class Ticket extends Command {
         const group = ctx.options.getSubcommandGroup();
         const sub = ctx.options.getSubcommand();
 
+        const invokedName = ctx.isInteraction ? 'ticket' : ((ctx as any).commandName || 'ticket');
+        if (invokedName === 'ticketdelete') {
+            return this.handleDelete(client, ctx);
+        }
+
         if (group === 'setup') {
             if (sub === 'single') return this.handleSetupSingle(client, ctx);
             if (sub === 'multi') return this.handleSetupMulti(client, ctx);
@@ -122,6 +134,7 @@ export default class Ticket extends Command {
 
         if (sub === 'add-option') return this.handleAddOption(client, ctx);
         if (sub === 'close') return this.handleClose(client, ctx);
+        if (sub === 'delete') return this.handleDelete(client, ctx);
         if (sub === 'add') return this.handleAdd(client, ctx);
         if (sub === 'remove') return this.handleRemove(client, ctx);
         if (sub === 'rename') return this.handleRename(client, ctx);
@@ -135,21 +148,30 @@ export default class Ticket extends Command {
             if (pSub2 === 'multi') return this.handleSetupMulti(client, ctx);
         }
         if (pSub === 'close') return this.handleClose(client, ctx);
+        if (pSub === 'delete') return this.handleDelete(client, ctx);
         if (pSub === 'add') return this.handleAdd(client, ctx);
         if (pSub === 'remove') return this.handleRemove(client, ctx);
         if (pSub === 'rename') return this.handleRename(client, ctx);
         if (pSub === 'claim') return this.handleClaim(client, ctx);
 
         return ctx.replyV2({ 
-            description: 'Please use a valid subcommand: `setup`, `close`, `add`, `remove`, `rename`, `claim`.', 
+            title: `${client.emoji.info || 'ℹ️'} Ticket Command Help`,
+            description: 'Please use a valid subcommand: `setup`, `close`, `delete`, `add`, `remove`, `rename`, `claim`.', 
             isAlert: true,
-            borderless: true 
+            borderless: true,
+            color: null 
         });
     }
 
     private async handleSetupSingle(client: ExtendedClient, ctx: Context) {
         if (!ctx.member?.permissions.has(PermissionFlagsBits.Administrator)) {
-            return ctx.replyV2({ description: 'Only Admins can setup tickets.', isAlert: true, borderless: true });
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Permission Denied`,
+                description: 'Only server administrators can setup tickets.', 
+                isAlert: true, 
+                borderless: true,
+                color: null 
+            });
         }
         
         const panelId = ctx.options.getString('panel_id') || (ctx as any).args[2];
@@ -159,7 +181,13 @@ export default class Ticket extends Command {
         const roleId = ctx.options.getRole('role') || (ctx as any).args[6];
 
         if (!panelId || !name || !channelId || !categoryId || !roleId) {
-            return ctx.replyV2({ description: 'Missing required arguments for single setup.', isAlert: true, borderless: true });
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Missing Arguments`,
+                description: 'Missing required arguments for single setup: `panel_id`, `name`, `channel`, `category`, `role`.', 
+                isAlert: true, 
+                borderless: true,
+                color: null 
+            });
         }
 
         const channel = ctx.guild.channels.cache.get(channelId.id || channelId) as any;
@@ -173,8 +201,8 @@ export default class Ticket extends Command {
             title: `🎟️ ${name}`,
             description: description,
             footer: `Powered by ${client.user?.username}`,
-            color: client.color.main,
             borderless: true,
+            color: null,
             buttons: [
                 new ButtonBuilder()
                     .setCustomId(`ticket_open_${panelId}`)
@@ -196,16 +224,22 @@ export default class Ticket extends Command {
         });
 
         return ctx.replyV2({ 
-            title: 'Setup Complete', 
+            title: `${client.emoji.success || '✅'} Setup Complete`, 
             description: `Single ticket panel **${name}** set up in ${channel}.`, 
-            color: client.color.main,
-            borderless: true 
+            borderless: true,
+            color: null 
         });
     }
 
     private async handleSetupMulti(client: ExtendedClient, ctx: Context) {
         if (!ctx.member?.permissions.has(PermissionFlagsBits.Administrator)) {
-            return ctx.replyV2({ description: 'Only Admins can setup tickets.', isAlert: true, borderless: true });
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Permission Denied`,
+                description: 'Only server administrators can setup tickets.', 
+                isAlert: true, 
+                borderless: true,
+                color: null 
+            });
         }
         
         const panelId = ctx.options.getString('panel_id') || (ctx as any).args[2];
@@ -213,7 +247,13 @@ export default class Ticket extends Command {
         const channelId = ctx.options.getChannel('channel') || (ctx as any).args[4];
 
         if (!panelId || !name || !channelId) {
-            return ctx.replyV2({ description: 'Missing required arguments for multi setup.', isAlert: true, borderless: true });
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Missing Arguments`,
+                description: 'Missing required arguments for multi setup: `panel_id`, `name`, `channel`.', 
+                isAlert: true, 
+                borderless: true,
+                color: null 
+            });
         }
 
         const channel = ctx.guild.channels.cache.get(channelId.id || channelId) as any;
@@ -223,8 +263,8 @@ export default class Ticket extends Command {
             title: `🎟️ ${name}`,
             description: description + '\n\n*(Currently no options. Use `/ticket add-option` to add some)*',
             footer: `Powered by ${client.user?.username}`,
-            color: client.color.main,
-            borderless: true
+            borderless: true,
+            color: null
         }));
 
         await (client.prisma as any).ticketConfig.upsert({
@@ -245,16 +285,22 @@ export default class Ticket extends Command {
         });
 
         return ctx.replyV2({ 
-            title: 'Multi-Panel Created', 
-            description: `Multi ticket panel **${name}** set up in ${channel}.`, 
-            color: client.color.main,
-            borderless: true 
+            title: `${client.emoji.success || '✅'} Multi-Panel Created`, 
+            description: `Multi ticket panel **${name}** set up in ${channel}. Use \`/ticket add-option\` to configure categories.`, 
+            borderless: true,
+            color: null 
         });
     }
 
     private async handleAddOption(client: ExtendedClient, ctx: Context) {
         if (!ctx.member?.permissions.has(PermissionFlagsBits.Administrator)) {
-            return ctx.replyV2({ description: 'Only Admins can manage ticket options.', isAlert: true, borderless: true });
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Permission Denied`,
+                description: 'Only server administrators can manage ticket options.', 
+                isAlert: true, 
+                borderless: true,
+                color: null 
+            });
         }
 
         const panelId = ctx.options.getString('panel_id') || (ctx as any).args[2];
@@ -265,7 +311,13 @@ export default class Ticket extends Command {
         const emoji = ctx.options.getString('emoji') || (ctx as any).args[7] || null;
 
         if (!panelId || !optionId || !label || !categoryId || !roleId) {
-            return ctx.replyV2({ description: 'Missing required arguments for add-option.', isAlert: true, borderless: true });
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Missing Arguments`,
+                description: 'Missing required arguments for add-option.', 
+                isAlert: true, 
+                borderless: true,
+                color: null 
+            });
         }
 
         const category = ctx.guild.channels.cache.get(categoryId.id || categoryId) as any;
@@ -276,7 +328,13 @@ export default class Ticket extends Command {
         });
 
         if (!panelConf || !panelConf.isMulti) {
-            return ctx.replyV2({ description: `Panel \`${panelId}\` not found or is not a Multi-Panel.`, isAlert: true, borderless: true });
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Panel Not Found`,
+                description: `Panel \`${panelId}\` not found or is not a Multi-Panel.`, 
+                isAlert: true, 
+                borderless: true,
+                color: null 
+            });
         }
 
         await (client.prisma as any).ticketPanelOption.upsert({
@@ -312,18 +370,18 @@ export default class Ticket extends Command {
                     title: `🎟️ ${panelConf.name}`,
                     description: panelConf.description,
                     footer: `Powered by ${client.user?.username}`,
-                    color: client.color.main,
                     borderless: true,
+                    color: null,
                     selectMenu: selectMenu
                 }) as any).catch(() => {});
             }
         }
 
         return ctx.replyV2({ 
-            title: 'Option Added', 
-            description: `Added **${label}** to Panel \`${panelId}\` and refreshed the panel.`, 
-            color: client.color.main,
-            borderless: true 
+            title: `${client.emoji.success || '✅'} Option Added`, 
+            description: `Added **${label}** to Panel \`${panelId}\` and refreshed the panel message.`, 
+            borderless: true,
+            color: null 
         });
     }
 
@@ -336,27 +394,31 @@ export default class Ticket extends Command {
 
         if (!ticket) {
             return ctx.replyV2({ 
-                description: `${client.emoji.cross || '❌'} This channel is not a registered ticket.`, 
+                title: `${client.emoji.cross || '❌'} Invalid Channel`,
+                description: 'This channel is not a registered ticket.', 
                 isAlert: true,
-                borderless: true 
+                borderless: true,
+                color: null 
             });
         }
 
         if (ticket.status === 'CLOSED') {
             return ctx.replyV2({ 
-                description: `${client.emoji.cross || '❌'} This ticket is already in the process of closing.`, 
+                title: `${client.emoji.cross || '❌'} Already Closing`,
+                description: 'This ticket is already in the process of closing.', 
                 isAlert: true,
-                borderless: true 
+                borderless: true,
+                color: null 
             });
         }
 
         // Persistent Borderless V2 Close Confirmation
         const closePayload = V2Helper.createLayout({
             title: '🔒 Ticket Close Confirmation',
-            description: `Are you sure you want to close this ticket?\n\n**Note:** Transcripts will be archived, and this channel will be closed.\n\n<@${ticket.userId}> or Support Staff, please confirm below.`,
+            description: `Are you sure you want to close this ticket?\n\n**Note:** An HTML transcript will be archived, and this channel will be closed.\n\n<@${ticket.userId}> or Support Staff, please confirm below.`,
             isAlert: true,
-            color: 0xFFA500,
             borderless: true,
+            color: null,
             buttons: [
                 new ButtonBuilder()
                     .setCustomId('ticket_confirm_close')
@@ -369,58 +431,196 @@ export default class Ticket extends Command {
             ]
         });
 
-        return await ctx.reply(closePayload as any);
+        return await ctx.replyV2(closePayload);
+    }
+
+    private async handleDelete(client: ExtendedClient, ctx: Context) {
+        if (!ctx.guild || !ctx.channel) return;
+
+        const ticket = await (client.prisma as any).ticket.findUnique({ 
+            where: { channelId: ctx.channel.id } 
+        });
+
+        if (!ticket) {
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Invalid Channel`,
+                description: 'This channel is not a registered ticket.', 
+                borderless: true,
+                color: null,
+                isAlert: true 
+            });
+        }
+
+        const member = ctx.member as any;
+        const isAdmin = member?.permissions?.has(PermissionFlagsBits.Administrator) || member?.permissions?.has(PermissionFlagsBits.ManageChannels);
+        let config = null;
+        if (ticket.panelId) {
+            config = await (client.prisma as any).ticketConfig.findUnique({
+                where: { guildId_panelId: { guildId: ctx.guild.id, panelId: ticket.panelId } }
+            });
+        }
+        if (!config) {
+            config = await (client.prisma as any).ticketConfig.findFirst({
+                where: { guildId: ctx.guild.id }
+            });
+        }
+        const isStaff = config?.supportRoleId ? member?.roles?.cache?.has(config.supportRoleId) : false;
+
+        if (!isAdmin && !isStaff) {
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Permission Denied`,
+                description: 'Only administrators and support staff can delete tickets.', 
+                borderless: true,
+                color: null,
+                isAlert: true 
+            });
+        }
+
+        // Generate transcript and log to transcript channel before deleting
+        if (config?.transcriptEnabled && config?.transcriptChannelId) {
+            try {
+                const logChannel = await ctx.guild.channels.fetch(config.transcriptChannelId).catch(() => null);
+                if (logChannel && logChannel.isTextBased()) {
+                    const transcriptFile = await TicketTranscript.generate(ctx.channel as TextChannel, ticket, {
+                        closer: ctx.author,
+                        closedReason: 'Ticket deleted via command'
+                    });
+                    const logLayout = V2Helper.createLayout({
+                        title: '🗑️ Ticket Deleted & Archived',
+                        description: 
+                            `Ticket **#${(ctx.channel as any).name}** was deleted.\n\n` +
+                            `• **Creator:** <@${ticket.userId}> (\`${ticket.userId}\`)\n` +
+                            `• **Deleted By:** <@${ctx.author.id}> (${ctx.author.tag})\n` +
+                            `• **Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>`,
+                        borderless: true,
+                        color: null
+                    });
+                    await (logChannel as any).send({
+                        ...logLayout,
+                        files: [transcriptFile],
+                        allowedMentions: { parse: [], roles: [], users: [] }
+                    }).catch(() => {});
+                }
+            } catch (err) {
+                console.error('Failed to log transcript during ticket deletion:', err);
+            }
+        }
+
+        // Mark ticket closed in DB
+        await (client.prisma as any).ticket.update({
+            where: { id: ticket.id },
+            data: { status: 'CLOSED' }
+        }).catch(() => {});
+
+        await ctx.replyV2({
+            title: '🗑️ Deleting Ticket',
+            description: 'This ticket is being deleted immediately...',
+            borderless: true,
+            color: null,
+            isAlert: true
+        });
+
+        setTimeout(async () => {
+            await (ctx.channel as any)?.delete(`Ticket deleted by ${ctx.author.tag}`).catch(() => {});
+        }, 1500);
     }
 
     private async handleAdd(client: ExtendedClient, ctx: Context) {
         const target = await Resolver.resolveMember(ctx);
-        if (!target) return ctx.replyV2({ description: 'Member not found.', isAlert: true, borderless: true });
+        if (!target) {
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Member Not Found`,
+                description: 'Could not find that member in this server.', 
+                isAlert: true, 
+                borderless: true,
+                color: null 
+            });
+        }
 
         await (ctx.channel as any).permissionOverwrites.edit(target.id, {
             ViewChannel: true, SendMessages: true, EmbedLinks: true, AttachFiles: true
         });
 
         return ctx.replyV2({ 
-            description: `${target} has been added to the ticket.`, 
-            color: client.color.main,
-            borderless: true 
+            title: `${client.emoji.success || '✅'} User Added`,
+            description: `${target} has been added to this ticket.`, 
+            borderless: true,
+            color: null,
+            allowedMentions: { parse: [], roles: [], users: [target.id, ctx.author.id], repliedUser: false }
         });
     }
 
     private async handleRemove(client: ExtendedClient, ctx: Context) {
         const target = await Resolver.resolveMember(ctx);
-        if (!target) return ctx.replyV2({ description: 'Member not found.', isAlert: true, borderless: true });
+        if (!target) {
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Member Not Found`,
+                description: 'Could not find that member in this server.', 
+                isAlert: true, 
+                borderless: true,
+                color: null 
+            });
+        }
 
         await (ctx.channel as any).permissionOverwrites.delete(target.id);
         return ctx.replyV2({ 
-            description: `${target} has been removed from the ticket.`, 
-            color: client.color.main,
-            borderless: true 
+            title: `${client.emoji.success || '✅'} User Removed`,
+            description: `${target} has been removed from this ticket.`, 
+            borderless: true,
+            color: null,
+            allowedMentions: { parse: [], roles: [], users: [target.id, ctx.author.id], repliedUser: false }
         });
     }
 
     private async handleRename(client: ExtendedClient, ctx: Context) {
         const name = ctx.options.getString('name') || (ctx as any).args[1];
-        if (!name) return ctx.replyV2({ description: 'Please specify a new name.', isAlert: true, borderless: true });
+        if (!name) {
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Invalid Name`,
+                description: 'Please specify a new name for the ticket channel.', 
+                isAlert: true, 
+                borderless: true,
+                color: null 
+            });
+        }
 
         await (ctx.channel as any).setName(name);
         return ctx.replyV2({ 
-            description: `Ticket renamed to \`${name}\`.`, 
-            color: client.color.main,
-            borderless: true 
+            title: `${client.emoji.success || '✅'} Ticket Renamed`,
+            description: `Ticket channel renamed to \`${name}\`.`, 
+            borderless: true,
+            color: null 
         });
     }
 
     private async handleClaim(client: ExtendedClient, ctx: Context) {
         const ticket = await (client.prisma as any).ticket.findUnique({ where: { channelId: ctx.channel.id } });
-        if (!ticket) return ctx.replyV2({ description: 'Not a ticket channel.', isAlert: true, borderless: true });
-        if (ticket.claimantId) return ctx.replyV2({ description: `Already claimed by <@${ticket.claimantId}>.`, isAlert: true, borderless: true });
+        if (!ticket) {
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Invalid Channel`,
+                description: 'This is not a registered ticket channel.', 
+                isAlert: true, 
+                borderless: true,
+                color: null 
+            });
+        }
+        if (ticket.claimantId) {
+            return ctx.replyV2({ 
+                title: `${client.emoji.cross || '❌'} Already Claimed`,
+                description: `This ticket is already claimed by <@${ticket.claimantId}>.`, 
+                isAlert: true, 
+                borderless: true,
+                color: null 
+            });
+        }
 
         await (client.prisma as any).ticket.update({ where: { id: ticket.id }, data: { claimantId: ctx.author.id } });
         return ctx.replyV2({ 
-            description: `Ticket claimed by ${ctx.author}!`, 
-            color: client.color.main,
-            borderless: true 
+            title: `${client.emoji.success || '✅'} Ticket Claimed`,
+            description: `Ticket successfully claimed by ${ctx.author}!`, 
+            borderless: true,
+            color: null,
+            allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
         });
     }
 }

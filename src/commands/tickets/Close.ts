@@ -31,27 +31,31 @@ export default class Close extends Command {
 
         if (!ticket) {
             return await ctx.replyV2({ 
-                description: `${client.emoji.cross || '❌'} This channel is not a registered ticket.`, 
+                title: `${client.emoji.cross || '❌'} Invalid Channel`,
+                description: 'This channel is not a registered ticket.', 
                 isAlert: true,
-                borderless: true 
+                borderless: true,
+                color: null 
             });
         }
 
         if (ticket.status === 'CLOSED') {
             return await ctx.replyV2({ 
-                description: `${client.emoji.cross || '❌'} This ticket is already in the process of closing.`, 
+                title: `${client.emoji.cross || '❌'} Already Closing`,
+                description: 'This ticket is already in the process of closing.', 
                 isAlert: true,
-                borderless: true 
+                borderless: true,
+                color: null 
             });
         }
 
         // Send Persistent Borderless V2 Close Confirmation Layout
         const closePayload = V2Helper.createLayout({
             title: '🔒 Ticket Close Confirmation',
-            description: `Are you sure you want to close this ticket?\n\n**Note:** Transcripts will be archived, and this channel will be closed.\n\n<@${ticket.userId}> or Support Staff, please confirm below.`,
+            description: `Are you sure you want to close this ticket?\n\n**Note:** An HTML transcript will be archived, and this channel will be closed.\n\n<@${ticket.userId}> or Support Staff, please confirm below.`,
             isAlert: true,
-            color: 0xFFA500,
             borderless: true,
+            color: null,
             buttons: [
                 new ButtonBuilder()
                     .setCustomId('ticket_confirm_close')
@@ -64,6 +68,6 @@ export default class Close extends Command {
             ]
         });
 
-        return await ctx.reply(closePayload as any);
+        return await ctx.replyV2(closePayload);
     }
 }

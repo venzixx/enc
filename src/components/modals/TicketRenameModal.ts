@@ -1,6 +1,7 @@
-import { type ModalSubmitInteraction, EmbedBuilder } from "discord.js";
+import { type ModalSubmitInteraction } from "discord.js";
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
+import { V2Helper } from "../../utils/V2Helper";
 
 export default class TicketRenameModal extends Component {
 	constructor(client: ExtendedClient) {
@@ -17,11 +18,13 @@ export default class TicketRenameModal extends Component {
         const oldName = (interaction.channel as any).name;
         await (interaction.channel as any).setName(newName);
 
-        const embed = new EmbedBuilder()
-            .setColor(this.client.color.main)
-            .setDescription(`${this.client.emoji.edit} Ticket renamed from \`${oldName}\` to \`${newName}\` by ${interaction.user}`)
-            .setTimestamp();
-
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({
+            ...V2Helper.createLayout({
+                title: 'Ticket Renamed',
+                description: `${this.client.emoji.edit || '✏️'} Ticket renamed from \`${oldName}\` to \`${newName}\` by ${interaction.user}`,
+                borderless: true,
+                color: null
+            }) as any
+        });
 	}
 }
