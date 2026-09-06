@@ -70,27 +70,62 @@ export default class Mute extends Command {
 		const isGuildOwner = ctx.guild.ownerId === ctx.author.id || isBotOwner;
 
 		if (!target) {
-			return await ctx.replyV2({ description: 'Could not find that member in this server.', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Member Not Found`,
+				description: 'Could not find that member in this server.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true,
+				allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+			});
 		}
 
 		if (target.id === ctx.author.id) {
-			return await ctx.replyV2({ description: 'Self-harm is not permitted. You cannot mute yourself.', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Invalid Action`,
+				description: 'Self-harm is not permitted. You cannot mute yourself.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true,
+				allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+			});
 		}
 
 		if (!isGuildOwner && target.roles.highest.position >= (ctx.member as GuildMember).roles.highest.position) {
-			return await ctx.replyV2({ description: 'Hierarchy Violation: You cannot mute someone with a higher or equal role.', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Hierarchy Violation`,
+				description: 'You cannot mute someone with a higher or equal role.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true,
+				allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+			});
 		}
 
 		if (!target.manageable) {
             if (isGuildOwner) {
                 return await this.askForceMute(client, ctx, target, null, reason, durationStr);
             }
-			return await ctx.replyV2({ description: 'Hierarchy Block: My role position is below this user. Move me higher to enable moderation.', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Hierarchy Block`,
+				description: 'My role position is below this user. Move me higher to enable moderation.', 
+				borderless: true, 
+				color: null, 
+				isAlert: true,
+				allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+			});
 		}
 
 		const time = durationStr ? ms(durationStr) : null;
 		if (!time || (time as any) < 10000 || (time as any) > 2419200000) {
-			return await ctx.replyV2({ description: 'Invalid Duration: Must be between 10 seconds and 28 days (e.g., 10m, 1h, 1d).', color: client.color.red, isAlert: true });
+			return await ctx.replyV2({ 
+				title: `${client.emoji.cross} Invalid Duration`,
+				description: 'Must be between 10 seconds and 28 days (e.g., 10m, 1h, 1d).', 
+				borderless: true, 
+				color: null, 
+				isAlert: true,
+				allowedMentions: { parse: [], roles: [], users: [ctx.author.id], repliedUser: false }
+			});
 		}
 
 		const force = args.includes('--force') || args.includes('-f');
@@ -176,7 +211,8 @@ export default class Mute extends Command {
         const response = await ctx.replyV2({
             title: '⚠️ Force Mute Required',
             description: `${target} has administrative permissions that prevent a standard timeout.\n\n**Force Mute will:**\n1. Temporarily remove only the admin role(s): ${adminRoleNames}\n2. Apply the **${durationStr}** timeout.\n3. **Automatically restore** the admin role(s) upon unmute.\n\nDo you wish to proceed?`,
-            color: client.color.orange,
+            borderless: true,
+            color: null,
             buttons: [confirmBtn, cancelBtn]
         }) as any;
 
@@ -192,7 +228,12 @@ export default class Mute extends Command {
 
             if (i.customId === 'cancel_force_mute') {
                 await i.update({ 
-                    ...V2Helper.createLayout({ title: 'Operation Cancelled', description: 'Force mute was cancelled.', color: client.color.main }) 
+                    ...V2Helper.createLayout({ 
+                        title: 'Operation Cancelled', 
+                        description: 'Force mute was cancelled.', 
+                        borderless: true, 
+                        color: null 
+                    }) 
                 } as any);
                 return collector.stop();
             }
@@ -229,12 +270,19 @@ export default class Mute extends Command {
                     ...V2Helper.createLayout({ 
                         title: `${client.emoji.success} Force Mute Executed`, 
                         description: `Successfully timed out ${target} for **${durationStr}**.\n\n**Temporarily Removed Role(s):** ${removedNames}\n*These role(s) will be automatically restored upon unmute (Case #${newCase.caseNumber}).*`, 
-                        color: client.color.main 
+                        borderless: true,
+                        color: null 
                     })
                 } as any);
             } catch (err: any) {
                 await i.editReply({
-                    ...V2Helper.createLayout({ title: 'Force Mute Failed', description: `Critical failure during force mute: ${err.message}`, color: client.color.red, isAlert: true })
+                    ...V2Helper.createLayout({ 
+                        title: 'Force Mute Failed', 
+                        description: `Critical failure during force mute: ${err.message}`, 
+                        borderless: true,
+                        color: null, 
+                        isAlert: true 
+                    })
                 } as any);
             }
             collector.stop();
