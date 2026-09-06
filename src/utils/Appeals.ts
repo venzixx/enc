@@ -15,8 +15,9 @@ export class Appeals {
         user: User, 
         guild: Guild, 
         type: "BAN" | "KICK" | "MUTE", 
-        reason: string
-    ) {
+        reason: string,
+        inviteUrl?: string | null
+    ): Promise<boolean> {
         try {
             const embed = new EmbedBuilder()
                 .setTitle(`${client.emoji.shield} Sanction Notification: ${guild.name}`)
@@ -26,10 +27,28 @@ export class Appeals {
                     { name: `${client.emoji.mic} Reason`, value: reason || "No reason provided", inline: true }
                 )
                 .setColor(client.color.red)
-                .setFooter({ text: "You can appeal this sanction by clicking the button below." })
+                .setFooter({ text: inviteUrl ? "A rejoin invite link has been attached below." : "You can appeal this sanction by clicking the button below." })
                 .setTimestamp();
 
-            const buttons = [];
+            if (inviteUrl) {
+                embed.addFields({
+                    name: "🔗 Rejoin Invite",
+                    value: `You have been provided a one-time link to rejoin: [Click Here to Rejoin](${inviteUrl})\n*(One-time use • Expires in 24 hours)*`,
+                    inline: false
+                });
+            }
+
+            const buttons: ButtonBuilder[] = [];
+
+            if (inviteUrl) {
+                buttons.push(
+                    new ButtonBuilder()
+                        .setLabel("Rejoin Server")
+                        .setURL(inviteUrl)
+                        .setEmoji("🔗")
+                        .setStyle(ButtonStyle.Link)
+                );
+            }
             
             // Only add Discord button if it's a MUTE (user is still in the server)
             // Discord blocks DM button interactions if the user shares NO servers with the bot
@@ -38,7 +57,7 @@ export class Appeals {
                     new ButtonBuilder()
                         .setCustomId(`appeal_init_${guild.id}_${type}`)
                         .setLabel("Appeal via Discord")
-                        .setEmoji(client.emoji.edit.match(/\d+/)?.[0] || "📜")
+                        .setEmoji(client.emoji.edit?.match(/\d+/)?.[0] || "📜")
                         .setStyle(ButtonStyle.Primary)
                 );
             }
@@ -57,17 +76,22 @@ export class Appeals {
                 new ButtonBuilder()
                     .setLabel("Appeal via Web")
                     .setURL(webUrl)
-                    .setEmoji(client.emoji.link.match(/\d+/)?.[0] || "🌐")
+                    .setEmoji(client.emoji.link?.match(/\d+/)?.[0] || "🌐")
                     .setStyle(ButtonStyle.Link)
             );
 
             const row = new ActionRowBuilder<ButtonBuilder>().addComponents(buttons);
 
-            await user.send({ embeds: [embed], components: [row] }).catch(() => {
-                console.log(`Could not send DM to ${user.tag} for appeal.`);
-            });
+            let sent = false;
+            await user.send({ embeds: [embed], components: [row] })
+                .then(() => { sent = true; })
+                .catch(() => {
+                    console.log(`Could not send DM to ${user.tag} for appeal.`);
+                });
+            return sent;
         } catch (error) {
             console.error("Error in sendAppealDM:", error);
+            return false;
         }
     }
 }
