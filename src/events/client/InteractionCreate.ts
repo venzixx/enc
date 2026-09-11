@@ -20,6 +20,7 @@ import { AuditLogger, AuditLogType, AuditLogStatus } from "../../utils/AuditLogg
 import { LavamusicEventType } from "../../types/events";
 import { ExtendedClient } from "../../client";
 import { isDev } from "../../utils/devCheck";
+import { V2Helper } from "../../utils/V2Helper";
 
 export default class InteractionCreate extends Event {
 	constructor(client: ExtendedClient, file: string) {
@@ -69,15 +70,17 @@ export default class InteractionCreate extends Event {
 			// Maintenance Check
 			const isBotDev = await isDev(this.client, interaction.user.id);
 			if (this.client.maintenance.enabled && !isBotDev) {
+				const botName = this.client.user?.username || "This bot";
+				const etaText = this.client.maintenance.eta ? ` until **${this.client.maintenance.eta}**` : "";
 				return await interaction.reply({
-					embeds: [
-						new EmbedBuilder()
-							.setTitle("Under Maintenance")
-							.setDescription(`Dimscord is currently under maintenance${this.client.maintenance.eta ? ` until **${this.client.maintenance.eta}**` : ""}. Please try again later.`)
-							.setColor(this.client.color.yellow)
-							.setTimestamp()
-					],
-					flags: MessageFlags.Ephemeral,
+					...V2Helper.createLayout({
+						title: `${this.client.emoji.edit || '🛠️'} Under Maintenance`,
+						description: `**${botName}** is currently under maintenance${etaText}. Please try again later.`,
+						borderless: true,
+						color: null,
+						timestamp: true,
+						ephemeral: true
+					}) as any
 				});
 			}
 

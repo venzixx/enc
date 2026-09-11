@@ -1070,14 +1070,16 @@ export default class MessageCreate extends Event {
 
 		// Maintenance Check
 		if (this.client.maintenance.enabled && !isBotDev) {
+			const botName = this.client.user?.username || "This bot";
+			const etaText = this.client.maintenance.eta ? ` until **${this.client.maintenance.eta}**` : "";
 			return await message.reply({
-				embeds: [
-					new EmbedBuilder()
-						.setTitle("Under Maintenance")
-						.setDescription(`Dimscord is currently under maintenance${this.client.maintenance.eta ? ` until **${this.client.maintenance.eta}**` : ""}. Please try again later.`)
-						.setColor(this.client.color.yellow)
-						.setTimestamp()
-				]
+				...V2Helper.createLayout({
+					title: `${this.client.emoji.edit || '🛠️'} Under Maintenance`,
+					description: `**${botName}** is currently under maintenance${etaText}. Please try again later.`,
+					borderless: true,
+					color: null,
+					timestamp: true
+				}) as any
 			}).catch(() => { });
 		}
 
