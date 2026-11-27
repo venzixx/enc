@@ -1,4 +1,4 @@
-import { Client, ClientOptions, Collection, EmbedBuilder, REST, Routes, ActivityType, PresenceStatusData } from 'discord.js';
+import { Client, ClientOptions, Collection, EmbedBuilder, REST, ActivityType, PresenceStatusData } from 'discord.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { PrismaClient } from '@prisma/client';
@@ -49,7 +49,7 @@ export class ExtendedClient extends Client {
         this.registerLavalinkEvents();
     }
 
-    public embed(data?: any, ctx?: any): EmbedBuilder {
+    public embed(data?: any, _ctx?: any): EmbedBuilder {
         return new EmbedBuilder(data);
     }
 
@@ -129,7 +129,7 @@ export class ExtendedClient extends Client {
             if (track?.info?.title && (track?.info?.sourceName === "youtube" || !track?.info?.uri?.includes("soundcloud.com"))) {
                 logger.info(`[Lavalink] Attempting automatic failover to SoundCloud for: ${track.info.title}`);
                 try {
-                    const res = await this.lavalink.search({ query: track.info.title, source: "scsearch" }, track.requester);
+                    const res = await this.lavalink.search({ query: track.info.title, source: "ytmsearch" }, track.requester);
                     if (res && res.tracks && res.tracks.length > 0) {
                         logger.info(`[Lavalink] Failover found SoundCloud alternative: ${res.tracks[0].info.title}`);
                         await player.queue.add(res.tracks[0], 0);
@@ -151,7 +151,7 @@ export class ExtendedClient extends Client {
                 if (channel) channel.send(`${this.emoji.exclamation} Track playback stalled. Attempting to switch to an alternative source...`).catch(() => {});
                 
                 try {
-                    const res = await this.lavalink.search({ query: track.info.title, source: "scsearch" }, track.requester);
+                    const res = await this.lavalink.search({ query: track.info.title, source: "ytmsearch" }, track.requester);
                     if (res && res.tracks.length > 0) {
                         player.queue.add(res.tracks[0], 0);
                         return player.skip();

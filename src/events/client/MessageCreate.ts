@@ -8,6 +8,7 @@ import {
 	AttachmentBuilder,
 	type GuildMember,
 	type Message,
+	MessageType,
 	PermissionFlagsBits,
 	type TextChannel,
 } from "discord.js";
@@ -25,6 +26,7 @@ import { StreakManager } from "../../utils/StreakManager";
 import { isDev } from "../../utils/devCheck";
 import { AfkManager } from "../../utils/AfkManager";
 import { V2Helper } from "../../utils/V2Helper";
+import { BumpReminder } from "../../utils/BumpReminder";
 
 export default class MessageCreate extends Event {
 	constructor(client: ExtendedClient, file: string) {
@@ -35,7 +37,10 @@ export default class MessageCreate extends Event {
 	}
 
 	public async run(message: Message): Promise<any> {
-		if (message.author.bot) return;
+		if (message.author.bot) {
+			await BumpReminder.observe(this.client, message).catch(error => logger.error('Failed to track DISBOARD bump:', error));
+			return;
+		}
 
 		// --- DIRECT MESSAGE (DM) COMMAND HANDLING ---
 		if (!message.guild) {
@@ -72,7 +77,26 @@ export default class MessageCreate extends Event {
 			return;
 		}
 
-		console.log(`[DEBUG] Message from ${message.author.tag} in ${message.guild.name}: "${message.content}"`);
+
+		// --- DISCORD SERVER BOOST SYSTEM MESSAGE DETECTION ---
+		const boostTypes = [
+			MessageType.GuildBoost,
+			MessageType.GuildBoostTier1,
+			MessageType.GuildBoostTier2,
+			MessageType.GuildBoostTier3,
+		];
+		if (boostTypes.includes(message.type)) {
+			try {
+				const { BoosterNotification } = await import('../../utils/BoosterNotification');
+				const member = message.member || await message.guild.members.fetch(message.author.id).catch(() => null);
+				if (member) {
+					await BoosterNotification.dispatchBoost(this.client, member, message.guild, { sourceMessage: message });
+				}
+			} catch (boostErr) {
+				console.error('[BOOST_SYSTEM_MESSAGE_ERROR]', boostErr);
+			}
+			return;
+		}
 
 		// 0. AUTO-MOD CHECK 
 		// Check for spam, links, blacklisted words, etc.
@@ -342,7 +366,6 @@ export default class MessageCreate extends Event {
 
 		// 2) Check for Ignored Channels (Bypass for HELP command)
 		const prefix = setup?.prefix || guild?.prefix || process.env.PREFIX || "e!";
-		console.log(`[DEBUG] Message from ${message.author.tag}: "${message.content}". Prefix: "${prefix}"`);
 		const isHelp = message.content.toLowerCase().startsWith(prefix.toLowerCase() + "help") ||
 			message.content.startsWith(`<@!${this.client.user?.id}> help`) ||
 			message.content.startsWith(`<@${this.client.user?.id}> help`);
@@ -999,7 +1022,7 @@ export default class MessageCreate extends Event {
 			(ctx as any).args = args;
 			(ctx as any).prefix = matchedPrefix;
 
-			logger.info(`[Command] ${command.name} triggered by ${message.author.tag} (${message.author.id}) in ${message.guildId}. Content: "${message.content}"`);
+			logger.info(`[Command] ${command.name} triggered by ${message.author.id} in ${message.guildId}.`);
 
 			// ... (Rest of command validation and run)
 			return await this.handleCommand(command, ctx, args, locale, message);
@@ -1305,20 +1328,15 @@ export default class MessageCreate extends Event {
 				type: 'PREFIX'
 			}).catch(() => {});
 
+			const userErr = ErrorReporter.getUserErrorMessage(error);
 			await ctx.replyV2({
-				title: `${this.client.emoji.cross} Command Error`,
-				description: t(I18N.events.message.error, {
-					lng: locale,
-					error: error.message || "Unknown error",
-				}),
+				title: `${this.client.emoji.cross} ${userErr.title}`,
+				description: userErr.description,
 				isAlert: true,
 				color: this.client.color.red
 			}).catch(() => {
 				message.reply({
-					content: t(I18N.events.message.error, {
-						lng: locale,
-						error: error.message || "Unknown error",
-					}),
+					content: `${this.client.emoji.cross} **${userErr.title}**\n\n${userErr.description}`,
 				}).catch(() => {});
 			});
 		}

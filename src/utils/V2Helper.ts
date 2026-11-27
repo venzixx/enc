@@ -215,6 +215,24 @@ export class V2Helper {
             ? options.allowedMentions
             : { parse: [], roles: [], users: [], repliedUser: false };
 
+        if (payload.allowedMentions && typeof payload.allowedMentions === 'object') {
+            if (Array.isArray(payload.allowedMentions.users)) {
+                payload.allowedMentions.users = Array.from(new Set(payload.allowedMentions.users.filter(Boolean)));
+            }
+            if (Array.isArray(payload.allowedMentions.roles)) {
+                payload.allowedMentions.roles = Array.from(new Set(payload.allowedMentions.roles.filter(Boolean)));
+            }
+            if (Array.isArray(payload.allowedMentions.parse)) {
+                payload.allowedMentions.parse = Array.from(new Set(payload.allowedMentions.parse.filter(Boolean)));
+                if (payload.allowedMentions.parse.includes('users') && Array.isArray(payload.allowedMentions.users) && payload.allowedMentions.users.length > 0) {
+                    payload.allowedMentions.parse = payload.allowedMentions.parse.filter((p: string) => p !== 'users');
+                }
+                if (payload.allowedMentions.parse.includes('roles') && Array.isArray(payload.allowedMentions.roles) && payload.allowedMentions.roles.length > 0) {
+                    payload.allowedMentions.parse = payload.allowedMentions.parse.filter((p: string) => p !== 'roles');
+                }
+            }
+        }
+
         return payload;
     }
 

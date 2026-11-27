@@ -48,9 +48,9 @@ export default class RoleCommand extends Command {
 			name: 'role',
 			aliases: ['r', 'rl'],
 			description: {
-				content: 'Manage server roles (add, remove, create, delete, color, icon, info, exch, rename, strip, and move).',
-				usage: 'role <add/remove/create/delete/color/icon/info/exch/rename/strip/move> [args]',
-				examples: ['role add @Member @Admin', 'role move @VIP 3', 'role strip @User', 'role exch @RoleA , @RoleB', 'role rename @VIP VIP Member', 'role color @Admin #FF00FF']
+				content: 'Manage server roles (add, remove, create, delete, color, icon, info, exch, rename, strip, move, hoist, and mentionable).',
+				usage: 'role <add/remove/create/delete/color/icon/info/exch/rename/strip/move/hoist/mentionable> [args]',
+				examples: ['role hoist @Member on', 'role mentionable @Admin off', 'role move @VIP 3', 'role strip @User', 'role exch @RoleA , @RoleB', 'role rename @VIP VIP Member', 'role color @Admin #FF00FF']
 			},
 			category: 'tools',
 			cooldown: 3,
@@ -167,6 +167,24 @@ export default class RoleCommand extends Command {
                         { name: 'role', description: 'The role to move', type: 8, required: true },
                         { name: 'position', description: 'Target position number (from ,roles list)', type: 4, required: true }
                     ]
+                },
+                {
+                    name: 'hoist',
+                    description: 'Toggle displaying role members separately (hoist) on or off',
+                    type: 1,
+                    options: [
+                        { name: 'role', description: 'The role to modify', type: 8, required: true },
+                        { name: 'state', description: 'Enable or disable hoist', type: 5, required: true }
+                    ]
+                },
+                {
+                    name: 'mentionable',
+                    description: 'Toggle allowing anyone to mention this role on or off',
+                    type: 1,
+                    options: [
+                        { name: 'role', description: 'The role to modify', type: 8, required: true },
+                        { name: 'state', description: 'Enable or disable mentionable', type: 5, required: true }
+                    ]
                 }
 			]
 		});
@@ -196,7 +214,7 @@ export default class RoleCommand extends Command {
 				sub = args[0]?.toLowerCase();
 			}
 
-			if (!sub) return ctx.reply({ content: `Usage: \`${ctx.prefix}role <add/remove/create/delete/color/icon/info/inrole/exch/rename>\`` });
+			if (!sub) return ctx.reply({ content: `Usage: \`${ctx.prefix}role <add/remove/create/delete/color/icon/info/inrole/exch/rename/strip/move/hoist/mentionable>\`` });
 
         // Helper to resolve role by ID, exact name, or partial name
         const resolveRole = (query: string): Role | null => {
@@ -1422,7 +1440,195 @@ export default class RoleCommand extends Command {
             });
         }
 
-        return ctx.reply({ content: `${client.emoji.cross} Unknown subcommand \`${sub}\`. Usage: \`${ctx.prefix}role <add/remove/create/delete/color/icon/info/inrole/exch/rename/strip/move>\`` });
+        // Handle Hoist (display separately on/off)
+        if (sub === 'hoist') {
+            const ON_VALUES = new Set(['on', 'true', 'enable', 'enabled', 'yes', '1']);
+            const OFF_VALUES = new Set(['off', 'false', 'disable', 'disabled', 'no', '0']);
+
+            let roleToHoist: Role | null = null;
+            let targetState: boolean | null = null;
+
+            if (ctx.interaction) {
+                roleToHoist = ctx.options.getRole('role') as Role;
+                targetState = ctx.options.getBoolean('state');
+            } else {
+                const subArgs = args.slice(1);
+                const stateArg = subArgs.find(a => ON_VALUES.has(a.toLowerCase()) || OFF_VALUES.has(a.toLowerCase()))?.toLowerCase();
+                
+                if (stateArg) {
+                    targetState = ON_VALUES.has(stateArg);
+                }
+
+                // Check message mentions first
+                const mentions = ctx.message?.mentions.roles;
+                if (mentions && mentions.size > 0) {
+                    roleToHoist = mentions.first()!;
+                } else {
+                    const remainingQuery = subArgs.filter(a => a.toLowerCase() !== stateArg).join(' ').trim();
+                    roleToHoist = resolveRole(remainingQuery);
+                }
+            }
+
+            if (!roleToHoist) {
+                return ctx.replyV2({
+                    description: `Could not resolve the specified role.\nUsage: \`${ctx.prefix}r hoist <@role> <on/off>\``,
+                    isAlert: true
+                });
+            }
+
+            // If no on/off provided, toggle
+            if (targetState === null) {
+                targetState = !roleToHoist.hoist;
+            }
+
+            if (roleToHoist.managed) {
+                return ctx.replyV2({
+                    description: 'This role is managed by an integration/bot and cannot be modified.',
+                    isAlert: true
+                });
+            }
+
+            if (developer && !hasPerm && !isOwner && roleToHoist.permissions.has(PermissionFlagsBits.Administrator)) {
+                return ctx.replyV2({
+                    description: 'Developer bypass is not allowed to manage roles with Administrator permissions.',
+                    isAlert: true
+                });
+            }
+
+            const isGuildOwner = ctx.author.id === ctx.guild.ownerId;
+            if (!isGuildOwner && !isOwner && roleToHoist.position >= ctx.member!.roles.highest.position) {
+                return ctx.replyV2({
+                    description: 'You cannot modify a role higher than or equal to your highest role.',
+                    isAlert: true
+                });
+            }
+
+            const botMember = (ctx.guild.members.me as GuildMember);
+            if (roleToHoist.position >= botMember.roles.highest.position) {
+                return ctx.replyV2({
+                    description: 'My role is too low in the hierarchy to modify this role.',
+                    isAlert: true
+                });
+            }
+
+            if (roleToHoist.hoist === targetState) {
+                return ctx.replyV2({
+                    description: `<@&${roleToHoist.id}> already has hoist turned **${targetState ? 'ON' : 'OFF'}**.`,
+                    isAlert: true
+                });
+            }
+
+            try {
+                await roleToHoist.setHoist(targetState, `Hoist set to ${targetState ? 'ON' : 'OFF'} by ${ctx.author.tag}`);
+                return ctx.replyV2({
+                    title: 'Role Hoist Updated',
+                    description: `Successfully turned **hoist** (display separately) **${targetState ? 'ON' : 'OFF'}** for <@&${roleToHoist.id}>.`,
+                    borderless: true,
+                    color: null
+                });
+            } catch (err: any) {
+                return ctx.replyV2({
+                    description: `Failed to update role hoist: ${err.message || err}`,
+                    isAlert: true
+                });
+            }
+        }
+
+        // Handle Mentionable (allow anyone to mention on/off)
+        if (sub === 'mentionable' || sub === 'mention') {
+            const ON_VALUES = new Set(['on', 'true', 'enable', 'enabled', 'yes', '1']);
+            const OFF_VALUES = new Set(['off', 'false', 'disable', 'disabled', 'no', '0']);
+
+            let roleToMention: Role | null = null;
+            let targetState: boolean | null = null;
+
+            if (ctx.interaction) {
+                roleToMention = ctx.options.getRole('role') as Role;
+                targetState = ctx.options.getBoolean('state');
+            } else {
+                const subArgs = args.slice(1);
+                const stateArg = subArgs.find(a => ON_VALUES.has(a.toLowerCase()) || OFF_VALUES.has(a.toLowerCase()))?.toLowerCase();
+
+                if (stateArg) {
+                    targetState = ON_VALUES.has(stateArg);
+                }
+
+                // Check message mentions first
+                const mentions = ctx.message?.mentions.roles;
+                if (mentions && mentions.size > 0) {
+                    roleToMention = mentions.first()!;
+                } else {
+                    const remainingQuery = subArgs.filter(a => a.toLowerCase() !== stateArg).join(' ').trim();
+                    roleToMention = resolveRole(remainingQuery);
+                }
+            }
+
+            if (!roleToMention) {
+                return ctx.replyV2({
+                    description: `Could not resolve the specified role.\nUsage: \`${ctx.prefix}r mentionable <@role> <on/off>\``,
+                    isAlert: true
+                });
+            }
+
+            // If no on/off provided, toggle
+            if (targetState === null) {
+                targetState = !roleToMention.mentionable;
+            }
+
+            if (roleToMention.managed) {
+                return ctx.replyV2({
+                    description: 'This role is managed by an integration/bot and cannot be modified.',
+                    isAlert: true
+                });
+            }
+
+            if (developer && !hasPerm && !isOwner && roleToMention.permissions.has(PermissionFlagsBits.Administrator)) {
+                return ctx.replyV2({
+                    description: 'Developer bypass is not allowed to manage roles with Administrator permissions.',
+                    isAlert: true
+                });
+            }
+
+            const isGuildOwner = ctx.author.id === ctx.guild.ownerId;
+            if (!isGuildOwner && !isOwner && roleToMention.position >= ctx.member!.roles.highest.position) {
+                return ctx.replyV2({
+                    description: 'You cannot modify a role higher than or equal to your highest role.',
+                    isAlert: true
+                });
+            }
+
+            const botMember = (ctx.guild.members.me as GuildMember);
+            if (roleToMention.position >= botMember.roles.highest.position) {
+                return ctx.replyV2({
+                    description: 'My role is too low in the hierarchy to modify this role.',
+                    isAlert: true
+                });
+            }
+
+            if (roleToMention.mentionable === targetState) {
+                return ctx.replyV2({
+                    description: `<@&${roleToMention.id}> already has mentionable turned **${targetState ? 'ON' : 'OFF'}**.`,
+                    isAlert: true
+                });
+            }
+
+            try {
+                await roleToMention.setMentionable(targetState, `Mentionable set to ${targetState ? 'ON' : 'OFF'} by ${ctx.author.tag}`);
+                return ctx.replyV2({
+                    title: 'Role Mentionable Updated',
+                    description: `Successfully turned **mentionable** **${targetState ? 'ON' : 'OFF'}** for <@&${roleToMention.id}>.`,
+                    borderless: true,
+                    color: null
+                });
+            } catch (err: any) {
+                return ctx.replyV2({
+                    description: `Failed to update role mentionable: ${err.message || err}`,
+                    isAlert: true
+                });
+            }
+        }
+
+        return ctx.reply({ content: `${client.emoji.cross} Unknown subcommand \`${sub}\`. Usage: \`${ctx.prefix}role <add/remove/create/delete/color/icon/info/inrole/exch/rename/strip/move/hoist/mentionable>\`` });
     } catch (err: any) {
         console.error('[RoleCommand Error]:', err);
         return ctx.reply({

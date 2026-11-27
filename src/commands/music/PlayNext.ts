@@ -9,6 +9,7 @@ import {
 	ViewChannel,
 } from "../../utils/Permissions";
 import { ExtendedClient } from "../../client";
+import { SpotifyResolver } from "../../utils/SpotifyResolver";
 
 export default class PlayNext extends Command {
 	constructor(client: ExtendedClient) {
@@ -53,9 +54,16 @@ export default class PlayNext extends Command {
 		const player = client.lavalink.getPlayer(ctx.guild.id);
 		if (!player) return;
 
-		const res = await player.search({ query }, ctx.author);
+		let res = await player.search({ query }, ctx.author).catch(() => null);
 
-		if (res.loadType === "empty" || res.loadType === "error") {
+		if ((!res || res.loadType === "empty" || res.loadType === "error") && SpotifyResolver.isSpotifyUrl(query)) {
+			const resolved = await SpotifyResolver.resolveToSearchQuery(query);
+			if (resolved) {
+				res = await player.search({ query: resolved, source: "ytsearch" }, ctx.author).catch(() => null);
+			}
+		}
+
+		if (!res || res.loadType === "empty" || res.loadType === "error") {
 			return await ctx.sendMessage({
 				embeds: [
 					this.client.embed()

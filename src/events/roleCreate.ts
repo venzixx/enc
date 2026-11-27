@@ -3,6 +3,7 @@ import { Event } from '../structures';
 import { LavamusicEventType } from '../types/events';
 import { ExtendedClient } from '../client';
 import { AuditLogger, AuditLogType, AuditLogStatus } from '../utils/AuditLogger';
+import { AntiNukeTracker } from '../utils/AntiNukeTracker';
 
 export default class RoleCreate extends Event {
     constructor(client: ExtendedClient, file: string) {
@@ -27,5 +28,10 @@ export default class RoleCreate extends Event {
             details: `Color: ${role.hexColor}\nPermissions: ${role.permissions.bitfield}`,
             color: this.client.color.main
         });
+
+        // Anti-Nuke Occurrence Check
+        if (executor && executor.id !== this.client.user?.id) {
+            await AntiNukeTracker.checkAction(this.client, role.guild, executor.id, 'role', 'Role Creation');
+        }
     }
 }

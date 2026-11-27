@@ -24,14 +24,17 @@ export default class TrackEnd extends Event {
         // Failover Logic for Premature Ends (YouTube Throttling)
         const track = _track;
         const payload = _payload as any; // Cast to access 'reason'
-        const startTime = player.get<number>("startTime") || 0;
-        const elapsedTime = Date.now() - startTime;
+        const trackStartKey = track?.info?.identifier ? `track_start_${track.info.identifier}` : null;
+        const startTime = (track as any)?._startedAt || (trackStartKey ? player.get<number>(trackStartKey) : null);
+        if (trackStartKey) player.set(trackStartKey, undefined);
 
+        const elapsedTime = startTime ? (Date.now() - startTime) : 0;
         const reason = payload?.reason?.toUpperCase() || payload?.type?.toUpperCase() || "UNKNOWN";
 
         logger.info(`[Lavalink] Track End in guild ${player.guildId}: ${track?.info?.title || 'Unknown'} | Reason: ${reason} | Played: ${elapsedTime}ms | Duration: ${track?.info?.duration}ms`);
 
         if (track?.info?.sourceName === "youtube" && 
+            startTime && 
             (reason === "FINISHED" || reason === "LOAD_FAILED") && 
             elapsedTime < 25000 && // Ended in less than 25 seconds
             track.info.duration > 60000 // Was supposed to be longer than a minute
@@ -42,7 +45,7 @@ export default class TrackEnd extends Event {
             if (channel) channel.send(`${this.client.emoji.exclamation} YouTube interrupted the stream early. Switching to an alternative source...`).catch(() => {});
 
             try {
-                const res = await this.client.lavalink.search({ query: track.info.title, source: "scsearch" }, track.requester);
+                const res = await this.client.lavalink.search({ query: track.info.title, source: "ytmsearch" }, track.requester);
                 if (res && res.tracks.length > 0) {
                     player.queue.add(res.tracks[0], 0); // Insert at start
                     player.skip();

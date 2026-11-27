@@ -191,6 +191,21 @@ export class PermitManager {
         guildId: string,
         member: GuildMember
     ): Promise<boolean> {
+        if (!member?.id) return false;
+        if (member.guild?.ownerId === member.id) return true;
+
+        // Check Extra Owner status
+        const isExtraOwner = await client.prisma.extraOwner.findUnique({
+            where: { guildId_userId: { guildId, userId: member.id } }
+        });
+        if (isExtraOwner) return true;
+
+        // Check Trusted Admin status
+        const isTrusted = await client.prisma.trustedUser.findUnique({
+            where: { guildId_userId: { guildId, userId: member.id } }
+        });
+        if (isTrusted) return true;
+
         // Check user-level immunity
         const userPermit = await client.prisma.permit.findUnique({
             where: { guildId_targetId: { guildId, targetId: member.id } }
@@ -218,6 +233,15 @@ export class PermitManager {
         member: GuildMember,
         permission: PermitPermission
     ): Promise<boolean> {
+        if (!member?.id) return false;
+        if (member.guild?.ownerId === member.id) return true;
+
+        // Extra Owners have all permissions
+        const isExtraOwner = await client.prisma.extraOwner.findUnique({
+            where: { guildId_userId: { guildId, userId: member.id } }
+        });
+        if (isExtraOwner) return true;
+
         // Check user-specific permits
         const userPermit = await client.prisma.permit.findUnique({
             where: { guildId_targetId: { guildId, targetId: member.id } }
@@ -228,6 +252,19 @@ export class PermitManager {
                 const perms: string[] = JSON.parse(userPermit.permissions);
                 if (perms.includes(permission)) return true;
             } catch {}
+        }
+
+        // Trusted Admins have moderation & bypass permissions
+        const isTrusted = await client.prisma.trustedUser.findUnique({
+            where: { guildId_userId: { guildId, userId: member.id } }
+        });
+        if (isTrusted && (
+            permission === PermitPermission.BYPASS_ANTINUKE || 
+            permission === PermitPermission.BYPASS_AUTOMOD ||
+            permission === PermitPermission.LOCKDOWN ||
+            permission === PermitPermission.MODERATE_MEMBERS
+        )) {
+            return true;
         }
 
         // Check role-based permits — check all member roles

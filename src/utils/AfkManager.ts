@@ -63,9 +63,9 @@ class AfkManagerStore {
             if (!guild) continue;
             try {
                 const member = guild.members.cache.get(userId) || await guild.members.fetch(userId).catch(() => null);
-                if (member && member.nickname && member.nickname.startsWith('[AFK]')) {
+                if (member && typeof (member as any).setNickname === 'function' && member.nickname && member.nickname.startsWith('[AFK]')) {
                     const cleanedName = member.nickname.replace(/^\[AFK\]\s*/, '').trim();
-                    const shouldReset = cleanedName === member.user.username || cleanedName === member.user.displayName || !cleanedName;
+                    const shouldReset = cleanedName === member.user?.username || cleanedName === member.user?.displayName || !cleanedName;
                     await member.setNickname(shouldReset ? null : cleanedName).catch(() => {});
                 }
             } catch {}
@@ -81,10 +81,10 @@ class AfkManagerStore {
             return { success: false, existing };
         }
 
-        if (member) {
+        if (member && typeof (member as any).setNickname === 'function') {
             const currentNickname = member.nickname;
-            const baseName = currentNickname || member.displayName || member.user.username;
-            if (!baseName.startsWith('[AFK]')) {
+            const baseName = currentNickname || member.displayName || member.user?.username;
+            if (baseName && !baseName.startsWith('[AFK]')) {
                 const afkName = Array.from(`[AFK] ${baseName}`).slice(0, 32).join('');
                 await member.setNickname(afkName).catch(() => {});
             }
@@ -107,10 +107,10 @@ class AfkManagerStore {
             return { success: false, existing: this.serverAfkMap.get(key) };
         }
 
-        if (member) {
+        if (member && typeof (member as any).setNickname === 'function') {
             const currentNickname = member.nickname;
-            const baseName = currentNickname || member.displayName || member.user.username;
-            if (!baseName.startsWith('[AFK]')) {
+            const baseName = currentNickname || member.displayName || member.user?.username;
+            if (baseName && !baseName.startsWith('[AFK]')) {
                 const afkName = Array.from(`[AFK] ${baseName}`).slice(0, 32).join('');
                 await member.setNickname(afkName).catch(() => {});
             }

@@ -76,7 +76,8 @@ export default class Afk extends Command {
 			}
 		}
 
-		await AfkManager.setGlobalAfk(client, ctx.author.id, ctx.member, finalReason);
+		const memberToPass = (ctx.guild && ctx.member && typeof (ctx.member as any).setNickname === 'function') ? ctx.member : null;
+		await AfkManager.setGlobalAfk(client, ctx.author.id, memberToPass, finalReason);
 
 		return await ctx.replyV2({
 			description: `**${name}** is now AFK: ${displayReasonText}`,

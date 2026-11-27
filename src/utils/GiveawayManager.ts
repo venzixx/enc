@@ -104,68 +104,57 @@ export class GiveawayManager {
                 return { success: false, error: 'Giveaway not found.' };
             }
 
-            if (!giveaway.isActive) {
+            if (!giveaway.isActive && !giveaway.announcementPending) {
                 return { success: false, error: 'This giveaway is already ended.' };
             }
 
-            // Mark as inactive in DB
-            await client.prisma.giveaway.update({
-                where: { id: giveaway.id },
-                data: { isActive: false, endTime: new Date() }
-            });
-
             const guild = client.guilds.cache.get(giveaway.guildId);
-            const channel = guild?.channels.cache.get(giveaway.channelId) as GuildTextBasedChannel | undefined;
-            const message = channel ? await channel.messages.fetch(giveaway.messageId).catch(() => null) : null;
+            if (!guild?.available) return { success: false, error: 'The giveaway server is unavailable.' };
 
             const entries = giveaway.entries;
             const entriesCount = entries.length;
+            let uniqueWinners = giveaway.finalWinners;
+            if (giveaway.isActive) {
+                // Fetch bonus entries for this guild to calculate weight
+                const bonusEntriesMap = await client.prisma.giveawayBonusEntry.findMany({
+                    where: { guildId: giveaway.guildId }
+                });
 
-            if (entriesCount === 0) {
-                if (message) {
-                    const embed = this.buildEmbed(client, giveaway, 0, true, []);
-                    const buttons = this.buildButtons(0, true);
-                    await message.edit({ embeds: [embed], components: [buttons] }).catch(() => null);
-                }
-                if (channel) {
-                    await channel.send({
-                        content: `🎉 **Giveaway Ended:** No one entered for **${giveaway.prize}**.\n` +
-                                 `👑 **Hosted by:** <@${giveaway.hostId}>\n` +
-                                 `🔗 https://discord.com/channels/${giveaway.guildId}/${giveaway.channelId}/${giveaway.messageId}`
-                    }).catch(() => null);
-                }
-                return { success: true, giveaway, winners: [] };
-            }
-
-            // Fetch bonus entries for this guild to calculate weight
-            const bonusEntriesMap = await client.prisma.giveawayBonusEntry.findMany({
-                where: { guildId: giveaway.guildId }
-            });
-
-            // Build weighted entry pool
-            const pool: string[] = [];
-            for (const entry of entries) {
-                let weight = 1;
-                if (guild) {
-                    const member = guild.members.cache.get(entry.userId);
-                    if (member) {
-                        for (const bonus of bonusEntriesMap) {
-                            if (bonus.type === 'ROLE' && member.roles.cache.has(bonus.targetId)) {
-                                weight += Math.max(0, bonus.entries);
-                            } else if (bonus.type === 'USER' && entry.userId === bonus.targetId) {
-                                weight += Math.max(0, bonus.entries);
+                // Build weighted entry pool
+                const pool: string[] = [];
+                for (const entry of entries) {
+                    let weight = 1;
+                    if (guild) {
+                        const member = guild.members.cache.get(entry.userId);
+                        if (member) {
+                            for (const bonus of bonusEntriesMap) {
+                                if (bonus.type === 'ROLE' && member.roles.cache.has(bonus.targetId)) {
+                                    weight += Math.max(0, bonus.entries);
+                                } else if (bonus.type === 'USER' && entry.userId === bonus.targetId) {
+                                    weight += Math.max(0, bonus.entries);
+                                }
                             }
                         }
                     }
+                    for (let i = 0; i < weight; i++) {
+                        pool.push(entry.userId);
+                    }
                 }
-                for (let i = 0; i < weight; i++) {
-                    pool.push(entry.userId);
-                }
+
+                // Pick unique winners
+                const shuffledPool = pool.sort(() => Math.random() - 0.5);
+                uniqueWinners = Array.from(new Set(shuffledPool)).slice(0, Math.min(giveaway.winnersCount, entriesCount));
+
+                const claimed = await client.prisma.giveaway.updateMany({
+                    where: { id: giveaway.id, isActive: true },
+                    data: { isActive: false, endTime: new Date(), finalWinners: uniqueWinners, announcementPending: true }
+                });
+                if (!claimed.count) return { success: false, error: 'This giveaway is already being ended.' };
             }
 
-            // Pick unique winners
-            const shuffledPool = pool.sort(() => Math.random() - 0.5);
-            const uniqueWinners = Array.from(new Set(shuffledPool)).slice(0, Math.min(giveaway.winnersCount, entriesCount));
+            const channel = await guild.channels.fetch(giveaway.channelId);
+            if (!channel?.isSendable()) return { success: false, error: 'The giveaway channel is unavailable. Announcement will retry.' };
+            const message = await channel.messages.fetch(giveaway.messageId).catch(() => null);
 
             // Update giveaway message
             if (message) {
@@ -174,15 +163,18 @@ export class GiveawayManager {
                 await message.edit({ embeds: [embed], components: [buttons] }).catch(() => null);
             }
 
-            // Announce winners
-            if (channel) {
-                const winnerMentions = uniqueWinners.map(id => `<@${id}>`).join(', ');
-                await channel.send({
-                    content: `🎉 Congratulations ${winnerMentions}! You won **${giveaway.prize}**!\n` +
-                             `👑 **Hosted by:** <@${giveaway.hostId}>\n` +
-                             `🔗 https://discord.com/channels/${giveaway.guildId}/${giveaway.channelId}/${giveaway.messageId}`
-                }).catch(() => null);
-            }
+            const winnerMentions = uniqueWinners.map(id => `<@${id}>`).join(', ');
+            const result = uniqueWinners.length
+                ? `🎉 Congratulations ${winnerMentions}! You won **${giveaway.prize}**!`
+                : `🎉 **Giveaway Ended:** No one entered for **${giveaway.prize}**.`;
+            await channel.send({
+                content: `${result}\n👑 **Hosted by:** <@${giveaway.hostId}>\n🔗 https://discord.com/channels/${giveaway.guildId}/${giveaway.channelId}/${giveaway.messageId}`,
+                nonce: `g${giveaway.messageId}`, enforceNonce: true
+            });
+            await client.prisma.giveaway.updateMany({
+                where: { id: giveaway.id, announcementPending: true },
+                data: { announcementPending: false }
+            });
 
             logger.info(`[Giveaway] Ended giveaway "${giveaway.prize}" (${giveaway.messageId}). Winners: ${uniqueWinners.join(', ')}`);
             return { success: true, giveaway, winners: uniqueWinners };

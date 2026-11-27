@@ -1,6 +1,9 @@
+import { isDev } from '../../utils/devCheck';
 import { 
     ApplicationCommandOptionType, 
-    AutocompleteInteraction 
+    AutocompleteInteraction,
+    GuildMember,
+    PermissionFlagsBits
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
@@ -29,6 +32,7 @@ import Replay from './Replay';
 import PlayNext from './PlayNext';
 import Search from './search';
 import Seek from './seek';
+import ChannelCommand from './channel';
 
 export default class Music extends Command {
     private commands: Map<string, Command>;
@@ -44,7 +48,6 @@ export default class Music extends Command {
             category: 'music',
             cooldown: 3,
             slashCommand: true,
-            player: { voice: true, active: false },
             options: [
                 {
                     name: 'play',
@@ -52,6 +55,38 @@ export default class Music extends Command {
                     type: ApplicationCommandOptionType.Subcommand,
                     options: [
                         { name: 'song', description: 'Song name or URL', type: ApplicationCommandOptionType.String, required: true, autocomplete: true }
+                    ]
+                },
+                {
+                    name: 'channel',
+                    description: 'Set up or manage the dedicated song request channel.',
+                    type: ApplicationCommandOptionType.Subcommand,
+                    options: [
+                        {
+                            name: 'action',
+                            description: 'Action to perform (set, create, delete, prefix, info)',
+                            type: ApplicationCommandOptionType.String,
+                            required: false,
+                            choices: [
+                                { name: 'Set', value: 'set' },
+                                { name: 'Create', value: 'create' },
+                                { name: 'Delete', value: 'delete' },
+                                { name: 'Prefix', value: 'prefix' },
+                                { name: 'Info', value: 'info' }
+                            ]
+                        },
+                        {
+                            name: 'channel',
+                            description: 'The text channel to set for song requests (used with set)',
+                            type: ApplicationCommandOptionType.Channel,
+                            required: false
+                        },
+                        {
+                            name: 'prefix',
+                            description: 'The prefix to require in the song request channel (or "remove" to clear)',
+                            type: ApplicationCommandOptionType.String,
+                            required: false
+                        }
                     ]
                 },
                 {
@@ -187,19 +222,19 @@ export default class Music extends Command {
         this.commands.set('fairplay', new FairPlay(client));
         this.commands.set('seek', new Seek(client));
         this.commands.set('playnext', new PlayNext(client));
+        this.commands.set('channel', new ChannelCommand(client));
+        this.commands.set('musicchannel', this.commands.get('channel')!);
+        this.commands.set('songrequest', this.commands.get('channel')!);
     }
 
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-        const group = ctx.options.getSubcommandGroup();
-        const sub = ctx.options.getSubcommand();
-        const target = sub === 'view' ? 'queue' : sub; // Handle edge cases
+        let target = '';
+        let internalArgs = [...args];
 
-        const cmd = this.commands.get(target);
-        if (!cmd) return ctx.replyV2({ description: `Music action **${target}** not implemented.`, isAlert: true });
-
-        // Map arguments if needed for prefix-style run
-        const internalArgs = [...args];
-        if (ctx.interaction && (ctx.interaction as any).options) {
+        if (ctx.interaction) {
+            const group = (ctx.interaction as any).options.getSubcommandGroup(false);
+            const sub = (ctx.interaction as any).options.getSubcommand(false);
+            target = sub === 'view' ? 'queue' : (sub || '');
             const extractOptions = (data: any[]): string[] => {
                 const res: string[] = [];
                 for (const opt of data) {
@@ -212,12 +247,123 @@ export default class Music extends Command {
                 }
                 return res;
             };
-            const extracted = extractOptions((ctx.interaction as any).options.data || []);
-            if (extracted.length > 0) {
-                internalArgs.push(...extracted);
+            internalArgs = extractOptions((ctx.interaction as any).options?.data || []);
+        } else {
+            if (args.length > 0) {
+                const first = args[0].toLowerCase();
+                const groups = ['control', 'queue', 'info', 'settings'];
+                if (groups.includes(first) && args.length > 1) {
+                    target = args[1].toLowerCase();
+                    internalArgs = args.slice(2);
+                } else {
+                    target = first;
+                    internalArgs = args.slice(1);
+                }
             }
-        } else if (group) {
-            internalArgs.shift(); // Remove group if present
+        }
+
+        if (target === 'view') target = 'queue';
+
+        if (!target) {
+            return ctx.replyV2({
+                title: '🎵 Enc Music System',
+                description:
+                    'Play music, manage the queue, or configure a dedicated song-request channel!\n\n' +
+                    '**Key Commands:**\n' +
+                    '• `,music channel` - Create or manage the dedicated song request channel\n' +
+                    '• `,play <song>` - Play a track from YouTube, Spotify, SoundCloud, etc.\n' +
+                    '• `,skip` / `,stop` / `,pause` / `,resume` - Playback controls\n' +
+                    '• `,queue` / `,nowplaying` - View current playback & upcoming tracks',
+                borderless: true,
+                color: null
+            });
+        }
+
+        const cmd = this.commands.get(target);
+        if (!cmd) return ctx.replyV2({ description: `Music action **${target}** not implemented.`, isAlert: true });
+
+        const member = ctx.member as GuildMember;
+        const clientMember = ctx.guild?.members.me;
+        const isOwner = ctx.guild?.ownerId === ctx.author.id;
+        const isBotDev = await isDev(client, ctx.author.id);
+
+        // Check permissions of delegated command
+        if (cmd.permissions) {
+            if (cmd.permissions.dev && !isBotDev) {
+                return ctx.replyV2({ description: 'This command is reserved for bot developers.', isAlert: true });
+            }
+
+            if (cmd.permissions.user && Array.isArray(cmd.permissions.user) && cmd.permissions.user.length > 0) {
+                const hasPerms = member && cmd.permissions.user.every((perm: any) => member.permissions.has(perm));
+                if (!isOwner && !isBotDev && !hasPerms) {
+                    return ctx.replyV2({ description: 'You do not have permission to use this command.', isAlert: true });
+                }
+            }
+        }
+
+        // Check player requirements of delegated command
+        if (cmd.player) {
+            if (cmd.player.voice) {
+                if (!member?.voice?.channel) {
+                    return ctx.replyV2({
+                        description: `You must be connected to a voice channel to use the \`${target}\` command.`,
+                        isAlert: true,
+                        color: client.color.red
+                    });
+                }
+
+                if (clientMember && !clientMember.permissions.has(PermissionFlagsBits.Connect)) {
+                    return ctx.replyV2({
+                        description: `I don't have permission to connect to your voice channel.`,
+                        isAlert: true,
+                        color: client.color.red
+                    });
+                }
+
+                if (clientMember && !clientMember.permissions.has(PermissionFlagsBits.Speak)) {
+                    return ctx.replyV2({
+                        description: `I don't have permission to speak in your voice channel.`,
+                        isAlert: true,
+                        color: client.color.red
+                    });
+                }
+
+                if (clientMember?.voice?.channelId && clientMember.voice.channelId !== member.voice.channelId) {
+                    return ctx.replyV2({
+                        description: `You must be in the same voice channel as me (<#${clientMember.voice.channelId}>) to use this command.`,
+                        isAlert: true,
+                        color: client.color.red
+                    });
+                }
+            }
+
+            if (cmd.player.active) {
+                const player = client.lavalink.getPlayer(ctx.guild!.id);
+                if (!player?.queue?.current) {
+                    return ctx.replyV2({
+                        description: `There is no music currently playing.`,
+                        isAlert: true,
+                        color: client.color.red
+                    });
+                }
+            }
+
+            if (cmd.player.dj) {
+                const dj = await client.db.getDj(ctx.guild!.id);
+                if (dj?.mode) {
+                    const djRoles = await client.db.getRoles(ctx.guild!.id);
+                    if (djRoles && djRoles.length > 0) {
+                        const hasDJRole = member?.roles?.cache?.some((role) => djRoles.some((r: any) => r.roleId === role.id));
+                        if (!isBotDev && !isOwner && !hasDJRole && !member?.permissions?.has(PermissionFlagsBits.ManageGuild)) {
+                            return ctx.replyV2({
+                                description: 'You need the DJ role to use this command.',
+                                isAlert: true,
+                                color: client.color.red
+                            });
+                        }
+                    }
+                }
+            }
         }
 
         return cmd.run(client, ctx, internalArgs);

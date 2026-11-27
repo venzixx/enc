@@ -26,7 +26,7 @@ export default class Help extends Command {
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, _args: string[]): Promise<any> {
-		const commandName = ctx.options.getString('command') || _args[0];
+		const commandName = ctx.options?.getString?.('command') || _args[0];
 
 		if (commandName) {
 			return await this.showCommandDetail(client, ctx, commandName);
@@ -39,22 +39,23 @@ export default class Help extends Command {
 	 * Shows detailed information about a specific command.
 	 */
 	private async showCommandDetail(client: ExtendedClient, ctx: Context, commandName: string): Promise<any> {
-		const command = client.commands.get(commandName) || client.commands.find(c => c.aliases.includes(commandName));
+		const command = client.commands.get(commandName) || client.commands.find(c => c.aliases && c.aliases.includes(commandName));
 		if (!command) {
 			return await ctx.replyV2({ 
 				title: 'Command Not Found', 
 				description: `${client.emoji.cross} No command found matching \`${commandName}\`.`,
 				isAlert: true,
-				color: 0xFF0000,
+				borderless: true,
+				color: null,
 				ephemeral: true
 			});
 		}
 
 		const lines: string[] = [
-			command.description.content,
+			command.description?.content || 'No description provided.',
 			'',
-			`${client.emoji.tool_wrench} **Module** · \`${command.category}\`　　${client.emoji.clock_time} **Cooldown** · \`${command.cooldown}s\``,
-			`${client.emoji.system_info} **Usage** · \`/${command.name} ${command.description.usage}\``,
+			`${client.emoji.tool_wrench || '🛠️'} **Module** · \`${command.category}\`　　${client.emoji.clock_time || '⏱️'} **Cooldown** · \`${command.cooldown || 3}s\``,
+			`${client.emoji.system_info || 'ℹ️'} **Usage** · \`/${command.name} ${command.description?.usage || ''}\``,
 		];
 
 		// Subcommands
@@ -81,7 +82,7 @@ export default class Help extends Command {
 		}
 
 		// Examples
-		if (command.description.examples && command.description.examples.length > 0) {
+		if (command.description?.examples && command.description.examples.length > 0) {
 			lines.push('', `**Examples**`);
 			lines.push(command.description.examples.map((e: string) => `\`/${e}\``).join('　'));
 		}
@@ -89,13 +90,13 @@ export default class Help extends Command {
 		const layout: any = {
 			title: `${Help.getCategoryEmoji(command.category, client)} ${command.name}`,
 			description: lines.join('\n'),
-			color: client.color.main,
+			borderless: true,
+			color: null,
 			footer: `Module: ${command.category}`,
 			buttons: [
 				new ButtonBuilder()
 					.setCustomId('help_back')
-					.setEmoji(client.emoji.page.back.match(/\d+/)?.[0] || '⬅️')
-					.setLabel('Back')
+					.setLabel('Back to Hub')
 					.setStyle(ButtonStyle.Secondary)
 			]
 		};
@@ -142,14 +143,15 @@ export default class Help extends Command {
 		];
 
 		return {
-			title: `${client.emoji.system_bot} Enc · Command Hub`,
+			title: `${client.emoji.system_bot || '🤖'} Enc · Command Hub`,
 			description: [
 				`Explore **${totalCommands}** commands across **${categories.length}** modules.`,
 				`Select a module below or use \`/help <command>\` for detailed syntax.`,
 				'',
 				categoryLines.join('\n'),
 			].join('\n'),
-			color: client.color.main,
+			borderless: true,
+			color: null,
 			footer: `Premium Utility • Monochromatic V2 Engine`,
 			selectMenu: menu,
 			buttons
@@ -157,12 +159,21 @@ export default class Help extends Command {
 	}
 
 	/**
-	 * Builds the category view layout for a selected module.
+	 * Builds the category view layout for a selected module with pagination support.
 	 */
-	public static getCategoryLayout(client: ExtendedClient, category: string) {
+	public static getCategoryLayout(client: ExtendedClient, category: string, page = 1) {
 		const commands = client.commands.filter(c => c.category === category && !c.hidden);
+		const commandList = Array.from(commands.values());
+		const totalCommands = commandList.length;
 
-		const commandsList = commands.map(c => {
+		const pageSize = 12; // Keeps displayable text well under Discord's 4000 char limit
+		const totalPages = Math.max(1, Math.ceil(totalCommands / pageSize));
+		const currentPage = Math.min(Math.max(1, page), totalPages);
+
+		const startIdx = (currentPage - 1) * pageSize;
+		const pageCommands = commandList.slice(startIdx, startIdx + pageSize);
+
+		const commandsList = pageCommands.map(c => {
 			let text = `**\`/${c.name}\`** · ${c.description?.content || 'No description'}`;
 
 			// If command has subcommands, show a concise inline list of subcommands
@@ -182,7 +193,7 @@ export default class Help extends Command {
 			}
 
 			// Special handling for the 'do' command to show reactions as prefix commands
-			if (c.name === 'do' && c.aliases.length > 0) {
+			if (c.name === 'do' && c.aliases && c.aliases.length > 0) {
 				const reactions = c.aliases.slice(0, 15).map(r => `\`${r}\``).join(', ');
 				text += `\n\u3000\u2514 **Reactions**: ${reactions}${c.aliases.length > 15 ? '...' : ''}`;
 			}
@@ -193,18 +204,44 @@ export default class Help extends Command {
 		const categoryEmoji = Help.getCategoryEmoji(category, client);
 		const categoryName = category.charAt(0).toUpperCase() + category.slice(1);
 
-		return {
-			title: `${categoryEmoji} **${categoryName}** · ${commands.size} commands`,
-			description: commandsList || 'No visible commands in this module.',
-			color: client.color.main,
-			footer: `Use /help <command> for detailed syntax`,
-			buttons: [
+		const buttons: ButtonBuilder[] = [];
+
+		if (totalPages > 1) {
+			buttons.push(
 				new ButtonBuilder()
-					.setCustomId('help_back')
-					.setEmoji(client.emoji.page.back.match(/\d+/)?.[0] || '⬅️')
-					.setLabel('Back')
+					.setCustomId(`help_page_${category}_${currentPage - 1}`)
+					.setLabel('Previous')
 					.setStyle(ButtonStyle.Secondary)
-			]
+					.setDisabled(currentPage <= 1)
+			);
+		}
+
+		buttons.push(
+			new ButtonBuilder()
+				.setCustomId('help_back')
+				.setLabel('Back to Hub')
+				.setStyle(ButtonStyle.Secondary)
+		);
+
+		if (totalPages > 1) {
+			buttons.push(
+				new ButtonBuilder()
+					.setCustomId(`help_page_${category}_${currentPage + 1}`)
+					.setLabel('Next')
+					.setStyle(ButtonStyle.Secondary)
+					.setDisabled(currentPage >= totalPages)
+			);
+		}
+
+		return {
+			title: `${categoryEmoji} **${categoryName}** · ${totalCommands} commands`,
+			description: commandsList || 'No visible commands in this module.',
+			borderless: true,
+			color: null,
+			footer: totalPages > 1 
+				? `Page ${currentPage} of ${totalPages} • Use /help <command> for syntax` 
+				: `Use /help <command> for detailed syntax`,
+			buttons
 		};
 	}
 

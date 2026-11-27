@@ -193,7 +193,15 @@ export default class Context {
 
 		if (this.interaction) {
 			if (this.interaction.replied || this.interaction.deferred) {
-				return await this.interaction.editReply(opt as InteractionEditReplyOptions);
+				return await this.interaction.editReply(opt as InteractionEditReplyOptions).catch(async (err: any) => {
+					if (err?.code === 10008 || err?.code === 10062) {
+						if (this.channel && 'send' in this.channel) {
+							return await (this.channel as any).send(opt as MessageCreateOptions).catch(() => null);
+						}
+						return await this.interaction!.followUp(opt as InteractionReplyOptions).catch(() => null);
+					}
+					throw err;
+				});
 			}
             
             if (opt.ephemeral) {
@@ -215,7 +223,21 @@ export default class Context {
 	}
 
     public async sendDeferMessage(options: string | MessageCreateOptions | InteractionReplyOptions) {
-        return this.sendMessage(options);
+        if (this.interaction) {
+            if (!this.interaction.deferred && !this.interaction.replied) {
+                const ephemeral = typeof options === 'object' && Boolean((options as any).ephemeral);
+                const resp = await this.interaction.deferReply({ flags: ephemeral ? [MessageFlags.Ephemeral] : undefined }).catch(() => null);
+                this.deferred = true;
+                return resp;
+            }
+            return null;
+        }
+        const desc = typeof options === 'string' ? options : ((options as any).content || 'Loading...');
+        return await this.sendV2({
+            description: desc,
+            borderless: true,
+            color: null
+        });
     }
 
 	public async editMessage(options: string | MessageCreateOptions | InteractionEditReplyOptions) {
@@ -252,9 +274,37 @@ export default class Context {
         }
 
 		if (this.interaction) {
-			return await this.interaction.editReply(opt as InteractionEditReplyOptions);
+			return await this.interaction.editReply(opt as InteractionEditReplyOptions).catch(async (err: any) => {
+				if (err?.code === 10008 || err?.code === 10062) {
+					if (this.channel && 'send' in this.channel) {
+						return await (this.channel as any).send(opt as MessageCreateOptions).catch(() => null);
+					}
+					return await this.interaction!.followUp(opt as InteractionReplyOptions).catch(() => null);
+				}
+                if (err?.code === 50035 && hasV2Component) {
+                    await this.interaction!.deleteReply().catch(() => {});
+                    if (this.channel && 'send' in this.channel) {
+                        return await (this.channel as any).send(opt as MessageCreateOptions).catch(() => null);
+                    }
+                    return await this.interaction!.followUp(opt as InteractionReplyOptions).catch(() => null);
+                }
+				throw err;
+			});
 		}
 		if (this.response) {
+            if (hasV2Component) {
+                try {
+                    return await this.response.edit(opt as any);
+                } catch (err: any) {
+                    if (err?.code === 50035 || err?.message?.includes('IS_COMPONENTS_V2')) {
+                        await this.response.delete().catch(() => {});
+                        const newMsg = await this.channel?.send(opt as MessageCreateOptions);
+                        if (newMsg) this.response = newMsg;
+                        return newMsg;
+                    }
+                    throw err;
+                }
+            }
 			return await this.response.edit(opt as any);
 		}
         // Fallback for logic where editMessage might be called before sendMessage
@@ -283,7 +333,10 @@ export default class Context {
 
 	public async deferReply(ephemeral = false) {
 		if (this.interaction) {
-			const resp = await this.interaction.deferReply({ flags: ephemeral ? [MessageFlags.Ephemeral] : undefined });
+            if (this.interaction.deferred || this.interaction.replied) {
+                return null;
+            }
+			const resp = await this.interaction.deferReply({ flags: ephemeral ? [MessageFlags.Ephemeral] : undefined }).catch(() => null);
             this.deferred = true;
             return resp;
 		}

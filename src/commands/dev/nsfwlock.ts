@@ -1,6 +1,5 @@
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
-import { isDev } from '../../utils/devCheck';
 
 export default class NsfwLock extends Command {
     constructor(client: ExtendedClient) {

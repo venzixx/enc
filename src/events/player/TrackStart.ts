@@ -42,7 +42,8 @@ export default class TrackStart extends Event {
 		if (!channel) return;
 
 		const locale = await this.client.db.getLanguage(guild.id);
-        player.set("startTime", Date.now());
+        player.set(`track_start_${track.info.identifier}`, Date.now());
+        (track as any)._startedAt = Date.now();
         logger.info(`[Lavalink] Track Started: ${track.info.title} in guild ${guild.id}. Timestamp recorded.`);
 
 		if (player.voiceChannelId) {

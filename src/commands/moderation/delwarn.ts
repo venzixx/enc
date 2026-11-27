@@ -116,7 +116,7 @@ export default class DelWarn extends Command {
                 `• **Original Reason:** ${deletedCase.reason}`,
             borderless: true,
             color: null,
-            allowedMentions: { parse: [], roles: [], users: [deletedCase.targetId, ctx.author.id], repliedUser: false }
+            allowedMentions: { parse: [], roles: [], users: Array.from(new Set([deletedCase.targetId, ctx.author.id].filter(Boolean))), repliedUser: false }
         });
     }
 }

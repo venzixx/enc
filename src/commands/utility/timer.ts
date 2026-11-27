@@ -1,21 +1,9 @@
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
-import { PermissionFlagsBits, EmbedBuilder } from 'discord.js';
+import { PermissionFlagsBits } from 'discord.js';
 import ms from 'ms';
-
-interface TimerInstance {
-    id: string; // Message ID
-    channelId: string;
-    guildId: string | null;
-    authorId: string;
-    authorTag: string;
-    endTime: number; // Unix timestamp in seconds
-    durationStr: string;
-    reason: string;
-    timeoutId: NodeJS.Timeout;
-}
-
-const runningTimers = new Map<string, TimerInstance>();
+import { TimerManager } from '../../utils/TimerManager';
+import { V2Helper } from '../../utils/V2Helper';
 
 export default class Timer extends Command {
     constructor(client: ExtendedClient) {
@@ -28,7 +16,7 @@ export default class Timer extends Command {
                 examples: ['timer 10m study session', 'timer list', 'timer remove 123456789012345678']
             },
             category: 'utility',
-            cooldown: 5,
+            cooldown: 3,
             slashCommand: true,
             options: [
                 {
@@ -38,7 +26,7 @@ export default class Timer extends Command {
                     options: [
                         {
                             name: 'duration',
-                            description: 'Timer duration (e.g., 10m, 1h)',
+                            description: 'Timer duration (e.g., 10s, 5m, 1h)',
                             type: 3, // STRING
                             required: true
                         },
@@ -112,27 +100,30 @@ export default class Timer extends Command {
         // ===== START TIMER =====
         if (sub === 'start') {
             if (!durationStr) {
-                return ctx.replyV2({ description: 'Please provide a valid duration (e.g., 5m, 1h).', isAlert: true });
+                return ctx.replyV2({ description: 'Please provide a valid duration (e.g., 10s, 5m, 1h).', isAlert: true });
             }
 
             const duration = ms(durationStr as any) as unknown as number;
             if (!duration || duration < 1000) {
-                return ctx.replyV2({ description: 'Invalid duration provided. Minimum is 1 second.', isAlert: true });
+                return ctx.replyV2({ description: 'Invalid duration provided. Minimum is 1 second (e.g., 10s, 5m, 1h).', isAlert: true });
             }
 
             if (duration > 86400000 * 7) { // 7 days limit
                 return ctx.replyV2({ description: 'Timer duration cannot exceed 7 days.', isAlert: true });
             }
 
-            const endTime = Math.floor((Date.now() + duration) / 1000);
+            const now = Date.now();
+            const endTime = now + duration;
+            const endUnix = Math.floor(endTime / 1000);
 
-            // Start with a V2 Card showing the live countdown
+            // Send initial layout showing live countdown
             const reply = await ctx.replyV2({
-                title: 'Timer Started',
-                description: `⏱️ Your **${durationStr}** timer will end <t:${endTime}:R>.${reason ? `\n**Reason:** ${reason}` : ''}`,
+                title: '⏱️ Timer Started',
+                description: `Your **${durationStr}** timer will end <t:${endUnix}:R> (<t:${endUnix}:t>).${reason ? `\n> **Reason:** ${reason}` : ''}`,
                 color: client.color.main
             });
 
+            // Extract message ID
             let messageId = '';
             if (ctx.interaction) {
                 try {
@@ -143,33 +134,22 @@ export default class Timer extends Command {
                 messageId = (reply as any).id;
             }
 
-            // Set the timeout
-            const timeoutId = setTimeout(async () => {
-                try {
-                    if (messageId) {
-                        runningTimers.delete(messageId);
-                    }
-                    await ctx.followUp({
-                        content: `🔔 ${ctx.author}, your **${durationStr}** timer has ended!${reason ? `\n**Reason:** ${reason}` : ''}`,
-                    });
-                } catch (e) {
-                    // Silently fail if channel is inaccessible
-                }
-            }, duration);
-
-            if (messageId) {
-                runningTimers.set(messageId, {
-                    id: messageId,
-                    channelId: ctx.channel?.id || '',
-                    guildId: ctx.guild?.id || null,
-                    authorId: ctx.author.id,
-                    authorTag: ctx.author.tag,
-                    endTime,
-                    durationStr,
-                    reason,
-                    timeoutId
-                });
+            if (!messageId) {
+                messageId = `timer_${ctx.author.id}_${now}`;
             }
+
+            // Register timer with persistent TimerManager
+            TimerManager.addTimer({
+                id: messageId,
+                channelId: ctx.channel?.id || '',
+                guildId: ctx.guild?.id || null,
+                authorId: ctx.author.id,
+                authorTag: ctx.author.tag || ctx.author.username,
+                startTime: now,
+                endTime,
+                durationStr,
+                reason
+            });
 
             return;
         }
@@ -177,72 +157,74 @@ export default class Timer extends Command {
         // ===== LIST TIMERS =====
         if (sub === 'list') {
             const guildId = ctx.guild?.id || null;
-            const guildTimers = Array.from(runningTimers.values()).filter(t => t.guildId === guildId);
+            const guildTimers = TimerManager.getGuildTimers(guildId);
 
             if (guildTimers.length === 0) {
                 return ctx.replyV2({ description: 'No active countdown timers running in this server.' });
             }
 
-            const embed = client.embed()
-                .setTitle('Active Timers')
-                .setColor(client.color.main);
-
             const listLines = guildTimers.map((t, idx) => {
-                return `**${idx + 1}.** ID: \`${t.id}\`\n\u3000\u2022 **Author:** <@${t.authorId}> (${t.authorTag})\n\u3000\u2022 **Ends:** <t:${t.endTime}:R> (Duration: ${t.durationStr})\n\u3000\u2022 **Reason:** ${t.reason || 'No reason provided'}`;
+                const endUnix = Math.floor(t.endTime / 1000);
+                return `**${idx + 1}.** ID: \`${t.id}\`\n> • **Author:** <@${t.authorId}> (${t.authorTag})\n> • **Ends:** <t:${endUnix}:R> (<t:${endUnix}:t>)\n> • **Reason:** ${t.reason || 'No reason provided'}`;
             });
 
-            embed.setDescription(listLines.join('\n\n'));
-            return ctx.reply({ embeds: [embed] });
+            return ctx.replyV2({
+                title: '⏱️ Active Timers',
+                description: listLines.join('\n\n'),
+                color: client.color.main
+            });
         }
 
         // ===== REMOVE TIMER =====
         if (sub === 'remove') {
             if (!removeMsgId) {
-                return ctx.replyV2({ description: 'Please provide a valid Message ID of the timer to cancel.', isAlert: true });
+                return ctx.replyV2({ description: 'Please provide the Message ID of the timer to cancel.', isAlert: true });
             }
 
-            const timer = runningTimers.get(removeMsgId);
+            const timer = TimerManager.getTimer(removeMsgId);
             if (!timer) {
                 return ctx.replyV2({ description: `No active timer found with Message ID \`${removeMsgId}\`.`, isAlert: true });
             }
 
             // Check authorization:
-            // 1. Is bot owner?
+            // 1. Bot owner?
             const BOT_OWNERS = new Set<string>(['903646482610126848', '994411485977653248', '865906211948724226']);
             const isBotOwner = BOT_OWNERS.has(ctx.author.id);
-            // 2. Is server administrator?
+            // 2. Server admin?
             const isGuildAdmin = ctx.member?.permissions.has(PermissionFlagsBits.Administrator) || ctx.member?.permissions.has(PermissionFlagsBits.ManageGuild);
-            // 3. Is the creator of the timer?
+            // 3. Creator of the timer?
             const isCreator = timer.authorId === ctx.author.id;
 
             if (!isBotOwner && !isGuildAdmin && !isCreator) {
-                return ctx.replyV2({ description: `${client.emoji.cross} You do not have permission to remove this timer. Only administrators or the timer creator can cancel it.`, isAlert: true });
+                return ctx.replyV2({
+                    description: `${client.emoji.cross || '❌'} You do not have permission to remove this timer. Only administrators or the timer creator can cancel it.`,
+                    isAlert: true
+                });
             }
 
             // Cancel the timer
-            clearTimeout(timer.timeoutId);
-            runningTimers.delete(removeMsgId);
+            TimerManager.removeTimer(removeMsgId);
 
-            // Attempt to edit the original message to reflect cancellation
+            // Attempt to edit original message to reflect cancellation
             try {
                 const channel = await client.channels.fetch(timer.channelId).catch(() => null);
                 if (channel && channel.isTextBased()) {
                     const originalMsg = await (channel as any).messages.fetch(timer.id).catch(() => null);
                     if (originalMsg) {
-                        await originalMsg.edit({
-                            embeds: [
-                                new EmbedBuilder()
-                                    .setTitle('Timer Cancelled')
-                                    .setDescription(`⏱️ The **${timer.durationStr}** timer was cancelled by ${ctx.author.tag}.${timer.reason ? `\n**Reason:** ${timer.reason}` : ''}`)
-                                    .setColor(0xFF0000)
-                            ],
-                            components: []
+                        const cancelLayout = V2Helper.createLayout({
+                            title: '⏱️ Timer Cancelled',
+                            description: `❌ The **${timer.durationStr}** timer was cancelled by <@${ctx.author.id}>.${timer.reason ? `\n> **Reason:** ${timer.reason}` : ''}`,
+                            color: client.color.red || 0xef4444,
+                            borderless: true
                         });
+                        await originalMsg.edit(cancelLayout as any).catch(() => {});
                     }
                 }
             } catch {}
 
-            return ctx.replyV2({ description: `${client.emoji.success} Successfully cancelled the countdown timer with ID \`${removeMsgId}\`.` });
+            return ctx.replyV2({
+                description: `${client.emoji.success || '✅'} Successfully cancelled the countdown timer with ID \`${removeMsgId}\`.`
+            });
         }
     }
 }

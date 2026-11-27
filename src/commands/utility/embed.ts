@@ -87,24 +87,24 @@ export default class Embed extends Command {
 
 		const getRows = () => {
 			const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-				new ButtonBuilder().setCustomId('eb_basics').setLabel(' Text').setStyle(ButtonStyle.Primary),
-				new ButtonBuilder().setCustomId('eb_color').setLabel(' Color').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('eb_media').setLabel(' Media').setStyle(ButtonStyle.Secondary),
-				new ButtonBuilder().setCustomId('eb_fields').setLabel(' Fields').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('eb_interact').setLabel(' Interact').setStyle(ButtonStyle.Secondary)
+				new ButtonBuilder().setCustomId('eb_basics').setLabel('Text').setStyle(ButtonStyle.Primary),
+				new ButtonBuilder().setCustomId('eb_color').setLabel('Color').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('eb_media').setLabel('Media').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('eb_fields').setLabel('Fields').setStyle(ButtonStyle.Secondary),
+				new ButtonBuilder().setCustomId('eb_interact').setLabel('Interact').setStyle(ButtonStyle.Secondary)
 			);
-            const row2 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-                new StringSelectMenuBuilder()
-                    .setCustomId('eb_style')
-                    .setPlaceholder(' Select Style (Legacy vs V2)')
-                    .addOptions([
-                        { label: 'Standard Embed (Legacy)', value: 'legacy', description: 'Traditional Discord embed box', emoji: '', default: embedData.style === 'legacy' },
-                        { label: 'Components V2 (Modern)', value: 'v2', description: 'Premium integrated modular layout', emoji: '', default: embedData.style === 'v2' }
-                    ])
-            );
+			const row2 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+				new StringSelectMenuBuilder()
+					.setCustomId('eb_style')
+					.setPlaceholder('Select Style (Legacy vs V2)')
+					.addOptions([
+						{ label: 'Standard Embed (Legacy)', value: 'legacy', description: 'Traditional Discord embed box', emoji: '📦', default: embedData.style === 'legacy' },
+						{ label: 'Components V2 (Modern)', value: 'v2', description: 'Premium integrated modular layout', emoji: '⚡', default: embedData.style === 'v2' }
+					])
+			);
 			const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-				new ButtonBuilder().setCustomId('eb_send').setLabel(`${client.emoji.success} Send`).setStyle(ButtonStyle.Success),
-				new ButtonBuilder().setCustomId('eb_cancel').setLabel(' Cancel').setStyle(ButtonStyle.Danger)
+				new ButtonBuilder().setCustomId('eb_send').setLabel('Send').setStyle(ButtonStyle.Success),
+				new ButtonBuilder().setCustomId('eb_cancel').setLabel('Cancel').setStyle(ButtonStyle.Danger)
 			);
 			return [row1, row2, row3];
 		};

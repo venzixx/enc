@@ -162,9 +162,9 @@ export default class InroleCommand extends Command {
 			components,
 		});
 
-		if (totalPages <= 1 || !message || !("createMessageComponentCollector" in message)) return;
+		if (totalPages <= 1 || !message || typeof (message as any)?.createMessageComponentCollector !== 'function') return;
 
-		const collector = message.createMessageComponentCollector({
+		const collector = (message as any).createMessageComponentCollector({
 			componentType: ComponentType.Button,
 			time: 120000,
 			filter: (i: any) => i.user.id === ctx.author.id,

@@ -68,20 +68,29 @@ export default class QuoteCommand extends Command {
 
         await ctx.deferReply();
 
-        let initialFont = 'Inter';
-        if (_args && _args.length > 0) {
+        const preferences = await client.prisma.userConfig.findUnique({
+            where: { userId: ctx.author.id },
+            select: { quoteFont: true, quoteStyle: true }
+        }).catch(() => null);
+        let initialFont = preferences?.quoteFont && Object.hasOwn(FONT_REGISTRY, preferences.quoteFont)
+            ? preferences.quoteFont
+            : 'Inter';
+        const isContextMenu = ctx.interaction && ctx.interaction instanceof MessageContextMenuCommandInteraction;
+        if (!isContextMenu && _args && _args.length > 0) {
             const argStr = _args.join(' ').trim();
-            const match = argStr.match(/font=["']?([^"']+)["']?/i);
-            if (match) {
-                initialFont = match[1].trim();
-            } else {
-                initialFont = argStr;
+            if (!/^\d+$/.test(argStr)) {
+                const match = argStr.match(/font=["']?([^"']+)["']?/i);
+                if (match) {
+                    initialFont = match[1].trim();
+                } else {
+                    initialFont = argStr;
+                }
             }
         }
 
         let options: QuoteOptions = {
-            color: false,
-            theme: 'dark',
+            color: preferences?.quoteStyle === 'color',
+            theme: preferences?.quoteStyle === 'light' ? 'light' : 'dark',
             reverse: false,
             blur: false,
             gif: false,
@@ -137,7 +146,7 @@ export default class QuoteCommand extends Command {
                         .setStyle(options.gif ? ButtonStyle.Success : ButtonStyle.Secondary)
                 );
 
-                const baseFonts = Object.keys(FONT_REGISTRY).slice(0, 24).map(fontName => ({
+                const baseFonts = Object.keys(FONT_REGISTRY).slice(0, 23).map(fontName => ({
                     label: fontName,
                     value: fontName
                 }));
@@ -160,11 +169,13 @@ export default class QuoteCommand extends Command {
                     });
                 }
 
+                const safeMenuOptions = menuOptions.slice(0, 25);
+
                 const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
                     new StringSelectMenuBuilder()
                         .setCustomId('q_font')
                         .setPlaceholder('Select Font')
-                        .addOptions(menuOptions)
+                        .addOptions(safeMenuOptions)
                 );
 
                 const data = {
@@ -188,12 +199,12 @@ export default class QuoteCommand extends Command {
             }
         };
 
-        const message = await generateAndSend();
-        if (!message || !('createMessageComponentCollector' in message)) return;
+        const message: any = await generateAndSend();
+        if (!message || typeof message.createMessageComponentCollector !== 'function') return;
 
         const collector = message.createMessageComponentCollector({
             time: 300000, // 5 minutes
-            filter: (i) => i.user.id === ctx.author.id
+            filter: (i: any) => i.user.id === ctx.author.id
         });
 
         collector.on('collect', async (i: any) => {

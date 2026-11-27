@@ -1,5 +1,6 @@
 import { ColorResolvable, EmbedBuilder, Guild, TextChannel, AttachmentBuilder } from 'discord.js';
 import { ExtendedClient } from '../client';
+import { V2Helper } from './V2Helper';
 
 export enum AuditLogType {
     SECURITY = 'SECURITY',
@@ -30,6 +31,10 @@ export enum AuditLogStatus {
 }
 
 export class AuditLogger {
+    public static banReason(moderatorId: string, reason: string): string {
+        return Array.from(`[Enc moderator:${moderatorId}] ${reason}`).slice(0, 512).join('');
+    }
+
     public static async log(
         client: ExtendedClient,
         guild: Guild,
@@ -45,6 +50,7 @@ export class AuditLogger {
             color?: ColorResolvable;
             transcript?: string;
             files?: any[];
+            borderless?: boolean;
         }
     ) {
         try {
@@ -135,6 +141,26 @@ export class AuditLogger {
                 }
 
                 if (logChannel && logChannel.isTextBased()) {
+                    if (data.borderless) {
+                        const fields = [
+                            { name: 'Category', value: `\`${data.type}\``, inline: true },
+                            { name: 'Status', value: `\`${data.status || 'INFO'}\``, inline: true },
+                            {
+                                name: 'Executor',
+                                value: data.executorId ? `<@${data.executorId}> (\`${data.executorId}\`)` : 'Unknown'
+                            }
+                        ];
+                        if (data.targetName) {
+                            fields.push({ name: 'Target', value: `\`${data.targetName}\`${data.targetId ? ` (\`${data.targetId}\`)` : ''}` });
+                        }
+                        if (data.details) fields.push({ name: 'Details', value: data.details });
+                        await logChannel.send({
+                            ...V2Helper.createLayout({ title: `Audit Log // ${data.event}`, fields, timestamp: true, borderless: true }),
+                            files: data.files
+                        }).catch(() => null);
+                        return;
+                    }
+
                     const embed = new EmbedBuilder()
                         .setTitle(` Audit Log // ${data.event}`)
                         .setColor(data.color || client.color.main)

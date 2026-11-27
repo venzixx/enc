@@ -1,4 +1,4 @@
-import { type ButtonInteraction, PermissionFlagsBits, AttachmentBuilder, TextChannel } from "discord.js";
+import { type ButtonInteraction, PermissionFlagsBits, AttachmentBuilder, TextChannel, EmbedBuilder } from "discord.js";
 import { Component } from "../../structures";
 import { ExtendedClient } from "../../client";
 import { V2Helper } from "../../utils/V2Helper";
@@ -121,16 +121,17 @@ export default class TicketConfirmClose extends Component {
                 try {
                     const creator = await interaction.guild?.members.fetch(ticket.userId).catch(() => null);
                     if (creator) {
-                        const dmLayout = V2Helper.createLayout({
-                            title: `📁 Ticket Closed: #${channel.name}`,
-                            description: `Your ticket in **${interaction.guild?.name}** has been closed.\n\nA full HTML transcript of the conversation has been attached below for your records.`,
-                            borderless: true,
-                            color: null
-                        });
+                        const dmEmbed = new EmbedBuilder()
+                            .setTitle(`📁 Ticket Closed: #${channel.name}`)
+                            .setDescription(`Your ticket in **${interaction.guild?.name}** has been closed.\n\nA full HTML transcript of the conversation has been attached below for your records.`)
+                            .setColor(0x9333ea);
+
                         await creator.send({ 
-                            ...dmLayout,
+                            embeds: [dmEmbed],
                             files: [transcriptFile]
-                        }).catch(() => {});
+                        }).catch((err) => {
+                            console.error('Failed to DM transcript to user:', err);
+                        });
                     }
                 } catch (err) {
                     console.log('Failed to DM transcript to user:', err);
@@ -142,21 +143,23 @@ export default class TicketConfirmClose extends Component {
                 try {
                     const logChannel = await interaction.guild?.channels.fetch(transcriptChannelId).catch(() => null);
                     if (logChannel && logChannel.isTextBased()) {
-                        const logLayout = V2Helper.createLayout({
-                            title: '📁 Ticket Closed & Archived',
-                            description: 
+                        const logEmbed = new EmbedBuilder()
+                            .setTitle('📁 Ticket Closed & Archived')
+                            .setDescription(
                                 `Ticket **#${channel.name}** has been closed.\n\n` +
                                 `• **Creator:** <@${ticket.userId}> (\`${ticket.userId}\`)\n` +
                                 `• **Closed By:** <@${interaction.user.id}> (${interaction.user.tag})\n` +
-                                `• **Closed At:** <t:${Math.floor(Date.now() / 1000)}:F>`,
-                            borderless: true,
-                            color: null
-                        });
+                                `• **Closed At:** <t:${Math.floor(Date.now() / 1000)}:F>`
+                            )
+                            .setColor(0x9333ea);
+
                         await (logChannel as any).send({
-                            ...logLayout,
+                            embeds: [logEmbed],
                             files: [transcriptFile],
                             allowedMentions: { parse: [], roles: [], users: [] }
-                        }).catch(() => {});
+                        }).catch((err: any) => {
+                            console.error('Failed to send transcript to log channel:', err);
+                        });
                     }
                 } catch (err) {
                     console.log('Failed to send transcript to log channel:', err);

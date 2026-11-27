@@ -14,7 +14,7 @@ export class PlaceholderManager {
         if (!text) return { content: '', embeds: [], components: [] };
 
         const trimmed = text.trim();
-        const containsMentionTag = trimmed.includes('{userMention}') || trimmed.includes('{user_mention}') || trimmed.includes('{user.mention}') || trimmed.includes('{mentionID}') || trimmed.includes('{user}');
+        const containsMentionTag = trimmed.includes('{userMention}') || trimmed.includes('{user_mention}') || trimmed.includes('{user.mention}') || trimmed.includes('{mentionID}') || trimmed.includes('{user}') || trimmed.includes('{booster}') || trimmed.includes('{booster.mention}');
 
         // 1. Direct JSON / Discohook Payload Handling
         if (trimmed.startsWith('{') && (trimmed.includes('"embeds"') || trimmed.includes('"content"'))) {
@@ -103,7 +103,10 @@ export class PlaceholderManager {
                 'server', 'server.id', 'server.name', 'server.member_count', 'server.icon',
                 'guild', 'guild.name', 'count', 'tag', 'inviter', 'mentionID', 
                 'username', 'member.count', 'user.name', 'user.id', 'user.tag', 'user.avatar',
-                'user.created', 'user.joined', 'user.level'
+                'user.created', 'user.joined', 'user.level',
+                'booster', 'booster.name', 'booster.tag', 'booster.id', 'booster.mention', 'booster.avatar',
+                'boost_count', 'boosts', 'boost_tier', 'tier', 'server.boost_count', 'server.boost_tier', 'server.boost_level',
+                'ordinal'
             ].includes(tagName)) continue;
 
             // Check if this is a saved embed
@@ -219,6 +222,12 @@ export class PlaceholderManager {
             .replace(/{user\.id}/g, member.id)
             .replace(/{user\.tag}/g, member.user.tag || member.user.username)
             .replace(/{user\.avatar}/g, member.user.displayAvatarURL({ extension: 'png', size: 256 }))
+            .replace(/{booster}/g, member.toString())
+            .replace(/{booster\.name}/g, member.user.username)
+            .replace(/{booster\.tag}/g, member.user.tag || member.user.username)
+            .replace(/{booster\.id}/g, member.id)
+            .replace(/{booster\.mention}/g, `<@${member.id}>`)
+            .replace(/{booster\.avatar}/g, member.user.displayAvatarURL({ extension: 'png', size: 256 }))
             .replace(/{user\.created}/g, `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`)
             .replace(/{user\.joined}/g, member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Unknown')
             .replace(/{user\.level}/g, '{user.level}')
@@ -231,7 +240,17 @@ export class PlaceholderManager {
             .replace(/{server\.icon}/g, guild.iconURL({ extension: 'png', size: 256 }) || '')
             .replace(/{server\.boost_count}/g, (guild.premiumSubscriptionCount || 0).toString())
             .replace(/{server\.boost_tier}/g, guild.premiumTier.toString())
+            .replace(/{server\.boost_level}/g, guild.premiumTier.toString())
+            .replace(/{boost_count}/g, (guild.premiumSubscriptionCount || 0).toString())
+            .replace(/{boosts}/g, (guild.premiumSubscriptionCount || 0).toString())
+            .replace(/{boost_tier}/g, guild.premiumTier.toString())
+            .replace(/{tier}/g, guild.premiumTier.toString())
             .replace(/{count}/g, guild.memberCount.toString())
+            .replace(/{ordinal}/g, (() => {
+                const s = ["th", "st", "nd", "rd"];
+                const v = guild.memberCount % 100;
+                return guild.memberCount + (s[(v - 20) % 10] || s[v] || s[0]);
+            })())
             .replace(/{tag}/g, member.user.tag || member.user.username)
             .replace(/{member\.count}/g, guild.memberCount.toString());
     }

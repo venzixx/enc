@@ -5,7 +5,8 @@ import {
     ButtonStyle, 
     StringSelectMenuBuilder,
     ApplicationCommandOptionType,
-    TextChannel
+    TextChannel,
+    EmbedBuilder
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
@@ -485,21 +486,23 @@ export default class Ticket extends Command {
                         closer: ctx.author,
                         closedReason: 'Ticket deleted via command'
                     });
-                    const logLayout = V2Helper.createLayout({
-                        title: '🗑️ Ticket Deleted & Archived',
-                        description: 
+                    const logEmbed = new EmbedBuilder()
+                        .setTitle('🗑️ Ticket Deleted & Archived')
+                        .setDescription(
                             `Ticket **#${(ctx.channel as any).name}** was deleted.\n\n` +
                             `• **Creator:** <@${ticket.userId}> (\`${ticket.userId}\`)\n` +
                             `• **Deleted By:** <@${ctx.author.id}> (${ctx.author.tag})\n` +
-                            `• **Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>`,
-                        borderless: true,
-                        color: null
-                    });
+                            `• **Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>`
+                        )
+                        .setColor(0x9333ea);
+
                     await (logChannel as any).send({
-                        ...logLayout,
+                        embeds: [logEmbed],
                         files: [transcriptFile],
                         allowedMentions: { parse: [], roles: [], users: [] }
-                    }).catch(() => {});
+                    }).catch((err: any) => {
+                        console.error('Failed to send transcript during ticket deletion:', err);
+                    });
                 }
             } catch (err) {
                 console.error('Failed to log transcript during ticket deletion:', err);

@@ -87,13 +87,23 @@ export default class ServerData {
 	// -----------------------------
 	// Setup
 	// -----------------------------
-	public async getSetup(guildId: string): Promise<{ textId: string; messageId: string } | null> {
+	public async getSetup(guildId: string): Promise<{ textId: string; messageId: string; prefix?: string | null } | null> {
 		const guild = await this.get(guildId);
 		if (!guild.setupChannel || !guild.setupMessage) return null;
 		return {
 			textId: guild.setupChannel,
 			messageId: guild.setupMessage,
+			prefix: (guild as any).setupPrefix || null,
 		};
+	}
+
+	public async setSetupPrefix(guildId: string, prefix: string | null): Promise<void> {
+		await (this.prisma.guild as any).update({
+			where: { id: guildId },
+			data: {
+				setupPrefix: prefix,
+			},
+		});
 	}
 
 	public async setSetup(guildId: string, textId: string, messageId: string): Promise<void> {
@@ -107,11 +117,12 @@ export default class ServerData {
 	}
 
 	public async deleteSetup(guildId: string): Promise<void> {
-		await this.prisma.guild.update({
+		await (this.prisma.guild as any).update({
 			where: { id: guildId },
 			data: {
 				setupChannel: null,
 				setupMessage: null,
+				setupPrefix: null,
 			},
 		});
 	}

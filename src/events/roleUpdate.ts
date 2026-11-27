@@ -3,6 +3,7 @@ import { Event } from '../structures';
 import { LavamusicEventType } from '../types/events';
 import { ExtendedClient } from '../client';
 import { AuditLogger, AuditLogType, AuditLogStatus } from '../utils/AuditLogger';
+import { AntiNukeTracker } from '../utils/AntiNukeTracker';
 
 export default class RoleUpdate extends Event {
     constructor(client: ExtendedClient, file: string) {
@@ -34,5 +35,10 @@ export default class RoleUpdate extends Event {
             details: changes.join('\n'),
             color: this.client.color.main
         });
+
+        // Anti-Nuke Occurrence Check
+        if (executor && executor.id !== this.client.user?.id) {
+            await AntiNukeTracker.checkAction(this.client, newRole.guild, executor.id, 'role', 'Role Modification');
+        }
     }
 }

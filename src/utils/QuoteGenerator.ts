@@ -235,10 +235,6 @@ export class QuoteGenerator {
             miq.setAvatar(avatarUrl);
         }
 
-        if (options.color && baseTheme !== 'light' && baseTheme !== 'portrait-light') {
-            miq.setTheme('color');
-        }
-
         const canvas = await miq.render();
 
         if (options.gif) {
@@ -302,10 +298,6 @@ export class QuoteGenerator {
             .setUsername(cleanedUsername)
             .setDisplayName(cleanedDisplayName)
             .setWatermark('enc');
-
-        if (options.color && baseTheme !== 'light' && baseTheme !== 'portrait-light') {
-            miq.setTheme('color');
-        }
 
         const canvas = await miq.render();
 

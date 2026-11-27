@@ -8,6 +8,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
 import { CaseManager } from '../../utils/CaseManager';
+import { AuditLogger } from '../../utils/AuditLogger';
 import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class Softban extends Command {
@@ -154,14 +155,15 @@ export default class Softban extends Command {
 		if (!confirmed) return;
 
 		try {
+            const auditReason = AuditLogger.banReason(ctx.author.id, reason);
             if (targetMember) {
                 await targetMember.ban({ 
-                    reason: `Softbanned by ${ctx.author.tag}: ${reason}`,
+                    reason: auditReason,
                     deleteMessageSeconds: days * 86400
                 });
             } else {
                 await ctx.guild.bans.create(targetUser.id, {
-                    reason: `Softbanned by ${ctx.author.tag}: ${reason}`,
+                    reason: auditReason,
                     deleteMessageSeconds: days * 86400
                 });
             }

@@ -5,12 +5,15 @@ import { GiveawayManager } from "../utils/GiveawayManager";
 export async function startGiveawayScheduler(client: ExtendedClient): Promise<void> {
     logger.info("[Giveaway] Scheduler started.");
 
+    let running = false;
     setInterval(async () => {
+        if (running) return;
+        running = true;
         try {
             const expiredGiveaways = await client.prisma.giveaway.findMany({
                 where: {
-                    isActive: true,
-                    endTime: { lte: new Date() }
+                    guildId: { in: [...client.guilds.cache.keys()] },
+                    OR: [{ isActive: true, endTime: { lte: new Date() } }, { announcementPending: true }]
                 }
             });
 
@@ -23,6 +26,8 @@ export async function startGiveawayScheduler(client: ExtendedClient): Promise<vo
             }
         } catch (err) {
             logger.error("[Giveaway] Scheduler error:", err);
+        } finally {
+            running = false;
         }
     }, 5000); // Runs every 5 seconds
 }

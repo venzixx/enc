@@ -6,10 +6,6 @@ import {
     ButtonStyle,
     TextChannel,
     CategoryChannel,
-    Role,
-    EmbedBuilder,
-    ActionRowBuilder,
-    ComponentType,
     StringSelectMenuBuilder
 } from 'discord.js';
 import { Command, Context } from '../../structures';

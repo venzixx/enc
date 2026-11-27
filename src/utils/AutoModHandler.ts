@@ -14,7 +14,28 @@ export interface AutoModWordsConfig {
 }
 
 export class AutoModHandler {
-    private static messageCache = new Map<string, { count: number, resetAt: number }>();
+    // Sliding-window action timestamps: Map<`${guildId}:${userId}:${filterType}`, number[]>
+    private static actionTimestamps = new Map<string, number[]>();
+
+    /**
+     * Sliding window rate limit check (10s occurrence limit)
+     */
+    public static checkRateLimit(guildId: string, userId: string, filterType: string, limit: number = 3, windowMs: number = 10000): boolean {
+        const key = `${guildId}:${userId}:${filterType}`;
+        const now = Date.now();
+        let timestamps = this.actionTimestamps.get(key) || [];
+
+        // Filter out expired occurrences
+        timestamps = timestamps.filter(t => now - t <= windowMs);
+        timestamps.push(now);
+        this.actionTimestamps.set(key, timestamps);
+
+        if (timestamps.length > limit) {
+            this.actionTimestamps.delete(key);
+            return true;
+        }
+        return false;
+    }
 
     public static parseWordsConfig(data: string | null | undefined): AutoModWordsConfig {
         if (!data) {
@@ -112,7 +133,32 @@ export class AutoModHandler {
             }
         }
 
-        // 3. Fetch Filters
+        // 2c. SecurityWhitelist Granular Bypass Check
+        const secTargets = [message.author.id, message.channelId];
+        const channel = message.channel as TextChannel;
+        if (channel.parentId) secTargets.push(channel.parentId);
+        if (message.member) {
+            secTargets.push(...message.member.roles.cache.map(r => r.id));
+        }
+
+        const secWhitelists = await client.prisma.securityWhitelist.findMany({
+            where: {
+                guildId: message.guildId!,
+                targetId: { in: secTargets }
+            }
+        });
+
+        const grantedFeatures = new Set<string>();
+        for (const sw of secWhitelists) {
+            try {
+                const feats: string[] = JSON.parse(sw.features);
+                for (const f of feats) grantedFeatures.add(f.toLowerCase());
+            } catch {}
+        }
+
+        if (grantedFeatures.has('automod')) return false;
+
+        // 3. Fetch Active Filters
         const filters = await client.prisma.autoModFilter.findMany({
             where: { guildId: message.guild.id, enabled: true }
         });
@@ -120,27 +166,39 @@ export class AutoModHandler {
         if (filters.length === 0) return false;
 
         for (const filter of filters) {
+            if (filter.type === 'SPAM' && grantedFeatures.has('spam')) continue;
+            if (filter.type === 'IMAGE_SPAM' && grantedFeatures.has('spam')) continue;
+            if (filter.type === 'GIF_SPAM' && grantedFeatures.has('spam')) continue;
+            if (filter.type === 'MENTIONS' && grantedFeatures.has('mentions')) continue;
+            if ((filter.type === 'LINKS' || filter.type === 'INVITES') && grantedFeatures.has('links')) continue;
+
             let triggered = false;
             let violationDetails: any = null;
 
             switch (filter.type) {
                 case 'WORDS': {
-                    const result = this.checkWords(message, filter.data);
+                    const result = this.checkWords(message, filter.data, filter.threshold || 1);
                     triggered = result.triggered;
                     violationDetails = { matchedWord: result.matchedWord, wordsConfig: result.config };
                     break;
                 }
                 case 'LINKS':
-                    triggered = this.checkLinks(message, filter.data);
+                    triggered = this.checkLinks(message, filter.data, filter.threshold || 2);
                     break;
                 case 'INVITES':
-                    triggered = this.checkInvites(message);
+                    triggered = this.checkInvites(message, filter.threshold || 1);
                     break;
                 case 'SPAM':
                     triggered = this.checkSpam(message, filter.threshold || 5);
                     break;
+                case 'IMAGE_SPAM':
+                    triggered = this.checkImageSpam(message, filter.threshold || 3);
+                    break;
+                case 'GIF_SPAM':
+                    triggered = this.checkGifSpam(message, filter.threshold || 3);
+                    break;
                 case 'MENTIONS':
-                    triggered = this.checkMentions(message, filter.threshold || 10);
+                    triggered = this.checkMentions(message, filter.threshold || 5);
                     break;
             }
 
@@ -153,13 +211,14 @@ export class AutoModHandler {
         return false;
     }
 
-    private static checkWords(message: Message, data: string | null): { triggered: boolean; matchedWord?: string; config: AutoModWordsConfig } {
+    private static checkWords(message: Message, data: string | null, threshold: number = 1): { triggered: boolean; matchedWord?: string; config: AutoModWordsConfig } {
         const config = this.parseWordsConfig(data);
         if (!config.words || config.words.length === 0) return { triggered: false, config };
         const content = message.content.toLowerCase();
         const matched = config.words.find(word => word && content.includes(word.toLowerCase()));
         if (matched) {
-            return { triggered: true, matchedWord: matched, config };
+            const breached = this.checkRateLimit(message.guildId!, message.author.id, 'WORDS', threshold, 10000);
+            return { triggered: breached, matchedWord: matched, config };
         }
         return { triggered: false, config };
     }
@@ -206,7 +265,7 @@ export class AutoModHandler {
         }
     }
 
-    private static checkLinks(message: Message, customWhitelist?: string | null): boolean {
+    private static checkLinks(message: Message, customWhitelist?: string | null, threshold: number = 2): boolean {
         const content = message.content;
         const urlRegex = /https?:\/\/([^\s/]+)[^\s]*/gi;
 
@@ -215,9 +274,10 @@ export class AutoModHandler {
             try {
                 const extra: string[] = JSON.parse(customWhitelist);
                 safeDomains.push(...extra);
-            } catch { /* ignore parse errors */ }
+            } catch {}
         }
 
+        let hasForbiddenLink = false;
         let match;
         while ((match = urlRegex.exec(content)) !== null) {
             const fullUrl = match[0];
@@ -229,37 +289,68 @@ export class AutoModHandler {
                 const cleanSafe = safe.replace(/^www\./, '');
                 return domain === cleanSafe || domain.endsWith('.' + cleanSafe);
             });
-            if (!isSafe) return true;
+            if (!isSafe) {
+                hasForbiddenLink = true;
+                break;
+            }
+        }
+
+        if (!hasForbiddenLink) return false;
+        return this.checkRateLimit(message.guildId!, message.author.id, 'LINKS', threshold, 10000);
+    }
+
+    private static checkInvites(message: Message, threshold: number = 1): boolean {
+        const inviteRegex = /(discord\.(gg|io|me|li)|discordapp\.com\/invite)\/.+/gi;
+        if (!inviteRegex.test(message.content)) return false;
+        return this.checkRateLimit(message.guildId!, message.author.id, 'INVITES', threshold, 10000);
+    }
+
+    private static checkSpam(message: Message, threshold: number = 5): boolean {
+        return this.checkRateLimit(message.guildId!, message.author.id, 'SPAM', threshold, 10000);
+    }
+
+    private static checkImageSpam(message: Message, threshold: number = 3): boolean {
+        const hasImage = message.attachments.some(a => 
+            a.contentType?.startsWith('image/') || 
+            /\.(png|jpg|jpeg|webp|gif|bmp)$/i.test(a.name || '')
+        ) || message.embeds.some(e => e.image || e.thumbnail);
+
+        if (!hasImage) return false;
+        return this.checkRateLimit(message.guildId!, message.author.id, 'IMAGE_SPAM', threshold, 10000);
+    }
+
+    private static checkGifSpam(message: Message, threshold: number = 3): boolean {
+        const hasGif = this.isGifOrGifDomain(message.content) || 
+            message.attachments.some(a => a.contentType === 'image/gif' || a.name?.toLowerCase().endsWith('.gif')) ||
+            message.embeds.some(e => e.video || (e.url && this.isGifOrGifDomain(e.url)));
+
+        if (!hasGif) return false;
+        return this.checkRateLimit(message.guildId!, message.author.id, 'GIF_SPAM', threshold, 10000);
+    }
+
+    private static checkMentions(message: Message, threshold: number = 5): boolean {
+        const count = message.mentions.users.size + message.mentions.roles.size;
+        if (count <= 0) return false;
+
+        const key = `${message.guildId!}:${message.author.id}:MENTIONS`;
+        const now = Date.now();
+        let timestamps = this.actionTimestamps.get(key) || [];
+        timestamps = timestamps.filter(t => now - t <= 10000);
+        for (let i = 0; i < count; i++) {
+            timestamps.push(now);
+        }
+        this.actionTimestamps.set(key, timestamps);
+
+        if (timestamps.length > threshold) {
+            this.actionTimestamps.delete(key);
+            return true;
         }
         return false;
     }
 
-    private static checkInvites(message: Message): boolean {
-        const inviteRegex = /(discord\.(gg|io|me|li)|discordapp\.com\/invite)\/.+/gi;
-        return inviteRegex.test(message.content);
-    }
-
-    private static checkSpam(message: Message, threshold: number): boolean {
-        const key = `${message.guildId}:${message.author.id}:spam`;
-        const now = Date.now();
-        const data = this.messageCache.get(key);
-
-        if (!data || now > data.resetAt) {
-            this.messageCache.set(key, { count: 1, resetAt: now + 5000 });
-            return false;
-        }
-
-        data.count++;
-        return data.count > threshold;
-    }
-
-    private static checkMentions(message: Message, threshold: number): boolean {
-        return message.mentions.users.size > threshold || message.mentions.roles.size > threshold;
-    }
-
     private static async handleViolation(client: ExtendedClient, message: Message, filter: any, details?: any) {
         try {
-            if (message.deletable) await message.delete();
+            if (message.deletable) await message.delete().catch(() => {});
 
             const isWords = filter.type === 'WORDS';
             const wordsConfig: AutoModWordsConfig | undefined = details?.wordsConfig;
@@ -267,25 +358,57 @@ export class AutoModHandler {
 
             let wasMuted = false;
             let muteDurationMinutes = 10;
-            let muteReason = 'Auto-Mod: Triggered prohibited word filter';
+            let muteReason = isWords && wordsConfig?.muteReason ? wordsConfig.muteReason : `Auto-Mod: Triggered ${filter.type} occurrence limit`;
+            const action = filter.action || (isWords && wordsConfig?.autoMute ? 'MUTE' : 'DELETE');
 
-            // 1. Process Auto-Mute if configured for WORDS
-            if (isWords && wordsConfig && wordsConfig.autoMute && message.member) {
-                muteDurationMinutes = Math.max(1, Math.round((wordsConfig.muteDuration || 600) / 60));
-                muteReason = wordsConfig.muteReason || 'Auto-Mod: Triggered prohibited word filter';
-                const durationMs = (wordsConfig.muteDuration || 600) * 1000;
-
-                try {
-                    if (message.member.moderatable) {
-                        await message.member.timeout(durationMs, muteReason);
+            // Execute individual punishment
+            switch (action) {
+                case 'MUTE': {
+                    const durationSec = isWords && wordsConfig?.muteDuration ? wordsConfig.muteDuration : 600;
+                    muteDurationMinutes = Math.max(1, Math.round(durationSec / 60));
+                    if (message.member?.moderatable) {
+                        await message.member.timeout(durationSec * 1000, muteReason).catch(() => {});
                         wasMuted = true;
                     }
-                } catch (timeoutErr) {
-                    console.error('[AutoMod Timeout Error]', timeoutErr);
+                    break;
                 }
+                case 'KICK': {
+                    if (message.member?.kickable) {
+                        await message.member.kick(`Auto-Mod: ${filter.type} limit exceeded`).catch(() => {});
+                    }
+                    break;
+                }
+                case 'BAN': {
+                    if (message.member?.bannable) {
+                        await message.member.ban({ reason: `Auto-Mod: ${filter.type} limit exceeded` }).catch(() => {});
+                    }
+                    break;
+                }
+                case 'STRIP_ROLES': {
+                    if (message.member) {
+                        const botMember = await message.guild!.members.fetch(client.user!.id);
+                        const rolesToRemove = message.member.roles.cache.filter(role => 
+                            role.name !== '@everyone' && 
+                            role.comparePositionTo(botMember.roles.highest) < 0 &&
+                            role.managed === false
+                        );
+                        if (rolesToRemove.size > 0) {
+                            await message.member.roles.remove(rolesToRemove, `Auto-Mod: ${filter.type} limit reached`).catch(() => {});
+                        }
+                    }
+                    break;
+                }
+                case 'WARN': {
+                    await message.author.send(`⚠️ **AutoMod Warning:** You exceeded the **${filter.label || filter.type}** limit on **${message.guild!.name}**. Please adhere to server guidelines.`).catch(() => {});
+                    break;
+                }
+                case 'DELETE':
+                default:
+                    // Deletion already occurred
+                    break;
             }
 
-            // 2. Send Custom DM Notification (with Custom Embed support) if configured
+            // Send Custom DM Notification if configured for WORDS
             if (isWords && wordsConfig && (wordsConfig.dmEnabled || wordsConfig.dmReason || wordsConfig.customEmbed)) {
                 try {
                     const durationStr = `${muteDurationMinutes} minute${muteDurationMinutes > 1 ? 's' : ''}`;
@@ -377,26 +500,33 @@ export class AutoModHandler {
                 }
             }
 
-            // 3. Notify in channel
+            // Channel Warning
             const channel = message.channel as TextChannel;
             let warningText = `${client.emoji.exclamation || '⚠️'} <@${message.author.id}>, your message was removed due to our **${filter.type}** filter.`;
             if (wasMuted) {
-                warningText = `${client.emoji.cross || '🚫'} <@${message.author.id}> has been muted for **${muteDurationMinutes}m** for using prohibited words.`;
+                warningText = `${client.emoji.cross || '🚫'} <@${message.author.id}> has been muted for **${muteDurationMinutes}m** for violating **${filter.type}**.`;
+            } else if (action === 'KICK') {
+                warningText = `👢 <@${message.author.id}> was kicked for violating **${filter.type}** occurrences.`;
+            } else if (action === 'BAN') {
+                warningText = `🔨 <@${message.author.id}> was banned for violating **${filter.type}** occurrences.`;
+            } else if (action === 'STRIP_ROLES') {
+                warningText = `🛡️ Roles stripped from <@${message.author.id}> for violating **${filter.type}**.`;
             }
+
             const warning = await channel.send(warningText).catch(() => null);
             if (warning) setTimeout(() => warning.delete().catch(() => {}), 5000);
 
-            // 4. Log incident in Audit Log
+            // Incident Audit Log
             await AuditLogger.log(client, message.guild!, {
                 type: AuditLogType.AUTOMOD,
-                event: `Auto-Mod Filter: ${filter.type}${wasMuted ? ' (Auto-Muted)' : ''}`,
-                status: wasMuted ? AuditLogStatus.MOD : AuditLogStatus.INFO,
+                event: `Auto-Mod Filter: ${filter.type} (${action})`,
+                status: action !== 'DELETE' ? AuditLogStatus.MOD : AuditLogStatus.INFO,
                 executorId: client.user?.id,
                 executorTag: client.user?.tag,
                 targetId: message.author.id,
                 targetName: message.author.tag,
-                details: `Matched ${filter.type} filter in <#${message.channelId}>.${matchedWord ? `\nTrigger: \`${matchedWord}\`` : ''}${wasMuted ? `\nPunishment: Muted for ${muteDurationMinutes}m\nReason: ${muteReason}` : ''}\nContent: ${message.content.slice(0, 500)}`,
-                color: wasMuted ? client.color.red : client.color.yellow
+                details: `Triggered ${filter.type} rate-limit in <#${message.channelId}>.\nPunishment: ${action}${matchedWord ? `\nWord: \`${matchedWord}\`` : ''}\nContent: ${message.content.slice(0, 300)}`,
+                color: action !== 'DELETE' ? client.color.red : client.color.yellow
             });
         } catch (err) {
             console.error('[AutoMod] Violation handling failed:', err);

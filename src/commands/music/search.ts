@@ -16,6 +16,7 @@ import {
 	ViewChannel,
 } from "../../utils/Permissions";
 import { ExtendedClient } from "../../client";
+import { SpotifyResolver } from "../../utils/SpotifyResolver";
 
 export default class Search extends Command {
 	constructor(client: ExtendedClient) {
@@ -72,15 +73,24 @@ export default class Search extends Command {
 			});
 		}
 
+		player.voiceChannelId = (ctx.member as any).voice.channelId!;
+		player.options.voiceChannelId = (ctx.member as any).voice.channelId!;
 		if (!player.connected) await player.connect();
 
 		const isUrl = /^(https?:\/\/)/.test(query);
-		const res = await (player as any).search(
-			isUrl ? { query } : { query, source: "scsearch" },
+		let res = await (player as any).search(
+			isUrl ? { query } : { query, source: "ytsearch" },
 			ctx.author,
-		);
+		).catch(() => null);
 
-		if (res.loadType === "empty" || res.loadType === "error") {
+		if ((!res || res.loadType === "empty" || res.loadType === "error") && isUrl && SpotifyResolver.isSpotifyUrl(query)) {
+			const resolved = await SpotifyResolver.resolveToSearchQuery(query);
+			if (resolved) {
+				res = await (player as any).search({ query: resolved, source: "ytsearch" }, ctx.author).catch(() => null);
+			}
+		}
+
+		if (!res || res.loadType === "empty" || res.loadType === "error") {
 			return await ctx.sendMessage({
 				embeds: [
 					this.client.embed()

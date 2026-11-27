@@ -16,11 +16,43 @@ export class PersistentComponentRouter {
      * Handles persistent stateless buttons that survive bot restarts and collector timeouts.
      * Returns true if handled, false otherwise.
      */
-    public static async handle(client: ExtendedClient, interaction: ButtonInteraction): Promise<boolean> {
+    public static async handle(client: ExtendedClient, interaction: any): Promise<boolean> {
         const customId = interaction.customId;
         if (!customId) return false;
 
         try {
+            // ─── 0. PERMISSIONS TOGGLE (Discord Perms / Enc Perms) ────────────
+            if (customId.startsWith('perms_enc:') || customId.startsWith('perms_fake:') || customId.startsWith('perms_real:')) {
+                const parts = customId.split(':');
+                const action = parts[0];
+                const targetId = parts[1];
+                const authorId = parts[2];
+
+                const guild = interaction.guild;
+                if (!guild) return false;
+                const member = await guild.members.fetch(targetId).catch(() => null);
+                if (!member) {
+                    await interaction.reply({ content: 'Member not found in this server.', flags: MessageFlags.Ephemeral });
+                    return true;
+                }
+
+                const { PermsHelper } = await import('./PermsHelper');
+                if (action === 'perms_enc' || action === 'perms_fake') {
+                    const payload = await PermsHelper.buildEncPermsPayload(client, guild, member, authorId);
+                    await interaction.update(payload);
+                } else {
+                    const payload = PermsHelper.buildDiscordPermsPayload(interaction.channel, member, authorId);
+                    await interaction.update(payload);
+                }
+                return true;
+            }
+
+            // ─── 0. SECURITY WHITELIST MATRIX ───────────────────────────────────
+            if (customId.startsWith('sec_wl:')) {
+                const { SecurityWhitelistManager } = await import('./SecurityWhitelistManager');
+                return await SecurityWhitelistManager.handleInteraction(client, interaction);
+            }
+
             // ─── 1. SOCIAL / ACTION COMMANDS (Kiss, Hug, Slap, Cuddle, etc.) ────
             if (customId.startsWith('social_')) {
                 // Format: social_<action>_<initiatorId> or social_<action>_<initiatorId>_<targetId>
@@ -444,6 +476,39 @@ export class PersistentComponentRouter {
                 });
                 await interaction.editReply(confirmLayout as any);
                 return true;
+            }
+
+            // ─── 7. NSFW 18+ AGE-GATE & CONSENT PROMPTS ─────────────────────────
+            if (customId.startsWith('author_nsfw_agree_') || customId.startsWith('author_nsfw_decline_')) {
+                const parts = customId.split('_');
+                const authorId = parts[3];
+
+                if (interaction.user.id !== authorId) {
+                    await interaction.reply({
+                        content: `Only <@${authorId}> can respond to this age verification prompt.`,
+                        flags: MessageFlags.Ephemeral
+                    });
+                    return true;
+                }
+
+                // Authorized author clicked — let active in-memory collector handle it
+                return false;
+            }
+
+            if (customId.startsWith('target_nsfw_agree_') || customId.startsWith('target_nsfw_decline_')) {
+                const parts = customId.split('_');
+                const targetId = parts[3];
+
+                if (interaction.user.id !== targetId) {
+                    await interaction.reply({
+                        content: `Only <@${targetId}> can respond to this mutual consent prompt.`,
+                        flags: MessageFlags.Ephemeral
+                    });
+                    return true;
+                }
+
+                // Authorized target clicked — let active in-memory collector handle it
+                return false;
             }
 
             return false;

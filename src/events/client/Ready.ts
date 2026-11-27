@@ -6,6 +6,7 @@ import { LavamusicEventType } from "../../types/events";
 import { ExtendedClient } from "../../client";
 import { startGiveawayScheduler } from "../../tasks/giveawayScheduler";
 import { startRainbowScheduler } from "../../tasks/rainbowScheduler";
+import { BumpReminder } from "../../utils/BumpReminder";
 
 
 export default class Ready extends Event {
@@ -22,6 +23,9 @@ export default class Ready extends Event {
 		await startRainbowScheduler(this.client);
 		const { VoteReminderManager } = await import("../../utils/VoteReminderManager");
 		VoteReminderManager.init(this.client);
+		const { TimerManager } = await import("../../utils/TimerManager");
+		TimerManager.init(this.client);
+		BumpReminder.init(this.client);
 
 		await this.client.updateMaintenancePresence();
 

@@ -16,6 +16,7 @@ import {
 	ViewChannel,
 } from "../../utils/Permissions";
 import { ExtendedClient } from "../../client";
+import { SpotifyResolver } from "../../utils/SpotifyResolver";
 
 export default class Play extends Command {
 	constructor(client: ExtendedClient) {
@@ -88,20 +89,74 @@ export default class Play extends Command {
 				vcRegion: memberVoiceChannel.rtcRegion!,
 			});
 
+		player.voiceChannelId = memberVoiceChannel.id;
+		player.options.voiceChannelId = memberVoiceChannel.id;
 		if (!player.connected) await player.connect();
 
 		const isUrl = /^(https?:\/\/)/.test(query);
-		const response = (await player.search(
-			isUrl ? { query: query } : { query: query, source: "scsearch" },
+		let response = (await player.search(
+			isUrl ? { query: query } : { query: query, source: "ytsearch" },
 			ctx.author,
-		)) as SearchResult;
-		if (!response || response.tracks?.length === 0) {
+		).catch(() => null)) as SearchResult | null;
+
+		if ((!response || !response.tracks || response.tracks.length === 0 || response.loadType === "error") && isUrl && SpotifyResolver.isSpotifyUrl(query)) {
+			if (SpotifyResolver.isPlaylistOrAlbum(query)) {
+				const playlistData = await SpotifyResolver.resolvePlaylistOrAlbum(query);
+				if (playlistData && playlistData.tracks.length > 0) {
+					const firstRes = await player.search({ query: playlistData.tracks[0].query, source: "ytsearch" }, ctx.author).catch(() => null);
+					if (firstRes && firstRes.tracks?.length > 0) {
+						await player.queue.add(firstRes.tracks[0]);
+						if (!player.playing) await player.play({ paused: false });
+					}
+
+					await ctx.editMessageV2({
+						title: `${client.emoji.music} Spotify Playlist Queued`,
+						description: `Queued **${playlistData.tracks.length} tracks** from **${playlistData.name}**! Loading into queue in background...`,
+						color: this.client.config.color.main
+					}).catch(() => {});
+
+					const remaining = playlistData.tracks.slice(1);
+					(async () => {
+						for (let i = 0; i < remaining.length; i += 5) {
+							const chunk = remaining.slice(i, i + 5);
+							const chunkResults = await Promise.all(
+								chunk.map(t => player!.search({ query: t.query, source: "ytsearch" }, ctx.author).catch(() => null))
+							);
+							const tracksToAdd = chunkResults
+								.filter(r => r && r.tracks?.length > 0)
+								.map(r => r!.tracks[0]);
+							if (tracksToAdd.length > 0) {
+								await player!.queue.add(tracksToAdd);
+							}
+						}
+					})().catch(() => {});
+					return;
+				}
+			}
+
+			const resolved = await SpotifyResolver.resolveToSearchQuery(query);
+			if (resolved) {
+				response = (await player.search(
+					{ query: resolved, source: "ytsearch" },
+					ctx.author
+				).catch(() => null)) as SearchResult | null;
+			}
+		}
+
+		if ((!response || !response.tracks || response.tracks.length === 0 || response.loadType === "error") && !isUrl) {
+			response = (await player.search(
+				{ query: query, source: "ytmsearch" },
+				ctx.author
+			).catch(() => null)) as SearchResult | null;
+		}
+
+		if (!response || !response.tracks || response.tracks.length === 0 || response.loadType === "error") {
 			return await ctx.editMessageV2({
-                title: `${client.emoji.cross} Search Error`,
-                description: ctx.locale(I18N.commands.play.errors.search_error),
-                isAlert: true,
-                color: this.client.config.color.red
-            });
+				title: `${client.emoji.cross} Search Error`,
+				description: ctx.locale(I18N.commands.play.errors.search_error),
+				isAlert: true,
+				color: this.client.config.color.red
+			});
 		}
 
 		await player.queue.add(response.loadType === "playlist" ? response.tracks : response.tracks[0]);
@@ -113,21 +168,21 @@ export default class Play extends Command {
 
 		if (response.loadType === "playlist") {
 			await ctx.editMessageV2({
-                title: `${client.emoji.music} Playlist Added`,
-                description: ctx.locale(I18N.commands.play.added_playlist_to_queue, {
-                    length: response.tracks.length,
-                }),
-                color: this.client.config.color.main
-            });
+				title: `${client.emoji.music} Playlist Added`,
+				description: ctx.locale(I18N.commands.play.added_playlist_to_queue, {
+					length: response.tracks.length,
+				}),
+				color: this.client.config.color.main
+			}).catch(() => {});
 		} else {
 			await ctx.editMessageV2({
-                title: `${client.emoji.music} Track Added`,
-                description: ctx.locale(I18N.commands.play.added_to_queue, {
-                    title: response.tracks[0].info.title,
-                    uri: response.tracks[0].info.uri,
-                }),
-                color: this.client.config.color.main
-            });
+				title: `${client.emoji.music} Track Added`,
+				description: ctx.locale(I18N.commands.play.added_to_queue, {
+					title: response.tracks[0].info.title,
+					uri: response.tracks[0].info.uri,
+				}),
+				color: this.client.config.color.main
+			}).catch(() => {});
 		}
 		if (!player.playing && player.queue.tracks.length > 0) await player.play({ paused: false });
 	}

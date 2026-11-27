@@ -8,10 +8,11 @@ export default class Snipe extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'snipe',
+            aliases: ['s', 'editsnipe', 'esnipe'],
             description: {
-                content: 'View recently deleted messages or configure privacy settings.',
-                usage: 'snipe get [@user] | snipe server | snipe me',
-                examples: ['snipe get', 'snipe get @user', 'snipe server true', 'snipe me false']
+                content: 'View recently deleted or edited messages, or configure privacy settings.',
+                usage: 'snipe get [@user] | snipe edit [@user] | snipe edit list | snipe edit clear | snipe server | snipe me',
+                examples: ['snipe get', 'snipe edit', 'snipe edit list', 'snipe edit clear', 'snipe server true', 'snipe me false']
             },
             category: 'utility',
             cooldown: 3,
@@ -23,6 +24,42 @@ export default class Snipe extends Command {
                     type: 1, // SUB_COMMAND
                     options: [
                         { name: 'user', description: 'Filter by user', type: 6, required: false }
+                    ]
+                },
+                {
+                    name: 'edit',
+                    description: 'View or manage recently edited messages (expires after 1 hour)',
+                    type: 1, // SUB_COMMAND
+                    options: [
+                        {
+                            name: 'action',
+                            description: 'Action to perform: get, list, or clear',
+                            type: 3, // STRING
+                            required: false,
+                            choices: [
+                                { name: 'Get last edited message', value: 'get' },
+                                { name: 'List recent edits', value: 'list' },
+                                { name: 'Clear edit history', value: 'clear' }
+                            ]
+                        },
+                        {
+                            name: 'user',
+                            description: 'Filter by user',
+                            type: 6, // USER
+                            required: false
+                        },
+                        {
+                            name: 'index',
+                            description: 'Index of edited message (1 = most recent)',
+                            type: 4, // INTEGER
+                            required: false
+                        },
+                        {
+                            name: 'page',
+                            description: 'Page number for list',
+                            type: 4, // INTEGER
+                            required: false
+                        }
                     ]
                 },
                 {
@@ -56,7 +93,13 @@ export default class Snipe extends Command {
     public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
         await ctx.deferReply();
         
-        let subInput = ctx.options.getSubcommand() || args[0] || 'get';
+        let subInput = ctx.options?.getSubcommand?.() || args[0] || 'get';
+
+        // Check if invoked via alias editsnipe / esnipe
+        const invokedRaw = (ctx.ctx as any)?.content?.slice(ctx.prefix?.length || 0).trim().split(/\s+/)[0]?.toLowerCase();
+        if (invokedRaw === 'editsnipe' || invokedRaw === 'esnipe') {
+            subInput = 'edit';
+        }
         
         // Shorthands
         if (subInput.toLowerCase() === 'on') subInput = 'me_on';
@@ -160,6 +203,137 @@ export default class Snipe extends Command {
                 .setFooter({ text: `Page ${page} • Use .snipe <number> to view` });
 
             return ctx.reply({ embeds: [embed] });
+        }
+
+        // ===== EDIT / EDITSNIPE / ESNIPE (1h AUTO-REFRESH) =====
+        if (sub === 'edit' || sub === 'editsnipe' || sub === 'esnipe') {
+            const isDevCall = args.some(a => a.toLowerCase() === 'dev');
+            if (isDevCall && !(await isDev(client, ctx.author.id))) {
+                return ctx.replyV2({ description: 'Developer restricted subcommand.', color: client.color.red, isAlert: true });
+            }
+
+            const isEditPrefix = sub === 'edit';
+            const editArgs = isEditPrefix ? args.slice(1) : args;
+            const firstArg = editArgs[0]?.toLowerCase();
+            const slashAction = ctx.options?.getString?.('action')?.toLowerCase();
+
+            // 1. CLEAR ACTION: [,snipe edit clear]
+            if (firstArg === 'clear' || firstArg === 'cs' || slashAction === 'clear') {
+                const targetMention = editArgs.find(a => a.match(/<@!?(\d{17,20})>/))?.match(/<@!?(\d{17,20})>/);
+                const targetId = targetMention ? targetMention[1] : ctx.options?.getUser?.('user')?.id;
+
+                Sniper.clearEdits(ctx.channel.id, targetId, isDevCall);
+
+                if (isDevCall) {
+                    return ctx.replyV2({
+                        description: targetId
+                            ? `Purged all edit snipes (including dev cache) for <@${targetId}> in this channel.`
+                            : 'Purged all edit snipes (including dev cache) in this channel.',
+                        borderless: true,
+                        color: null
+                    });
+                } else {
+                    return ctx.replyV2({
+                        description: targetId
+                            ? `Cleared edit snipes for <@${targetId}> in this channel.`
+                            : 'Cleared all edit snipes in this channel.',
+                        borderless: true,
+                        color: null
+                    });
+                }
+            }
+
+            // 2. LIST ACTION: [,snipe edit list]
+            if (firstArg === 'list' || firstArg === 'l' || slashAction === 'list') {
+                const editSnipes = Sniper.getAllEdits(ctx.channel.id, isDevCall);
+
+                if (editSnipes.length === 0) {
+                    return ctx.replyV2({
+                        description: 'No recently edited messages found in the last hour.',
+                        isAlert: true
+                    });
+                }
+
+                const lines = editSnipes.map((s: any, i: number) => {
+                    const oldClean = (s.oldContent || '[No Content]').replace(/\s+/g, ' ');
+                    const newClean = (s.newContent || '[No Content]').replace(/\s+/g, ' ');
+                    const oldPreview = oldClean.substring(0, 25);
+                    const newPreview = newClean.substring(0, 25);
+                    const oldEllipsis = oldClean.length > 25 ? '...' : '';
+                    const newEllipsis = newClean.length > 25 ? '...' : '';
+                    const timeAgo = `<t:${Math.floor(s.timestamp.getTime() / 1000)}:R>`;
+                    return `**${i + 1}.** **${s.author}**: \`${oldPreview}${oldEllipsis}\` ➔ \`${newPreview}${newEllipsis}\` ${timeAgo}${s.isCleared ? ' 🗑️' : ''}`;
+                });
+
+                const pageArg = editArgs.find(a => !isNaN(parseInt(a)) && a !== 'list' && a !== 'l');
+                const page = Math.max(1, parseInt(pageArg || '') || ctx.options?.getInteger?.('page') || 1);
+                const totalPages = Math.ceil(lines.length / 10) || 1;
+                const start = (page - 1) * 10;
+                const currentLines = lines.slice(start, start + 10);
+
+                return ctx.replyV2({
+                    title: `Edit Snipe History - #${(ctx.channel as any).name || 'channel'}`,
+                    description: currentLines.join('\n') || 'No edited messages on this page.',
+                    footer: `Page ${page}/${totalPages} • Messages automatically refresh after 1 hour • Use ,snipe edit <number> to view`,
+                    borderless: true,
+                    color: null
+                });
+            }
+
+            // 3. GET ACTION: [,snipe edit]
+            const guildConf = await client.prisma.guild.findUnique({ where: { id: ctx.guild.id } });
+            if (guildConf?.snipeEnabled === false && !isDevCall && !(await isDev(client, ctx.author.id))) {
+                return ctx.replyV2({ description: 'Sniping is disabled in this server.', isAlert: true });
+            }
+
+            const targetMention = editArgs.find(a => a.match(/<@!?(\d{17,20})>/))?.match(/<@!?(\d{17,20})>/);
+            const targetId = targetMention ? targetMention[1] : ctx.options?.getUser?.('user')?.id;
+
+            let editIndex = 0;
+            const numArg = editArgs.find(a => !isNaN(parseInt(a)) && !a.startsWith('<@'));
+            if (numArg) {
+                editIndex = Math.max(0, parseInt(numArg) - 1);
+            } else if (ctx.options?.getInteger?.('index')) {
+                editIndex = Math.max(0, ctx.options.getInteger('index') - 1);
+            }
+
+            const sniped = Sniper.getEdit(ctx.channel.id, editIndex, targetId, isDevCall);
+
+            if (!sniped) {
+                return ctx.replyV2({
+                    description: targetId
+                        ? 'No recently edited messages found for that user in the last hour.'
+                        : 'No recently edited messages found in the last hour.',
+                    isAlert: true
+                });
+            }
+
+            if (!isDevCall) {
+                const userConf = await client.prisma.userConfig.findUnique({ where: { userId: sniped.authorId } });
+                if (userConf?.snipeOptOut) {
+                    return ctx.replyV2({ description: 'This user has opted out of sniping.', isAlert: true });
+                }
+            }
+
+            const timeAgo = `<t:${Math.floor(sniped.timestamp.getTime() / 1000)}:R>`;
+            const beforeContent = sniped.oldContent?.length > 1000
+                ? sniped.oldContent.substring(0, 1000) + '...'
+                : (sniped.oldContent || '[No Content]');
+            const afterContent = sniped.newContent?.length > 1000
+                ? sniped.newContent.substring(0, 1000) + '...'
+                : (sniped.newContent || '[No Content]');
+
+            return ctx.replyV2({
+                authorName: `${sniped.author}${isDevCall ? ' (DEV)' : ''}`,
+                authorIcon: sniped.avatarUrl,
+                description: `### Message Edited ${timeAgo}\n\n` +
+                    `**Before:**\n${beforeContent}\n\n` +
+                    `**After:**\n${afterContent}`,
+                image: sniped.image,
+                footer: `Edit Snipe #${editIndex + 1} • Auto-expires in 1h${sniped.isCleared ? ' [CLEARED]' : ''}`,
+                borderless: true,
+                color: null
+            });
         }
 
         // ===== GET / DEV =====

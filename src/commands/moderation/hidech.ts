@@ -53,7 +53,7 @@ export default class HideChannel extends Command {
             dangerLevel: 'warning',
             details: 'This will hide ViewChannel permission from @everyone.',
             confirmLabel: 'Confirm Hide',
-            confirmEmoji: '👁️‍🗨️',
+            confirmEmoji: '🔒',
             force
         });
 

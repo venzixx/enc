@@ -43,6 +43,52 @@ export default class AntiNukeWebhookGuard extends Event {
 
         if (isOwner || isExtraOwner || isTrusted) return;
 
+        // Granular Whitelist Bypass Check (Bot/User, Channel, Role)
+        const targetsToCheck = [log.executorId, channel.id];
+        if (channel.parentId) targetsToCheck.push(channel.parentId);
+
+        const whitelists = await this.client.prisma.securityWhitelist.findMany({
+            where: {
+                guildId: guild.id,
+                targetId: { in: targetsToCheck }
+            }
+        });
+
+        let isWhitelisted = whitelists.some(w => {
+            try {
+                const feats: string[] = JSON.parse(w.features);
+                return feats.includes('webhook') || feats.includes('antinuke');
+            } catch {
+                return false;
+            }
+        });
+
+        if (!isWhitelisted && log.executorId) {
+            const member = await guild.members.fetch(log.executorId).catch(() => null);
+            if (member) {
+                const roleIds = member.roles.cache.map((r: any) => r.id);
+                const roleWhitelists = await this.client.prisma.securityWhitelist.findMany({
+                    where: {
+                        guildId: guild.id,
+                        targetId: { in: roleIds },
+                        targetType: 'ROLE'
+                    }
+                });
+                if (roleWhitelists.some((w: any) => {
+                    try {
+                        const feats: string[] = JSON.parse(w.features);
+                        return feats.includes('webhook') || feats.includes('antinuke');
+                    } catch {
+                        return false;
+                    }
+                })) {
+                    isWhitelisted = true;
+                }
+            }
+        }
+
+        if (isWhitelisted) return;
+
         // 4. Rogue Webhook Detected -> Delete all webhooks in this channel
         // Since WebhookUpdate doesn't give the specific webhook created, we fetch all and find the rogue one
         const webhooks = await channel.fetchWebhooks();

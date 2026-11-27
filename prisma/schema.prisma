@@ -18,6 +18,7 @@ model Guild {
   countingHighScore     Int               @default(0)
   logChannelId          String?
   autoroleId            String?
+  welcomeEnabled        Boolean           @default(false)
   welcomeChannelId      String?
   welcomeMessage        String?
   welcomeCardEnabled    Boolean           @default(true)
@@ -26,6 +27,18 @@ model Guild {
   welcomeCardFont       String?           @default("Exo2")
   welcomeCardStyle      String?           @default("glass")
   welcomeCardTitle      String?
+  welcomeCardFooter     String?
+  boosterEnabled        Boolean           @default(false)
+  boosterChannelId      String?
+  boosterMessage        String?
+  boosterCardEnabled    Boolean           @default(true)
+  boosterCardBackground String?
+  boosterCardColor      String?           @default("#f47fff")
+  boosterCardFont       String?           @default("Exo2")
+  boosterCardStyle      String?           @default("glass")
+  boosterCardTitle      String?
+  boosterCardFooter     String?
+  joinDmEnabled         Boolean           @default(false)
   joinDmMessage         String?
   giveawayDefaultRoleId  String?
   giveawayDefaultInvites Int?      @default(0)
@@ -106,6 +119,7 @@ model Guild {
   djMode                Boolean?          @default(false)
   setupChannel          String?
   setupMessage          String?
+  setupPrefix           String?
   stay247               Boolean?          @default(false)
   stay247TextChannel    String?
   stay247VoiceChannel   String?
@@ -131,6 +145,7 @@ model Guild {
   botAvatar             String? 
   botBanner             String?
   lastBrandingUpdate    DateTime?
+  leaveEnabled          Boolean           @default(false)
   leaveChannelId        String?
   leaveMessage          String?
   levelingEnabled       Boolean           @default(true)
@@ -194,6 +209,7 @@ model Guild {
   permits               Permit[]
   autoModFilters        AutoModFilter[]
   autoModWhitelists     AutoModWhitelist[]
+  securityWhitelists    SecurityWhitelist[]
   antiNukeConfig        AntiNukeConfig?
   giveawayBlacklists    GiveawayBlacklist[]
   giveawayBonusEntries  GiveawayBonusEntry[]
@@ -222,6 +238,7 @@ model Guild {
   forcedNicknames       ForcedNickname[]
   assets               Asset[]
   roleRules            RoleRule[]
+  economyMode          Int               @default(0) // 0 = Global, 1 = Server
 }
 
 model CommandAlias {
@@ -254,6 +271,8 @@ model Appeal {
 
 model UserConfig {
   userId        String    @id
+  quoteFont     String?
+  quoteStyle    String?
   snipeOptOut   Boolean   @default(false)
   timezone      String?
   nsfwConsent   Boolean   @default(false)
@@ -416,6 +435,8 @@ model Giveaway {
   hostId          String
   guild           Guild           @relation(fields: [guildId], references: [id])
   entries         GiveawayEntry[]
+  finalWinners    String[]        @default([])
+  announcementPending Boolean     @default(false)
 }
 
 model GiveawayEntry {
@@ -699,6 +720,18 @@ model AutoModWhitelist {
   guild     Guild    @relation(fields: [guildId], references: [id])
 }
 
+model SecurityWhitelist {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  targetId    String
+  targetType  String   // USER, ROLE, CHANNEL
+  features    String   @default("[]") // JSON string of features: ["antinuke", "webhook", "spam", "mentions", "links", "automod"]
+  guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, targetId])
+  @@index([guildId, targetType])
+}
+
 model AntiNukeConfig {
   id              Int     @id @default(autoincrement())
   guildId         String  @unique
@@ -709,6 +742,7 @@ model AntiNukeConfig {
   webhookHeat     Int     @default(25)
   decayRate       Int     @default(5)
   punishment      String  @default("STRIP_ROLES")
+  rules           String? @default("{}")
   guild           Guild   @relation(fields: [guildId], references: [id])
 }
 
@@ -1080,6 +1114,45 @@ model MachineBan {
   @@index([ip])
   @@index([guildId, fingerprint])
 }
+
+model BumpReminder {
+  guildId    String    @id
+  enabled    Boolean   @default(false)
+  channelId  String?
+  roleId     String?
+  userId     String?
+  title      String?
+  message    String?
+  footer     String?
+  lastBumpAt DateTime?
+  dueAt      DateTime?
+}
+
+model BumpScore {
+  guildId String
+  userId  String
+  count   Int @default(0)
+
+  @@id([guildId, userId])
+  @@index([guildId, count, userId])
+}
+
+model UserEconomy {
+  id               Int       @id @default(autoincrement())
+  userId           String
+  guildId          String    @default("global")
+  wallet           BigInt    @default(0)
+  bank             BigInt    @default(0)
+  dailyLastClaim   DateTime?
+  monthlyLastClaim DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId, guildId])
+  @@index([userId])
+  @@index([guildId])
+}
+
 
 
 

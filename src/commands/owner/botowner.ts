@@ -7,9 +7,9 @@ export default class BotOwnerCommand extends Command {
             name: 'botowner',
             aliases: ['bo'],
             description: {
-                content: 'Bot owner settings and Developer Anti-Nuke control.',
-                usage: 'botowner <add/remove/list/antinuke> [args]',
-                examples: ['botowner list', 'botowner add @user', 'botowner antinuke enable']
+                content: 'Bot owner settings and developer access control.',
+                usage: 'botowner <add/remove/list> [args]',
+                examples: ['botowner list', 'botowner add @user', 'botowner remove @user']
             },
             category: 'owner',
             cooldown: 3,
@@ -108,36 +108,12 @@ export default class BotOwnerCommand extends Command {
 
             return ctx.reply({ embeds: [embed] });
 
-        // ===== ANTINUKE CONTROL =====
+        // ===== ANTINUKE CONTROL (REDIRECTED) =====
         } else if (sub === 'antinuke') {
-            const arg = match[2]?.trim()?.toLowerCase();
-            const current = await (client.prisma as any).devAntiNuke.findUnique({
-                where: { guildId: ctx.guild.id }
-            });
-
-            if (!arg || arg === 'status') {
-                const state = current?.enabled ? '🟢 **ENABLED**' : '🔴 **DISABLED**';
-                return ctx.replyV2({
-                    title: '🛡️ Developer Anti-Nuke Status',
-                    description: `Developer Anti-Nuke is currently ${state} for **${ctx.guild.name}**.\n\n*Use \`botowner antinuke <enable|disable>\` to toggle.*`,
-                    color: current?.enabled ? client.color.green : client.color.red
-                });
-            }
-
-            if (!['enable', 'disable'].includes(arg)) {
-                return ctx.replyV2({ description: '**Usage:** `botowner antinuke <enable|disable|status>`', isAlert: true });
-            }
-
-            const isEnabled = arg === 'enable';
-            await (client.prisma as any).devAntiNuke.upsert({
-                where: { guildId: ctx.guild.id },
-                update: { enabled: isEnabled },
-                create: { guildId: ctx.guild.id, enabled: isEnabled }
-            });
-
             return ctx.replyV2({
-                description: `Developer Anti-Nuke has been **${isEnabled ? 'enabled' : 'disabled'}** for this server.`,
-                color: isEnabled ? client.color.green : client.color.red
+                title: '🛡️ Anti-Nuke Has Moved!',
+                description: `Developer Anti-Nuke has been graduated and moved directly to the server command.\n\nUse **\`,antinuke strict <enable|disable>\`** to manage strict anti-nuke defense!`,
+                color: client.color.main
             });
         }
     }

@@ -106,6 +106,25 @@ export default {
         check_success: "<:check_success:1541083792737968179>",
         cross_error: "<:cross_error:1541083790523244644>",
 
+        // High-Fidelity Economy & Zer Suite
+        eco_wallet: "<:eco_wallet:1562488117280116736>",
+        eco_bank: "<:eco_bank:1562488114822254702>",
+        eco_zer: "<:eco_zer:1562488112184168568>",
+        eco_daily: "<:eco_daily:1562488109814513765>",
+        eco_monthly: "<:eco_monthly1:1562488084405297238>",
+        eco_monthly1: "<:eco_monthly1:1562488084405297238>",
+        eco_pay: "<:eco_pay:1562488107322970133>",
+        eco_deposit: "<:eco_deposit:1562488104768638986>",
+        eco_withdraw: "<:eco_withdraw:1562488102256246894>",
+
+        // High-Fidelity Minigames Suite
+        game_revolver: "<:game_revolver:1562488098753871902>",
+        game_bang: "<:game_bang:1562488096317243392>",
+        game_letter: "<:game_letter:1562488093724905492>",
+        game_chamber: "<:game_chamber:1562488091560779927>",
+        game_timer: "<:game_timer:1562488089383800892>",
+        game_trophy: "<:game_trophy:1562488086968143902>",
+
 		page: {
 			last: "<:next:1494693118405120090>",
 			first: "<:previous:1494693121336934450>",

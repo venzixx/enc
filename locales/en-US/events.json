@@ -13,7 +13,7 @@
 		"no_dj_role": "DJ role is not set.",
 		"no_dj_permission": "You need to have the DJ role to use this command.",
 		"cooldown": "Please wait {time} more second(s) before reusing the `{command}` command.",
-		"error": "An error occurred: `{error}`",
+		"error": "This error has been **automatically reported** to the developer and will be fixed in a few hours.\n\n• **Error:** `{error}`\n• **Support:** If you need assistance, contact <@865906211948724226> (`@lrvenyx`) on Discord.",
 		"vote_button": "Vote for me!",
 		"vote_message": "Wait! You need to vote on top.gg to use this command. Thanks."
 	},
@@ -35,7 +35,7 @@
 		"syntax_footer": "Syntax: [] = optional, <> = required",
 		"cooldown": "Please wait {time} more second(s) before reusing the `{command}` command.",
 		"no_mention_everyone": "You can't use this command with everyone or here. Please use slash command.",
-		"error": "An error occurred: `{error}`",
+		"error": "This error has been **automatically reported** to the developer and will be fixed in a few hours.\n\n• **Error:** `{error}`\n• **Support:** If you need assistance, contact <@865906211948724226> (`@lrvenyx`) on Discord.",
 		"no_voice_channel_queue": "You are not connected to a voice channel to queue songs.",
 		"no_permission_connect_speak": "I don't have enough permission to connect/speak in <#{channel}>.",
 		"different_voice_channel_queue": "You are not connected to <#{channel}> to queue songs.",

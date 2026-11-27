@@ -38,6 +38,23 @@ export default class InteractionCreate extends Event {
 			interaction.type === InteractionType.ApplicationCommand &&
 			(interaction.isChatInputCommand() || interaction.isMessageContextMenuCommand())
 		) {
+			const { commandName } = interaction;
+			const command = this.client.commands.get(commandName);
+			if (!command) return;
+
+			const ctx = new Context(this.client, interaction);
+			ctx.prefix = '/';
+
+			if (commandName === 'roll') {
+				try {
+					await interaction.deferReply();
+				} catch (error: any) {
+					if (error?.code !== 10062 && error?.code !== 40060) throw error;
+					logger.warn(`Could not acknowledge /roll (Discord error ${error.code}).`);
+					return;
+				}
+			}
+
 			let locale = "en-US";
 			let setup = null;
 
@@ -49,50 +66,45 @@ export default class InteractionCreate extends Event {
 			}
 
 			const allowedCategories = ["filters", "music", "playlist"];
-			const commandInSetup = this.client.commands.get(interaction.commandName);
+			ctx.lng = locale || "en-US";
 
 			if (
 				interaction.guildId &&
 				setup &&
 				interaction.channelId === setup.textId &&
-				!(commandInSetup && allowedCategories.includes(commandInSetup.category))
+				!allowedCategories.includes(command.category)
 			) {
-				return await interaction.reply({
-					content: t(I18N.events.interaction.setup_channel, { lng: locale }),
-					flags: MessageFlags.Ephemeral,
+				return await ctx.replyV2({
+					description: t(I18N.events.interaction.setup_channel, { lng: locale }),
+					borderless: true,
+					ephemeral: !interaction.deferred,
 				});
 			}
 
-			const { commandName } = interaction;
-			const command = this.client.commands.get(commandName);
-			if (!command) return;
-
 			// Maintenance Check
-			const isBotDev = await isDev(this.client, interaction.user.id);
+			const isBotDev = (this.client.maintenance.enabled || command.permissions?.dev)
+				&& await isDev(this.client, interaction.user.id);
 			if (this.client.maintenance.enabled && !isBotDev) {
 				const botName = this.client.user?.username || "This bot";
 				const etaText = this.client.maintenance.eta ? ` until **${this.client.maintenance.eta}**` : "";
-				return await interaction.reply({
-					...V2Helper.createLayout({
+				return await ctx.replyV2({
 						title: `${this.client.emoji.edit || '🛠️'} Under Maintenance`,
 						description: `**${botName}** is currently under maintenance${etaText}. Please try again later.`,
 						borderless: true,
 						color: null,
 						timestamp: true,
-						ephemeral: true
-					}) as any
+						ephemeral: !interaction.deferred
 				});
 			}
 
-			const ctx = new Context(this.client, interaction);
-			ctx.lng = locale || "en-US";
-			ctx.prefix = '/';
-			
 			const clientMember = interaction.guild ? interaction.guild.members.resolve(this.client.user!) : null;
 			
 			if (interaction.guild) {
-				const permissions = (ctx.channel as any).permissionsFor ? (ctx.channel as any).permissionsFor(ctx.client.user!) : null;
-				if (permissions && !permissions.has(['SendMessages', 'ViewChannel', 'EmbedLinks'])) return;
+				const permissions = (ctx.channel as any)?.permissionsFor?.(ctx.client.user!);
+				if (permissions && !permissions.has(['SendMessages', 'ViewChannel', 'EmbedLinks'])) {
+					if (interaction.deferred) await interaction.deleteReply().catch(() => {});
+					return;
+				}
 			}
 
 			if (interaction.inGuild() && clientMember) {
@@ -104,6 +116,7 @@ export default class InteractionCreate extends Event {
 						clientMember.permissions.has(PermissionFlagsBits.ReadMessageHistory)
 					)
 				) {
+					if (interaction.deferred) await interaction.deleteReply().catch(() => {});
 					return await (interaction.member as GuildMember)
 						.send({
 							content: t(I18N.events.interaction.no_send_message, { lng: locale }),
@@ -151,7 +164,16 @@ export default class InteractionCreate extends Event {
 				}
 
 				if (command.permissions?.dev) {
-					if (!isBotDev) return;
+					if (!isBotDev) {
+						return await ctx.replyV2({
+							title: `${this.client.emoji.cross} Developer Restricted`,
+							description: 'This command is strictly restricted to bot developers.',
+							borderless: true,
+							color: null,
+							isAlert: true,
+							ephemeral: true
+						});
+					}
 				}
 			}
 
@@ -328,14 +350,16 @@ export default class InteractionCreate extends Event {
 				}).catch(() => {});
 
 				try {
+					const userErr = ErrorReporter.getUserErrorMessage(error);
 					await ctx.replyV2({
-						title: `${this.client.emoji.cross} Command Error`,
-						description: t(I18N.events.interaction.error, { lng: locale, error }),
+						title: `${this.client.emoji.cross} ${userErr.title}`,
+						description: userErr.description,
 						isAlert: true,
 						color: this.client.color.red,
+						ephemeral: true
 					});
 				} catch {
-					// Interaction already expired or was acknowledged  ignore
+					// Interaction already expired or was acknowledged - ignore
 				}
 			}
 
@@ -343,8 +367,29 @@ export default class InteractionCreate extends Event {
 			interaction.isButton() ||
 			interaction.isAnySelectMenu() ||
 			interaction.isModalSubmit()
-
 		) {
+            if ('update' in interaction && typeof (interaction as any).update === 'function') {
+                const origUpdate = (interaction as any).update.bind(interaction);
+                (interaction as any).update = async (options: any) => {
+                    if (options && typeof options === 'object') {
+                        const hasV2Component = Array.isArray(options.components) && options.components.some((c: any) => c.type === 17 || c.type === 9 || c.type === 10 || c.type === 12);
+                        if (hasV2Component) {
+                            delete options.content;
+                            delete options.embeds;
+                        }
+                        if (options.flags) {
+                            if (Array.isArray(options.flags)) {
+                                options.flags = options.flags.filter((f: any) => f !== MessageFlags.IsComponentsV2 && f !== 32768);
+                                if (options.flags.length === 0) delete options.flags;
+                            } else if (options.flags === MessageFlags.IsComponentsV2 || options.flags === 32768) {
+                                delete options.flags;
+                            }
+                        }
+                    }
+                    return origUpdate(options);
+                };
+            }
+
 			const customId = (interaction as any).customId;
             logger.info(`[DEBUG] Received component interaction: ${customId} from ${interaction.user.tag}`);
 
@@ -363,8 +408,8 @@ export default class InteractionCreate extends Event {
 				}
 			}
 
-			// Persistent Component Router (Social actions, Marriage, Divorce, Adoption, etc.)
-			if (interaction.isButton()) {
+			// Persistent Component Router (Social actions, Marriage, Whitelists, etc.)
+			if (interaction.isButton() || interaction.isAnySelectMenu()) {
 				const { PersistentComponentRouter } = await import('../../utils/PersistentComponentRouter');
 				const handled = await PersistentComponentRouter.handle(this.client, interaction as any);
 				if (handled) return;
@@ -396,9 +441,43 @@ export default class InteractionCreate extends Event {
 						channel: interaction.channel,
 						error: error
 					}).catch(() => {});
+
+					try {
+						const ctx = new Context(this.client, interaction as any);
+						const userErr = ErrorReporter.getUserErrorMessage(error);
+						await ctx.replyV2({
+							title: `${this.client.emoji.cross} ${userErr.title}`,
+							description: userErr.description,
+							isAlert: true,
+							color: this.client.color.red,
+							ephemeral: true
+						});
+					} catch {}
 				}
 			} else if (interaction.guildId) {
 				try {
+					if (interaction.isAnySelectMenu()) {
+						const values = (interaction as any).values || [];
+						let matched = false;
+						for (const val of values) {
+							const optAction = await (this.client.prisma as any).componentAction.findUnique({
+								where: {
+									guildId_customId: {
+										guildId: interaction.guildId,
+										customId: `${customId}:${val}`
+									}
+								}
+							});
+							if (optAction) {
+								const logic = JSON.parse(optAction.logic);
+								const { ActionFlowExecutor } = await import('../../utils/ActionFlowExecutor');
+								await ActionFlowExecutor.execute(this.client, interaction as any, logic);
+								matched = true;
+							}
+						}
+						if (matched) return;
+					}
+
 					const dbAction = await (this.client.prisma as any).componentAction.findUnique({
 						where: { 
 							guildId_customId: { 
@@ -421,21 +500,29 @@ export default class InteractionCreate extends Event {
 				// Unhandled component interaction — log for debug
 				logger.info(`[COMPONENT] Unhandled component interaction: ${customId}`);
 
-				// Global fallback acknowledgment to prevent "Application did not respond"
-				if (!interaction.replied && !interaction.deferred) {
-					await (interaction as any).reply({
-						content: `${this.client.emoji.clock || '⏳'} This interactive prompt has expired. Please re-run the command to interact again.`,
-						flags: MessageFlags.Ephemeral
-					}).catch(() => {});
-				}
+				// Deferred fallback acknowledgment for expired interactions (waits 2500ms so active collectors can handle it first)
+				setTimeout(async () => {
+					try {
+						if (!interaction.replied && !interaction.deferred) {
+							await (interaction as any).reply({
+								content: `${this.client.emoji.clock || '⏳'} This interactive prompt has expired. Please re-run the command to interact again.`,
+								flags: MessageFlags.Ephemeral
+							}).catch(() => {});
+						}
+					} catch {}
+				}, 2500);
 			} else {
-				// DM fallback acknowledgment
-				if (!interaction.replied && !interaction.deferred) {
-					await (interaction as any).reply({
-						content: `${this.client.emoji.clock || '⏳'} This interaction prompt has expired.`,
-						flags: MessageFlags.Ephemeral
-					}).catch(() => {});
-				}
+				// DM / Group DM fallback acknowledgment (waits 2500ms so active collectors can handle it first)
+				setTimeout(async () => {
+					try {
+						if (!interaction.replied && !interaction.deferred) {
+							await (interaction as any).reply({
+								content: `${this.client.emoji.clock || '⏳'} This interaction prompt has expired. Please re-run the command to interact again.`,
+								flags: MessageFlags.Ephemeral
+							}).catch(() => {});
+						}
+					} catch {}
+				}, 2500);
 			}
 		} else if (interaction.type === InteractionType.ApplicationCommandAutocomplete) {
 			const command = this.client.commands.get(interaction.commandName);

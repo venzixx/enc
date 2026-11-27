@@ -162,9 +162,25 @@ export default class Purge extends Command {
             if (!confirmed) return;
         }
 
-        await ctx.deferReply(true);
-
         const channel = ctx.channel as TextChannel;
+
+        let keepMsgId: string | undefined;
+        if (ctx.isInteraction && (ctx.interaction?.deferred || ctx.interaction?.replied)) {
+            const progress = await ctx.replyV2({
+                title: '🧹 Purge in Progress...',
+                description: `Scanning and deleting up to **${targetDeleteCount}** messages in <#${channel.id}>...`,
+                borderless: true,
+                color: null
+            }).catch(() => null);
+            const fetched = await ctx.interaction.fetchReply().catch(() => null);
+            keepMsgId = fetched?.id || (progress as any)?.id;
+        } else if (ctx.isInteraction && ctx.interaction) {
+            await ctx.deferReply(true);
+            const fetched = await ctx.interaction.fetchReply().catch(() => null);
+            keepMsgId = fetched?.id;
+        } else if (ctx.message) {
+            keepMsgId = ctx.message.id;
+        }
         let toDelete: Message[] = [];
         let deletedMessages: any[] = [];
         let lastId: string | undefined;
@@ -198,6 +214,7 @@ export default class Purge extends Command {
                 scanned += messages.size;
 
                 const filtered = messages.filter(msg => {
+                    if (keepMsgId && msg.id === keepMsgId) return false;
                     if (msg.createdTimestamp < twoWeeksAgo) return false;
                     if (targetUser && msg.author.id !== targetUser.id) return false;
 
@@ -318,7 +335,7 @@ export default class Purge extends Command {
             borderless: true,
             color: null,
             allowedMentions
-        });
+        }).catch(() => null);
 
         setTimeout(() => {
             if (ctx.interaction) ctx.interaction.deleteReply().catch(() => null);

@@ -14,15 +14,24 @@ import type { Requester } from "../types";
 import { getButtons } from "./Buttons";
 import { V2Helper } from "./V2Helper";
 import { ButtonBuilder } from "discord.js";
+import { SpotifyResolver } from "./SpotifyResolver";
 
 /**
  * A function that will generate a V2 layout based on the player's current track.
  */
-function getV2SetupLayout(player: Player, client: ExtendedClient, locale: string, disabled: boolean = false) {
+function getV2SetupLayout(player: Player, client: ExtendedClient, locale: string, disabled: boolean = false, setupPrefix?: string | null) {
     const currentTrack = player?.queue?.current;
     if (!currentTrack) {
+        const playInstruction = setupPrefix
+            ? ("Join a voice channel and send `" + setupPrefix + "<song>` or a direct link here to start playing!\nPrefix: `" + setupPrefix + "`\n\n")
+            : "Join a voice channel and send any song title or link here to start playing!\n\n";
         const embed = new EmbedBuilder()
-            .setDescription(t(I18N.player.setupStart.nothing_playing, { lng: locale }))
+            .setAuthor({ name: "🎵 Song Requests", iconURL: client.user?.displayAvatarURL() })
+            .setDescription(
+                "### No song currently playing\n" +
+                playInstruction +
+                "-# You can also control the music using the buttons below."
+            )
             .setColor(client.config.color.main as ColorResolvable);
 
         const buttonRows = getButtons(player).map(row => {
@@ -97,12 +106,63 @@ async function setupStart(
 		try {
 			if (message.inGuild()) {
 				const isUrl = /^(https?:\/\/)/.test(query);
-				const res = await player.search(
-					isUrl ? { query } : { query, source: "scsearch" },
+				let res = (await player.search(
+					isUrl ? { query } : { query, source: "ytsearch" },
 					message.author
-				);
+				).catch(() => null)) as any;
 
-				switch (res.loadType) {
+				if ((!res || res.loadType === "empty" || res.loadType === "error") && isUrl && SpotifyResolver.isSpotifyUrl(query)) {
+					if (SpotifyResolver.isPlaylistOrAlbum(query)) {
+						const playlistData = await SpotifyResolver.resolvePlaylistOrAlbum(query);
+						if (playlistData && playlistData.tracks.length > 0) {
+							const firstRes = (await player.search({ query: playlistData.tracks[0].query, source: "ytsearch" }, message.author).catch(() => null)) as any;
+							if (firstRes && firstRes.tracks?.length > 0) {
+								await player.queue.add(firstRes.tracks[0]);
+								if (!player.playing) await player.play();
+								await m.edit(getV2SetupLayout(player, client, locale) as any).catch(() => {});
+							}
+
+							await message.channel
+								.send({ embeds: [new EmbedBuilder().setDescription(`${client.emoji.success} ${t(I18N.player.setupStart.added_playlist_to_queue, { lng: locale, length: playlistData.tracks.length })}: **${playlistData.name}**`).setColor(client.config.color.main as ColorResolvable)] })
+								.then((msg) => setTimeout(() => msg.delete(), 5000));
+
+							const remaining = playlistData.tracks.slice(1);
+							(async () => {
+								for (let i = 0; i < remaining.length; i += 5) {
+									const chunk = remaining.slice(i, i + 5);
+									const chunkResults = await Promise.all(
+										chunk.map(t => player.search({ query: t.query, source: "ytsearch" }, message.author).catch(() => null))
+									);
+									const tracksToAdd = chunkResults
+										.filter((r: any) => r && r.tracks?.length > 0)
+										.map((r: any) => r.tracks[0]);
+									if (tracksToAdd.length > 0) {
+										await player.queue.add(tracksToAdd);
+									}
+								}
+							})().catch(() => {});
+							return;
+						}
+					}
+
+					const resolved = await SpotifyResolver.resolveToSearchQuery(query);
+					if (resolved) {
+						res = (await player.search({ query: resolved, source: "ytsearch" }, message.author).catch(() => null)) as any;
+					}
+				}
+
+				if ((!res || res.loadType === "empty" || res.loadType === "error") && !isUrl) {
+					res = (await player.search({ query, source: "ytmsearch" }, message.author).catch(() => res)) || res;
+				}
+
+				if (!res) {
+					await message.channel
+						.send({ embeds: [new EmbedBuilder().setDescription(`${client.emoji.cross} ${t(I18N.player.setupStart.error_searching, { lng: locale })}`).setColor(client.config.color.red as ColorResolvable)] })
+						.then((msg) => setTimeout(() => msg.delete(), 5000));
+					return;
+				}
+
+                switch (res.loadType) {
 					case "empty":
 					case "error":
 						await message.channel
@@ -222,5 +282,5 @@ async function oops(channel: TextChannel, args: string): Promise<void> {
 		return console.error(e);
 	}
 }
-export { buttonReply, oops, setupStart, trackStart, updateSetup };
+export { buttonReply, oops, setupStart, trackStart, updateSetup, getV2SetupLayout };
 

@@ -9,6 +9,7 @@ import { ExtendedClient } from '../../client';
 import { Resolver } from '../../utils/Resolver';
 import { Appeals } from '../../utils/Appeals';
 import { CaseManager } from '../../utils/CaseManager';
+import { AuditLogger } from '../../utils/AuditLogger';
 import { ModConfirmation } from '../../utils/ModConfirmation';
 
 export default class Ban extends Command {
@@ -204,14 +205,15 @@ export default class Ban extends Command {
                 await Appeals.sendAppealDM(client, targetUser, ctx.guild!, 'BAN', reason).catch(() => {});
             }
 
+            const auditReason = AuditLogger.banReason(ctx.author.id, reason);
             if (targetMember) {
                 await targetMember.ban({ 
-                    reason: `${isSoftban ? 'Softbanned' : 'Banned'} by ${ctx.author.tag}: ${reason}`,
+                    reason: auditReason,
                     deleteMessageSeconds: days * 86400
                 });
             } else {
                 await ctx.guild.bans.create(targetUser.id, {
-                    reason: `ID Banned by ${ctx.author.tag}: ${reason}`,
+                    reason: auditReason,
                     deleteMessageSeconds: days * 86400
                 });
             }

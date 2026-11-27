@@ -25,7 +25,7 @@ export class LavalinkClient extends LavalinkManager {
 				clientData: {
 					name: client.user?.username || "Enc",
 				},
-				defaultSearchPlatform: "scsearch",
+				defaultSearchPlatform: "ytsearch",
 			} as any,
 		} as any);
 		this.client = client;
@@ -59,7 +59,7 @@ export class LavalinkClient extends LavalinkManager {
                 
                 // If it's a search term and YouTube returns nothing, try SoundCloud
                 if ((!res || res.tracks.length === 0) && typeof query === "string" && !/^(https?:\/\/)/.test(query)) {
-                    const fallbackQuery = { query, source: "scsearch" };
+                    const fallbackQuery = { query, source: "ytmsearch" };
                     const scRes = await node.search(fallbackQuery as any, user);
                     if (scRes && scRes.tracks.length > 0) return scRes;
                 }
@@ -70,7 +70,7 @@ export class LavalinkClient extends LavalinkManager {
                 // If YouTube is restricted/403, try SoundCloud as fallback immediately for search terms
                 if ((error.message?.includes("403") || error.message?.includes("Forbidden")) && typeof query === "string" && !/^(https?:\/\/)/.test(query)) {
                     try {
-                        const scRes = await node.search({ query, source: "scsearch" } as any, user);
+                        const scRes = await node.search({ query, source: "ytmsearch" } as any, user);
                         if (scRes && scRes.tracks.length > 0) return scRes;
                     } catch { /* ignore fallback errors */ }
                 }

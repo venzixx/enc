@@ -284,7 +284,8 @@ export class TicketTranscript {
 </html>`;
 
         const buffer = Buffer.from(html, 'utf-8');
-        return new AttachmentBuilder(buffer, { name: `transcript-${channel.name}.html` });
+        const safeName = channel.name.replace(/[^a-zA-Z0-9_-]/g, '_') || 'ticket';
+        return new AttachmentBuilder(buffer, { name: `transcript-${safeName}.html` });
     }
 
     private static async fetchAllMessages(channel: TextChannel, limit = 500): Promise<Message[]> {

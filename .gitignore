@@ -21,6 +21,7 @@ scratch*
 .agents/
 .gemini/
 rainbowRoles.json
+timers.json*
 nginx_*.conf
 remote_env*
 dashboard.env*
@@ -82,7 +83,7 @@ errors.txt
 *.tmp
 *.restore
 files_to_compress.txt
-app/
+/app/
 test_latin.cjs
 
 # --- Fonts Cache & Clones ---

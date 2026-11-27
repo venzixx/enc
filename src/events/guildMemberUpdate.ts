@@ -4,6 +4,7 @@ import { LavamusicEventType } from '../types/events';
 import { ExtendedClient } from '../client';
 import { AuditLogger, AuditLogType, AuditLogStatus } from '../utils/AuditLogger';
 import { RoleRuleEvaluator } from '../utils/RoleRuleEvaluator';
+import { AntiNukeTracker } from '../utils/AntiNukeTracker';
 
 export default class GuildMemberUpdate extends Event {
     constructor(client: ExtendedClient, file: string) {
@@ -40,6 +41,10 @@ export default class GuildMemberUpdate extends Event {
                 details: details.trim(),
                 color: client.color.main
             });
+
+            if (executor && executor.id !== client.user?.id) {
+                await AntiNukeTracker.checkAction(client, newMember.guild, executor.id, 'member', 'Member Role Modification');
+            }
         }
 
         // 2. Nickname Change Logging
@@ -58,22 +63,19 @@ export default class GuildMemberUpdate extends Event {
                 details: `Old: ${oldMember.nickname || '[Default Name]'}\nNew: ${newMember.nickname || '[Default Name]'}`,
                 color: client.color.main
             });
+
+            if (executor && executor.id !== client.user?.id) {
+                await AntiNukeTracker.checkAction(client, newMember.guild, executor.id, 'member', 'Member Nickname Modification');
+            }
         }
 
-        // 3. Detect New Boost
+        // 3. Detect New Boost (Member premiumSince transition)
         if (!oldMember.premiumSince && newMember.premiumSince) {
-            const guild = newMember.guild;
-            const channel = guild.systemChannel;
-            if (channel) {
-                const embed = new EmbedBuilder()
-                    .setTitle(' New Server Boost!')
-                    .setDescription(`Wow! ${newMember.user} just boosted the server! Thank you so much for the support! `)
-                    .setThumbnail(newMember.user.displayAvatarURL())
-                    .setColor(0xFF73FA) // Pinkish boost color
-                    .setFooter({ text: `Total Boosts: ${guild.premiumSubscriptionCount || 0}` })
-                    .setTimestamp();
-                
-                await channel.send({ content: `${newMember.user}`, embeds: [embed] });
+            try {
+                const { BoosterNotification } = await import('../utils/BoosterNotification');
+                await BoosterNotification.dispatchBoost(client, newMember, newMember.guild);
+            } catch (boostErr) {
+                console.error('[BOOST_DISPATCH_ERROR]', boostErr);
             }
         }
 

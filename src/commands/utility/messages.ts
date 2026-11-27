@@ -1,7 +1,8 @@
 import { 
     EmbedBuilder, 
     ApplicationCommandOptionType,
-    AttachmentBuilder
+    AttachmentBuilder,
+    MessageFlags
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
@@ -177,30 +178,30 @@ export default class Messages extends Command {
 				return await ctx.reply({ embeds: [embed] });
 			}
 
-			const canvas = createCanvas(900, 300);
+			const canvas = createCanvas(1050, 350);
 			const ctx2d = canvas.getContext('2d');
 
 			// Dark obsidian gradient background
-			const bgGrad = ctx2d.createRadialGradient(450, 150, 50, 450, 150, 600);
+			const bgGrad = ctx2d.createRadialGradient(525, 175, 50, 525, 175, 700);
 			bgGrad.addColorStop(0, '#161026'); // Deep dark violet
 			bgGrad.addColorStop(1, '#09070f'); // Near black
 			ctx2d.fillStyle = bgGrad;
-			ctx2d.fillRect(0, 0, 900, 300);
+			ctx2d.fillRect(0, 0, 1050, 350);
 
 			// Subtle diagonal grid stripes
 			ctx2d.strokeStyle = 'rgba(255, 255, 255, 0.015)';
 			ctx2d.lineWidth = 1;
-			for (let i = -100; i < 900 + 300; i += 40) {
+			for (let i = -100; i < 1050 + 350; i += 40) {
 				ctx2d.beginPath();
 				ctx2d.moveTo(i, 0);
-				ctx2d.lineTo(i - 300, 300);
+				ctx2d.lineTo(i - 350, 350);
 				ctx2d.stroke();
 			}
 
 			// Draw card glass container
 			ctx2d.fillStyle = 'rgba(255, 255, 255, 0.02)';
 			ctx2d.beginPath();
-			ctx2d.roundRect(30, 30, 840, 240, 24);
+			ctx2d.roundRect(30, 30, 990, 290, 24);
 			ctx2d.fill();
 			ctx2d.strokeStyle = 'rgba(255, 255, 255, 0.06)';
 			ctx2d.lineWidth = 1;
@@ -211,8 +212,8 @@ export default class Messages extends Command {
 			const avatarBuffer = await fetchAvatarBuffer(memberAvatarUrl);
 
 			const avSize = 140;
-			const avX = 60;
-			const avY = 80;
+			const avX = 65;
+			const avY = 85;
 			const cx = avX + avSize / 2;
 			const cy = avY + avSize / 2;
 
@@ -249,46 +250,47 @@ export default class Messages extends Command {
 			ctx2d.stroke();
 
 			// Username Text
+			const textStartX = 240;
 			ctx2d.fillStyle = '#ffffff';
 			ctx2d.font = `bold 36px "${fontName}", sans-serif`;
 			ctx2d.textAlign = 'left';
 			ctx2d.textBaseline = 'top';
 			let nameText = displayName;
-			if (nameText.length > 18) {
-				nameText = nameText.substring(0, 16) + '...';
+			if (nameText.length > 22) {
+				nameText = nameText.substring(0, 20) + '...';
 			}
-			ctx2d.fillText(nameText, 230, 65);
+			ctx2d.fillText(nameText, textStartX, 70);
 
 			// Subtext: User ID
 			ctx2d.fillStyle = 'rgba(255, 255, 255, 0.4)';
 			ctx2d.font = `500 14px "${fontName}", sans-serif`;
-			ctx2d.fillText(`ID: ${target.id}`, 230, 110);
+			ctx2d.fillText(`ID: ${target.id}`, textStartX, 115);
 
 			// Premium Badge in top-right
-			const badgeX = 740;
-			const badgeY = 65;
-			const badgeW = 100;
-			const badgeH = 22;
+			const badgeX = 870;
+			const badgeY = 70;
+			const badgeW = 110;
+			const badgeH = 24;
 			ctx2d.fillStyle = 'rgba(244, 114, 182, 0.08)';
 			ctx2d.beginPath();
-			ctx2d.roundRect(badgeX, badgeY, badgeW, badgeH, 11);
+			ctx2d.roundRect(badgeX, badgeY, badgeW, badgeH, 12);
 			ctx2d.fill();
 			ctx2d.strokeStyle = 'rgba(244, 114, 182, 0.25)';
 			ctx2d.lineWidth = 1;
 			ctx2d.stroke();
 
 			ctx2d.fillStyle = '#f472b6';
-			ctx2d.font = `bold 9px "${fontName}", sans-serif`;
+			ctx2d.font = `bold 10px "${fontName}", sans-serif`;
 			ctx2d.textAlign = 'center';
 			ctx2d.textBaseline = 'middle';
 			ctx2d.fillText('MESSAGES', badgeX + badgeW / 2, badgeY + badgeH / 2);
 
 			// Draw 3 Stats Cards
-			const cardWidth = 185;
-			const cardHeight = 95;
-			const cardY = 145;
-			const cardGap = 20;
-			const startX = 230;
+			const cardWidth = 220;
+			const cardHeight = 100;
+			const cardY = 155;
+			const cardGap = 22;
+			const startX = textStartX;
 
 			const stats = [
 				{ label: 'DAILY MESSAGES', value: dailyCount, color: '#38bdf8' },
@@ -311,7 +313,7 @@ export default class Messages extends Command {
 
 				ctx2d.fillStyle = stat.color;
 				ctx2d.beginPath();
-				ctx2d.roundRect(x + 15, cardY + cardHeight - 5, cardWidth - 30, 3, 1.5);
+				ctx2d.roundRect(x + 20, cardY + cardHeight - 6, cardWidth - 40, 3, 1.5);
 				ctx2d.fill();
 
 				ctx2d.fillStyle = '#94a3b8';
@@ -321,7 +323,7 @@ export default class Messages extends Command {
 				ctx2d.fillText(stat.label, x + cardWidth / 2, cardY + 22);
 
 				ctx2d.fillStyle = '#ffffff';
-				ctx2d.font = `bold 24px "${fontName}", sans-serif`;
+				ctx2d.font = `bold 28px "${fontName}", sans-serif`;
 				ctx2d.textAlign = 'center';
 				ctx2d.textBaseline = 'top';
 				ctx2d.fillText(stat.value.toLocaleString(), x + cardWidth / 2, cardY + 45);
@@ -330,13 +332,33 @@ export default class Messages extends Command {
 			const buffer = await canvas.toBuffer('image/png');
 			const attachment = new AttachmentBuilder(buffer, { name: 'messages.png' });
 
-			const embed = new EmbedBuilder()
-				.setTitle(`Message Statistics: ${displayName}`)
-				.setImage('attachment://messages.png')
-				.setColor(client.color.main)
-				.setTimestamp();
+			// V2 Components layout - full-width Media Gallery
+			const container: any = {
+				type: 17, // Container
+				components: [
+					{
+						type: 12, // Media Gallery
+						items: [
+							{
+								media: {
+									url: 'attachment://messages.png'
+								}
+							}
+						]
+					},
+					{
+						type: 10, // Text Display
+						content: `-# Message Statistics: ${displayName}`
+					}
+				]
+			};
 
-			return await ctx.reply({ embeds: [embed], files: [attachment] });
+			return await ctx.reply({
+				components: [container],
+				files: [attachment],
+				flags: [MessageFlags.IsComponentsV2],
+				allowedMentions: { parse: [], roles: [], users: [] }
+			} as any);
 		}
 	}
 }

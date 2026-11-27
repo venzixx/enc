@@ -128,6 +128,7 @@ export default class Nsfw extends Command {
                         { name: 'boobs', value: 'boobs' },
                         { name: 'lewd', value: 'lewd' },
                         { name: 'spank', value: 'spank' },
+                        { name: 'verify / consent', value: 'verify' },
                         { name: 'revoke / optout (DMs)', value: 'revoke' }
                     ]
                 },
@@ -198,9 +199,21 @@ export default class Nsfw extends Command {
             }
         }
 
-        // Check for consent revocation
+        // Check for consent revocation or explicit verification
         if (actionName === 'revoke' || actionName === 'optout') {
             return await NsfwGuard.revokeConsent(client, ctx);
+        }
+
+        if (actionName === 'verify' || actionName === 'consent') {
+            const isAuthorized = await NsfwGuard.ensureAuthorConsent(client, ctx);
+            if (isAuthorized) {
+                return await ctx.replyV2({
+                    title: '✅ 18+ Verification Confirmed',
+                    description: 'You are verified and authorized to use NSFW commands with ENC.',
+                    color: client.color.main
+                });
+            }
+            return;
         }
 
         const actionConfig = ACTIONS[actionName] || ACTIONS.fuck;

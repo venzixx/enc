@@ -103,13 +103,12 @@ export default class AskCommand extends Command {
 
 			// Split response if it's too long for a single embed description (4096 characters limit)
 			const formattedPrompt = prompt.length > 50 ? `${prompt.substring(0, 47)}...` : prompt;
-			const provider = process.env.GEMINI_API_KEY ? "Gemini AI" : "Mistral AI";
 			
 			return await ctx.replyV2({
 				title: `**Query: ${formattedPrompt}**`,
 				description: response.length > 4000 ? `${response.substring(0, 3997)}...` : response,
-				color: client.color.main,
-				footer: `Asked by ${ctx.author.username} \u2022 Powered by ${provider}`,
+				borderless: true,
+				footer: `Asked by ${ctx.author.username}`,
 			});
 		} catch (error: any) {
 			return await ctx.replyV2({

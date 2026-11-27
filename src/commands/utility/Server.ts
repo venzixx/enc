@@ -9,6 +9,7 @@ import {
 } from 'discord.js';
 import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
+import { handleBrandingCommand } from '../../utils/BrandingHelper';
 
 export default class Server extends Command {
 	constructor(client: ExtendedClient) {
@@ -16,9 +17,9 @@ export default class Server extends Command {
 			name: 'server',
 			aliases: ['srv', 'guild'],
 			description: {
-				content: 'Get the server icon or banner in high resolution (User-Installable).',
-				usage: 'server [icon|banner]',
-				examples: ['server icon', 'server banner', 'srv icon']
+				content: 'Get the server icon or banner, or update the bot\'s server branding (User-Installable).',
+				usage: 'server [icon|banner|bpfp|bbanner] [image|reset]',
+				examples: ['server icon', 'server banner', 'server bpfp <image>', 'server bbanner <image>', 'server bpfp reset']
 			},
 			category: 'utility',
 			cooldown: 2,
@@ -28,20 +29,43 @@ export default class Server extends Command {
 			options: [
 				{
 					name: 'type',
-					description: 'What do you want to see?',
+					description: 'What do you want to see or configure?',
 					type: 3, // STRING
-					required: true,
+					required: false,
 					choices: [
 						{ name: 'Server Icon', value: 'icon' },
-						{ name: 'Server Banner', value: 'banner' }
+						{ name: 'Server Banner', value: 'banner' },
+						{ name: 'Bot Server Avatar (bpfp)', value: 'bpfp' },
+						{ name: 'Bot Server Banner (bbanner)', value: 'bbanner' }
 					]
+				},
+				{
+					name: 'image',
+					description: 'Image file for bot server avatar or banner',
+					type: 11, // ATTACHMENT
+					required: false
+				},
+				{
+					name: 'url',
+					description: 'Image URL or "reset" for bot server avatar/banner',
+					type: 3, // STRING
+					required: false
 				}
 			]
 		});
 	}
 
 	public async run(client: ExtendedClient, ctx: Context, args: string[]): Promise<any> {
-		const type = (args[0] || ctx.options.getString('type') || 'icon').toLowerCase();
+		const type = (args[0] || ctx.options?.getString?.('type') || 'icon').toLowerCase();
+
+		if (type === 'bpfp' || type === 'botpfp' || type === 'bavatar' || type === 'botavatar') {
+			return await handleBrandingCommand(client, ctx, args.slice(1), 'avatar');
+		}
+
+		if (type === 'bbanner' || type === 'botbanner') {
+			return await handleBrandingCommand(client, ctx, args.slice(1), 'banner');
+		}
+
 		const guildId = ctx.guild?.id || ctx.interaction?.guildId;
 
 		if (!guildId) {
@@ -166,6 +190,6 @@ export default class Server extends Command {
 			return await ctx.sendMessage({ embeds: [embed], components: [row] });
 		}
 
-		return await ctx.replyV2({ description: 'Please use `,srv icon` or `,srv banner`.', isAlert: true });
+		return await ctx.replyV2({ description: 'Please use `,server icon`, `,server banner`, `,server bpfp <image>`, or `,server bbanner <image>`.', isAlert: true });
 	}
 }

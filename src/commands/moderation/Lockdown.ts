@@ -7,6 +7,7 @@ import { Command, Context } from '../../structures';
 import { ExtendedClient } from '../../client';
 import { isDev } from '../../utils/devCheck';
 import { ModConfirmation } from '../../utils/ModConfirmation';
+import { AuditLogger } from '../../utils/AuditLogger';
 
 const DANGEROUS_PERMISSIONS = [
     PermissionFlagsBits.Administrator,
@@ -318,7 +319,7 @@ export default class LockdownCommand extends Command {
                         ]
                     }).catch(() => {});
 
-                    await member.ban({ reason: `Lockdown Ban: Raid containment by ${ctx.author.tag}` });
+                    await member.ban({ reason: AuditLogger.banReason(ctx.author.id, 'Lockdown Ban: Raid containment') });
                     bannedCount++;
                 } catch {}
             }

@@ -2,6 +2,7 @@ import { Events, Message, AuditLogEvent } from 'discord.js';
 import { Event } from '../structures';
 import { LavamusicEventType } from '../types/events';
 import { AuditLogger, AuditLogType, AuditLogStatus } from '../utils/AuditLogger';
+import { Sniper } from '../utils/Sniper';
 import type { ExtendedClient } from '../client';
 
 export default class MessageUpdate extends Event {
@@ -15,6 +16,9 @@ export default class MessageUpdate extends Event {
     public async run(oldMessage: Message, newMessage: Message): Promise<void> {
         if (!newMessage.guild || newMessage.author?.bot) return;
         if (oldMessage.content === newMessage.content) return;
+
+        // Add to edit snipes
+        Sniper.addEdit(newMessage.channelId, oldMessage, newMessage);
 
         // Capture attachments
         const attachments = newMessage.attachments.map(att => att.url);

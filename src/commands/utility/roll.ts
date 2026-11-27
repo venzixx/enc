@@ -76,9 +76,10 @@ export default class Roll extends Command {
         const reasonHeader = reason ? ` *(${reason})*` : '';
         const content = `<@${ctx.author.id}> 🎲${reasonHeader}\n**Result:** ${result.breakdown}\n**Total:** ${result.total}${critTag}`;
 
-        return await ctx.sendMessage({
-            content,
-            allowedMentions: { users: [ctx.author.id] }
+        return await ctx.replyV2({
+            description: content,
+            borderless: true,
+            allowedMentions: { parse: [], users: [ctx.author.id] }
         });
     }
 }

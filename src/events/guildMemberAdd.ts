@@ -1,4 +1,4 @@
-import { Events, GuildMember, Collection, EmbedBuilder, AttachmentBuilder } from 'discord.js';
+import { Events, GuildMember, Collection, EmbedBuilder, AttachmentBuilder, AuditLogEvent } from 'discord.js';
 import * as path from 'path';
 import * as fs from 'fs';
 import { Event } from '../structures';
@@ -6,6 +6,7 @@ import { LavamusicEventType } from '../types/events';
 import { ExtendedClient } from '../client';
 import { AuditLogger, AuditLogType, AuditLogStatus } from '../utils/AuditLogger';
 import { PlaceholderManager } from '../utils/PlaceholderManager';
+import { AntiNukeTracker } from '../utils/AntiNukeTracker';
 
 export default class GuildMemberAdd extends Event {
     constructor(client: ExtendedClient, file: string) {
@@ -18,6 +19,26 @@ export default class GuildMemberAdd extends Event {
     public async run(member: GuildMember): Promise<void> {
         const guild = member.guild;
         
+        // --- Anti-Nuke Bot Addition Check ---
+        if (member.user.bot) {
+            try {
+                const auditLog = await guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.BotAdd }).then(logs => logs.entries.first()).catch(() => null);
+                const executor = auditLog?.executor;
+                if (executor && executor.id !== this.client.user?.id) {
+                    const canAdd = await AntiNukeTracker.canAddBots(this.client, guild, executor.id);
+                    const { blocked } = await AntiNukeTracker.checkAction(this.client, guild, executor.id, 'bot', 'Bot Addition');
+                    if (!canAdd || blocked) {
+                        if (member.kickable) {
+                            await member.kick('Enc Anti-Nuke: Unauthorized Bot Added').catch(() => {});
+                        }
+                        return;
+                    }
+                }
+            } catch (botCheckErr) {
+                console.error('[AntiNuke BotAdd Error]', botCheckErr);
+            }
+        }
+
         // Log to Audit Manifest
         await AuditLogger.log(this.client, guild, {
             type: AuditLogType.MEMBERS,
@@ -83,7 +104,8 @@ export default class GuildMemberAdd extends Event {
             await RoleRuleEvaluator.evaluateMember(this.client, member);
 
             // --- Join DM ---
-            if (guildData?.joinDmMessage) {
+            const isJoinDmEnabled = (guildData as any)?.joinDmEnabled ?? !!guildData?.joinDmMessage;
+            if (isJoinDmEnabled && guildData?.joinDmMessage) {
                 try {
                     const resolved = await PlaceholderManager.resolve(this.client, guildData.joinDmMessage, member, guild);
                     await member.send({
@@ -121,7 +143,8 @@ export default class GuildMemberAdd extends Event {
             }
 
             // --- Welcome Image / Message ---
-            if (guildData?.welcomeChannelId) {
+            const isWelcomeEnabled = (guildData as any)?.welcomeEnabled ?? !!guildData?.welcomeChannelId;
+            if (isWelcomeEnabled && guildData?.welcomeChannelId) {
                 const welcomeChannel = guild.channels.cache.get(guildData.welcomeChannelId) as any;
                 if (welcomeChannel && welcomeChannel.isTextBased()) {
                     const welcomeRaw = guildData.welcomeMessage || `Welcome to the server, {user}! You were invited by **{inviter}** using code \`${usedInvite?.code || 'Direct Join'}\`.`;
@@ -139,7 +162,7 @@ export default class GuildMemberAdd extends Event {
                             components: resolved.components,
                             allowedMentions: shouldPing ? { users: [member.id], parse: [], roles: [] } : { parse: [], users: [], roles: [] }
                         }).catch(() => {});
-                    } else {
+                    } else if (guildData?.welcomeCardEnabled !== false) {
                         // Standard Welcome: V2 Borderless Card with Anime Banner & Avatar Thumbnail
                         try {
                             const { V2Helper } = await import('../utils/V2Helper');
@@ -163,12 +186,13 @@ export default class GuildMemberAdd extends Event {
                             }
 
                             // Banner image resolution
-                            const isCustomBgUrl = guildData.welcomeCardBackground && guildData.welcomeCardBackground.startsWith('http');
+                            const rawWelcomeBg = guildData.welcomeCardBackground;
+                            const isCustomBgUrl = rawWelcomeBg && (rawWelcomeBg.startsWith('http') || rawWelcomeBg.startsWith('/'));
                             let bannerUrl: string | undefined = undefined;
                             const files: AttachmentBuilder[] = [];
 
                             if (isCustomBgUrl) {
-                                bannerUrl = guildData.welcomeCardBackground!;
+                                bannerUrl = rawWelcomeBg!.startsWith('http') ? rawWelcomeBg! : `https://bot.encl.asia${rawWelcomeBg}`;
                             } else {
                                 const defaultBannerPaths = [
                                     path.join(process.cwd(), 'src/assets/images/default_welcome.jpg'),
@@ -185,14 +209,22 @@ export default class GuildMemberAdd extends Event {
                                 }
                             }
 
+                            const defaultWelcomeFooter = `${guild.name} • Member #${guild.memberCount} (${ordinal})`;
+                            const welcomeFooterRaw = (guildData as any).welcomeCardFooter || defaultWelcomeFooter;
+                            const footerText = PlaceholderManager.simpleResolve(welcomeFooterRaw, member, guild) || defaultWelcomeFooter;
+
+                            const defaultWelcomeTitle = `👋 Welcome to ${guild.name}!`;
+                            const welcomeTitleRaw = guildData.welcomeCardTitle || defaultWelcomeTitle;
+                            const welcomeTitleText = PlaceholderManager.simpleResolve(welcomeTitleRaw, member, guild) || defaultWelcomeTitle;
+
                             const v2Layout = V2Helper.createLayout({
                                 borderless: true,
-                                color: null,
-                                title: `👋 Welcome to ${guild.name}!`,
+                                color: (guildData?.welcomeCardColor as any) || null,
+                                title: welcomeTitleText,
                                 description: description,
                                 thumbnail: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
                                 image: bannerUrl,
-                                footer: `Enc Welcome Protocol • Member #${guild.memberCount} (${ordinal})`,
+                                footer: footerText,
                                 timestamp: true,
                                 allowedMentions: { users: [member.id], parse: [], roles: [] }
                             });
@@ -210,6 +242,13 @@ export default class GuildMemberAdd extends Event {
                                 allowedMentions: { users: [member.id], parse: [], roles: [] }
                             }).catch(() => {});
                         }
+                    } else {
+                        // Plain text mode
+                        const pingHeader = shouldPing ? `<@${member.id}>` : '';
+                        await welcomeChannel.send({
+                            content: `${pingHeader} ${resolved.content || welcomeRaw}`.trim(),
+                            allowedMentions: shouldPing ? { users: [member.id], parse: [], roles: [] } : { parse: [], users: [], roles: [] }
+                        }).catch(() => {});
                     }
                 }
             }

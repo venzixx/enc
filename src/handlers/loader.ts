@@ -4,7 +4,7 @@ import path from 'path';
 import { Command, Event, Component } from '../structures';
 import { LavamusicEventType } from '../types/events';
 import logger from '../structures/Logger';
-import { Routes, ApplicationCommandType, PermissionsBitField } from 'discord.js';
+import { Routes, ApplicationCommandType, Events, PermissionsBitField, type APIApplicationCommand } from 'discord.js';
 import { env } from '../env';
 
 const runtimeExtension = path.extname(__filename) === '.ts' ? 'ts' : 'js';
@@ -111,12 +111,45 @@ export async function loadCommands(client: ExtendedClient) {
         try {
             logger.info(`Started refreshing ${slashCommands.length} application (/) commands.`);
             
-            // All commands (currently 99, well within the 100 Discord limit) are registered globally
+            const globalRoute = Routes.applicationCommands(env.CLIENT_ID);
+            const chatCommands = slashCommands.filter(command => command.type === ApplicationCommandType.ChatInput);
+            let globalCommands = slashCommands;
+            if (chatCommands.length > 100) {
+                const registered = await client.rest.get(globalRoute) as APIApplicationCommand[];
+                const existingNames = new Set(registered.filter(command => command.type === ApplicationCommandType.ChatInput).map(command => command.name));
+                const ordered = [...chatCommands].sort((a, b) => Number(existingNames.has(b.name)) - Number(existingNames.has(a.name)) || a.name.localeCompare(b.name));
+                globalCommands = [
+                    ...slashCommands.filter(command => command.type !== ApplicationCommandType.ChatInput),
+                    ...ordered.slice(0, 100)
+                ];
+                const overflow = ordered.slice(100);
+                const registerGuildCommands = async (guildId: string) => {
+                    try {
+                        const route = Routes.applicationGuildCommands(env.CLIENT_ID, guildId);
+                        const existing = await client.rest.get(route) as APIApplicationCommand[];
+                        const guildNames = new Set(existing.filter(command => command.type === ApplicationCommandType.ChatInput).map(command => command.name));
+                        const refresh = chatCommands.filter(command => guildNames.has(command.name));
+                        const additions = overflow.filter(command => !guildNames.has(command.name));
+                        const available = 100 - guildNames.size;
+                        for (const { integration_types, contexts, ...body } of [...refresh, ...additions.slice(0, available)]) {
+                            await client.rest.post(route, { body });
+                        }
+                        if (available < additions.length) logger.warn(`Guild ${guildId} lacks room for ${additions.length - available} overflow commands.`);
+                    } catch (error) {
+                        logger.error(`Failed to register overflow commands in guild ${guildId}:`, error);
+                    }
+                };
+                client.once(Events.ClientReady, async ready => {
+                    for (const guild of ready.guilds.cache.values()) await registerGuildCommands(guild.id);
+                });
+                client.on(Events.GuildCreate, guild => { void registerGuildCommands(guild.id); });
+            }
+
             await client.rest.put(
-                Routes.applicationCommands(env.CLIENT_ID),
-                { body: slashCommands }
+                globalRoute,
+                { body: globalCommands }
             );
-            logger.success(`Successfully registered ${slashCommands.length} global application (/) commands.`);
+            logger.success(`Successfully registered ${globalCommands.length} global application (/) commands.`);
 
         } catch (error) {
             logger.error('Error refreshing application (/) commands:', error);

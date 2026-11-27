@@ -156,4 +156,23 @@ export class ErrorReporter {
             }
         }
     }
+
+    /**
+     * Generates a user-facing notification message explaining that the error has been logged,
+     * will be fixed in a few hours, and directing them to contact @lrvenyx for support.
+     */
+    public static getUserErrorMessage(rawError?: any): { title: string; description: string } {
+        const errorText = typeof rawError?.message === 'string'
+            ? rawError.message.slice(0, 200)
+            : (typeof rawError === 'string' ? rawError.slice(0, 200) : 'Internal execution exception');
+
+        return {
+            title: 'Command Execution Error',
+            description:
+                `An unexpected error occurred while processing this action.\n\n` +
+                `• **Status:** This error has been **automatically reported** to the developer and will be investigated and fixed in a few hours.\n` +
+                `• **Error:** \`${errorText}\`\n` +
+                `• **Support:** If you need assistance, contact <@865906211948724226> (\`@lrvenyx\`) on Discord.`
+        };
+    }
 }

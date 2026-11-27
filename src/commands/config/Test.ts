@@ -5,16 +5,17 @@ import { ExtendedClient } from "../../client";
 import { Command, Context } from "../../structures";
 import { PlaceholderManager } from "../../utils/PlaceholderManager";
 import { RankCardGenerator } from "../../utils/RankCardGenerator";
+import { BumpReminder } from "../../utils/BumpReminder";
 
 export default class Test extends Command {
     constructor(client: ExtendedClient) {
         super(client, {
             name: 'test',
-            aliases: ['preview', 'testwelcome', 'testwelcomer', 'welcomertest'],
+            aliases: ['preview', 'testwelcome', 'testwelcomer', 'welcomertest', 'testboost', 'testbooster', 'boosttest'],
             description: {
                 content: 'Test and preview your configurations.',
                 usage: 'test <module> [options]',
-                examples: ['test welcome', 'test greeter', 'test levelup', 'test streak']
+                examples: ['test welcome', 'test booster', 'test greeter', 'test levelup', 'test streak']
             },
             category: 'config',
             cooldown: 10,
@@ -24,6 +25,7 @@ export default class Test extends Command {
                 client: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles]
             },
             options: [
+                { name: 'bump', description: 'Preview the bump reminder without pinging anyone', type: 1 },
                 {
                     name: 'welcome',
                     description: 'Preview the modern welcome card and greeting',
@@ -49,11 +51,25 @@ export default class Test extends Command {
                             required: false,
                             choices: [
                                 { name: 'Welcome Card & Message', value: 'welcome' },
+                                { name: 'Booster Card & Message', value: 'booster' },
                                 { name: 'Greeter Message', value: 'greeter' },
                                 { name: 'Leave Message', value: 'leave' },
                                 { name: 'Join DM', value: 'joindm' },
                                 { name: 'All', value: 'all' },
                             ]
+                        }
+                    ]
+                },
+                {
+                    name: 'booster',
+                    description: 'Preview the configured server booster card and message',
+                    type: 1, // SUB_COMMAND
+                    options: [
+                        {
+                            name: 'user',
+                            description: 'Simulated booster member for the preview',
+                            type: 6, // USER
+                            required: false
                         }
                     ]
                 },
@@ -104,15 +120,23 @@ export default class Test extends Command {
         const cmdName = (interactionCmdName || msgCmdName)?.toLowerCase();
         if (cmdName === 'testwelcome' || cmdName === 'testwelcomer' || cmdName === 'welcomertest') {
             subCommand = 'welcome';
+        } else if (cmdName === 'testboost' || cmdName === 'testbooster' || cmdName === 'boosttest') {
+            subCommand = 'booster';
         }
 
         if (subCommand === 'welcomer') subCommand = 'welcome';
+        if (subCommand === 'boost') subCommand = 'booster';
         if (subCommand === 'level') subCommand = 'levelup';
 
-        if (!['welcome', 'greeter', 'levelup', 'streak'].includes(subCommand)) {
+        if (subCommand === 'bump' && ctx.guild) {
+            const settings = await client.prisma.bumpReminder.findUnique({ where: { guildId: ctx.guild.id } });
+            return ctx.replyV2({ ...BumpReminder.layout(settings, true), ephemeral: ctx.isInteraction });
+        }
+
+        if (!['welcome', 'booster', 'greeter', 'levelup', 'streak'].includes(subCommand)) {
             return ctx.replyV2({
                 title: `${client.emoji.cross} Error`,
-                description: 'Please specify a valid module to test: `welcome`, `greeter`, `levelup`, or `streak`.\n\n*Example:* `,test welcome`',
+                description: 'Please specify a valid module to test: `welcome`, `booster`, `greeter`, `levelup`, `streak`, or `bump`.\n\n*Example:* `,test booster`',
                 isAlert: true,
                 color: client.color.red
             });
@@ -167,12 +191,13 @@ export default class Test extends Command {
                 }
 
                 // Banner image resolution
-                const isCustomBgUrl = guildData.welcomeCardBackground && guildData.welcomeCardBackground.startsWith('http');
+                const rawWelcomeBg = guildData.welcomeCardBackground;
+                const isCustomBgUrl = rawWelcomeBg && (rawWelcomeBg.startsWith('http') || rawWelcomeBg.startsWith('/'));
                 let bannerUrl: string | undefined = undefined;
                 const files: AttachmentBuilder[] = [];
 
                 if (isCustomBgUrl) {
-                    bannerUrl = guildData.welcomeCardBackground!;
+                    bannerUrl = rawWelcomeBg!.startsWith('http') ? rawWelcomeBg! : `https://bot.encl.asia${rawWelcomeBg}`;
                 } else {
                     const defaultBannerPaths = [
                         path.join(process.cwd(), 'src/assets/images/default_welcome.jpg'),
@@ -189,15 +214,23 @@ export default class Test extends Command {
                     }
                 }
 
+                const defaultWelcomeFooter = `${guild.name} • Member #${guild.memberCount} (${ordinal})`;
+                const welcomeFooterRaw = (guildData as any).welcomeCardFooter || defaultWelcomeFooter;
+                const welcomeFooterText = PlaceholderManager.simpleResolve(welcomeFooterRaw, targetMember, guild) || defaultWelcomeFooter;
+
+                const defaultWelcomeTitle = `👋 Welcome to ${guild.name}!`;
+                const welcomeTitleRaw = (guildData as any).welcomeCardTitle || defaultWelcomeTitle;
+                const welcomeTitleText = PlaceholderManager.simpleResolve(welcomeTitleRaw, targetMember, guild) || defaultWelcomeTitle;
+
                 const { V2Helper } = await import('../../utils/V2Helper');
                 const v2Layout = V2Helper.createLayout({
                     borderless: true,
-                    color: null,
-                    title: `👋 Welcome Preview`,
+                    color: (guildData as any).welcomeCardColor || null,
+                    title: welcomeTitleText,
                     description: description,
                     thumbnail: targetMember.user.displayAvatarURL({ extension: 'png', size: 256 }),
                     image: bannerUrl,
-                    footer: `Enc Welcome Protocol • Member #${guild.memberCount} (${ordinal})`,
+                    footer: welcomeFooterText,
                     timestamp: true
                 });
 
@@ -211,6 +244,72 @@ export default class Test extends Command {
                 return ctx.replyV2({
                     title: `${client.emoji.cross} Render Error`,
                     description: `Failed to generate welcome preview: ${e.message}`,
+                    isAlert: true,
+                    color: client.color.red
+                });
+            }
+        }
+
+        if (subCommand === 'booster') {
+            const targetMember = (ctx.isInteraction ? ctx.options.getMember('user') : null) as GuildMember || ctx.member as GuildMember;
+            try {
+                const boosterRaw = (guildData as any).boosterMessage || `🎉 Huge shoutout to {booster} for boosting **{server}**! We are now at **{server.boost_count}** boosts (Tier {server.boost_tier})! 🚀`;
+                const resolved = await PlaceholderManager.resolve(client, boosterRaw, targetMember, guild);
+                const pingHeader = `<@${targetMember.id}>`;
+
+                if ((resolved.embeds && resolved.embeds.length > 0) || (resolved.components && resolved.components.length > 0)) {
+                    const finalContent = resolved.content ? resolved.content : pingHeader;
+                    return await ctx.sendMessage({
+                        content: finalContent,
+                        embeds: resolved.embeds,
+                        components: resolved.components,
+                        allowedMentions: { users: [targetMember.id], parse: [], roles: [] }
+                    });
+                }
+
+                let description: string;
+                if (resolved.content && resolved.content.trim()) {
+                    description = resolved.content;
+                } else {
+                    description = `Thank you so much ${targetMember.toString()} for boosting **${guild.name}**! 🚀\nWe have reached **${guild.premiumSubscriptionCount || 1}** boosts (Level ${guild.premiumTier}).\nYour support unlocks premium perks for everyone!`;
+                }
+
+                let bannerUrl: string | undefined = undefined;
+                const boosterBg = (guildData as any).boosterCardBackground;
+                if (boosterBg && (boosterBg.startsWith('http') || boosterBg.startsWith('/'))) {
+                    bannerUrl = boosterBg.startsWith('http') ? boosterBg : `https://bot.encl.asia${boosterBg}`;
+                }
+
+                const defaultBoosterFooter = `${guild.name} • Boost #${guild.premiumSubscriptionCount || 1} • Tier ${guild.premiumTier}`;
+                const boosterFooterRaw = (guildData as any).boosterCardFooter || defaultBoosterFooter;
+                const boosterFooterText = PlaceholderManager.simpleResolve(boosterFooterRaw, targetMember, guild) || defaultBoosterFooter;
+
+                const defaultBoosterTitle = `🚀 ${targetMember.user.username} Boosted the Server!`;
+                const boosterTitleRaw = (guildData as any).boosterCardTitle || defaultBoosterTitle;
+                const boosterTitleText = PlaceholderManager.simpleResolve(boosterTitleRaw, targetMember, guild) || defaultBoosterTitle;
+
+                const { V2Helper } = await import('../../utils/V2Helper');
+                const v2Layout = V2Helper.createLayout({
+                    borderless: true,
+                    color: (guildData as any).boosterCardColor || '#f47fff',
+                    title: boosterTitleText,
+                    description: description,
+                    thumbnail: targetMember.user.displayAvatarURL({ extension: 'png', size: 256 }),
+                    image: bannerUrl,
+                    footer: boosterFooterText,
+                    timestamp: true
+                });
+
+                return await ctx.sendMessage({
+                    content: pingHeader,
+                    components: v2Layout.components,
+                    flags: v2Layout.flags,
+                    allowedMentions: { users: [targetMember.id], parse: [], roles: [] }
+                });
+            } catch (e: any) {
+                return ctx.replyV2({
+                    title: `${client.emoji.cross} Render Error`,
+                    description: `Failed to generate booster preview: ${e.message}`,
                     isAlert: true,
                     color: client.color.red
                 });
@@ -295,15 +394,19 @@ export default class Test extends Command {
                             description = `Welcome ${member.toString()} to **${guild.name}**! 🎉\nYou are our **${ordinal}** member (\`#${guild.memberCount}\`).\nWe're thrilled to have you here!`;
                         }
 
+                        const defaultWelcomeFooter = `${guild.name} • Member #${guild.memberCount} (${ordinal})`;
+                        const welcomeFooterRaw = (guildData as any).welcomeCardFooter || defaultWelcomeFooter;
+                        const welcomeFooterText = PlaceholderManager.simpleResolve(welcomeFooterRaw, member, guild) || defaultWelcomeFooter;
+
                         const { V2Helper } = await import('../../utils/V2Helper');
                         const v2Layout = V2Helper.createLayout({
                             borderless: true,
-                            color: null,
-                            title: `👋 Welcome Preview`,
+                            color: (guildData as any).welcomeCardColor || null,
+                            title: (guildData as any).welcomeCardTitle || `👋 Welcome Preview`,
                             description: description,
                             thumbnail: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
                             image: bannerUrl,
-                            footer: `Enc Welcome Protocol • Member #${guild.memberCount} (${ordinal})`,
+                            footer: welcomeFooterText,
                             timestamp: true
                         });
 
@@ -320,6 +423,55 @@ export default class Test extends Command {
                     results.push('✅ Welcome previewed');
                 } catch (e: any) {
                     results.push(`❌ Welcome error: ${e.message}`);
+                }
+            }
+
+            // --- Booster Message Preview ---
+            if (type === 'booster' || type === 'all') {
+                try {
+                    const boosterRaw = (guildData as any).boosterMessage || `🎉 Huge shoutout to {booster} for boosting **{server}**! We are now at **{server.boost_count}** boosts (Tier {server.boost_tier})! 🚀`;
+                    const resolved = await PlaceholderManager.resolve(client, boosterRaw, member, guild);
+                    const pingHeader = `<@${member.id}>`;
+
+                    let bannerUrl: string | undefined = undefined;
+                    if ((guildData as any).boosterCardBackground && (guildData as any).boosterCardBackground.startsWith('http')) {
+                        bannerUrl = (guildData as any).boosterCardBackground;
+                    }
+
+                    let description: string;
+                    if (resolved.content && resolved.content.trim()) {
+                        description = resolved.content;
+                    } else {
+                        description = `Thank you so much ${member.toString()} for boosting **${guild.name}**! 🚀\nWe have reached **${guild.premiumSubscriptionCount || 1}** boosts (Level ${guild.premiumTier}).\nYour support unlocks premium perks for everyone!`;
+                    }
+
+                    const defaultBoosterFooter = `${guild.name} • Boost #${guild.premiumSubscriptionCount || 1} • Tier ${guild.premiumTier}`;
+                    const boosterFooterRaw = (guildData as any).boosterCardFooter || defaultBoosterFooter;
+                    const boosterFooterText = PlaceholderManager.simpleResolve(boosterFooterRaw, member, guild) || defaultBoosterFooter;
+
+                    const { V2Helper } = await import('../../utils/V2Helper');
+                    const v2Layout = V2Helper.createLayout({
+                        borderless: true,
+                        color: (guildData as any).boosterCardColor || '#f47fff',
+                        title: (guildData as any).boosterCardTitle || `🚀 ${member.user.username} Boosted the Server!`,
+                        description: description,
+                        thumbnail: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
+                        image: bannerUrl,
+                        footer: boosterFooterText,
+                        timestamp: true
+                    });
+
+                    await ctx.channel.send({
+                        content: `📋 **Booster Preview:**`,
+                    });
+                    await ctx.channel.send({
+                        components: v2Layout.components,
+                        flags: v2Layout.flags,
+                        allowedMentions: { users: [member.id], parse: [], roles: [] }
+                    });
+                    results.push('✅ Booster previewed');
+                } catch (e: any) {
+                    results.push(`❌ Booster error: ${e.message}`);
                 }
             }
 

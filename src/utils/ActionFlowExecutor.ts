@@ -24,8 +24,11 @@ export class ActionFlowExecutor {
         interaction: ButtonInteraction | AnySelectMenuInteraction,
         actions: Action[]
     ): Promise<void> {
-        const member = interaction.member as GuildMember;
-        const guild = interaction.guild!;
+        const guild = interaction.guild || (interaction.guildId ? await client.guilds.fetch(interaction.guildId).catch(() => null) : null);
+        let member = interaction.member as GuildMember;
+        if ((!member || !member.roles?.add) && guild) {
+            member = await guild.members.fetch(interaction.user.id).catch(() => null) as any;
+        }
 
         // Defer if not already acknowledged
         if (!interaction.deferred && !interaction.replied) {
@@ -36,17 +39,25 @@ export class ActionFlowExecutor {
             try {
                 switch (action.type) {
                     case 'AddRole':
-                        if (action.roleId) await member.roles.add(action.roleId).catch(() => {});
+                        if (action.roleId && member?.roles?.add) {
+                            await member.roles.add(action.roleId).catch((e) => console.error('[ActionFlowExecutor] AddRole error:', e));
+                        }
                         break;
 
                     case 'RemoveRole':
-                        if (action.roleId) await member.roles.remove(action.roleId).catch(() => {});
+                        if (action.roleId && member?.roles?.remove) {
+                            await member.roles.remove(action.roleId).catch((e) => console.error('[ActionFlowExecutor] RemoveRole error:', e));
+                        }
                         break;
 
                     case 'ToggleRole':
-                        if (action.roleId) {
-                            if (member.roles.cache.has(action.roleId)) await member.roles.remove(action.roleId).catch(() => {});
-                            else await member.roles.add(action.roleId).catch(() => {});
+                        if (action.roleId && member?.roles?.cache) {
+                            const has = member.roles.cache.has(action.roleId);
+                            if (has) {
+                                await member.roles.remove(action.roleId).catch((e) => console.error('[ActionFlowExecutor] ToggleRole remove error:', e));
+                            } else {
+                                await member.roles.add(action.roleId).catch((e) => console.error('[ActionFlowExecutor] ToggleRole add error:', e));
+                            }
                         }
                         break;
 
@@ -58,7 +69,7 @@ export class ActionFlowExecutor {
                     case 'ShowEmbed':
                         const text = action.type === 'ShowEmbed' && action.embedId ? `{${action.embedId}}` : action.content;
                         if (text) {
-                            const resolved = await PlaceholderManager.resolve(client, text, member, guild);
+                            const resolved = await PlaceholderManager.resolve(client, text, member, guild as any);
                             await interaction.followUp({
                                 content: resolved.content || undefined,
                                 embeds: resolved.embeds,
