@@ -131,9 +131,23 @@ export async function loadCommands(client: ExtendedClient) {
                         const refresh = chatCommands.filter(command => guildNames.has(command.name));
                         const additions = overflow.filter(command => !guildNames.has(command.name));
                         const available = 100 - guildNames.size;
-                        for (const { integration_types, contexts, ...body } of [...refresh, ...additions.slice(0, available)]) {
-                            await client.rest.post(route, { body });
-                        }
+                        const updates = [...refresh, ...additions.slice(0, available)];
+                        const updatedNames = new Set(updates.map(command => command.name));
+                        const preserved = existing.filter(command =>
+                            command.type !== ApplicationCommandType.ChatInput || !updatedNames.has(command.name));
+                        const body = [
+                            ...preserved.map(({ id, name, type, name_localizations, default_member_permissions, ...command }) => ({
+                                id, name, type, name_localizations, default_member_permissions,
+                                ...(type === ApplicationCommandType.ChatInput && 'options' in command ? {
+                                    description: command.description, description_localizations: command.description_localizations,
+                                    options: command.options
+                                } : type === ApplicationCommandType.ChatInput && 'description' in command ? {
+                                    description: command.description, description_localizations: command.description_localizations
+                                } : {})
+                            })),
+                            ...updates.map(({ integration_types, contexts, ...command }) => command)
+                        ];
+                        await client.rest.put(route, { body });
                         if (available < additions.length) logger.warn(`Guild ${guildId} lacks room for ${additions.length - available} overflow commands.`);
                     } catch (error) {
                         logger.error(`Failed to register overflow commands in guild ${guildId}:`, error);
